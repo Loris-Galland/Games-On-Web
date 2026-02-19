@@ -10,13 +10,13 @@ export class Player {
         
         // Réglages
         this.camera.attachControl(this.canvas, true);
-        this.camera.speed = 0.5;
+        this.camera.speed = 3.5;
         this.camera.angularSensibility = 2000; 
         this.camera.inertia = 0; // Arrêt net
         this.camera.minZ = 0.1; 
 
         // Physique
-        this.camera.checkCollisions = true;
+        this.camera.checkCollisions = false;
         this.camera.applyGravity = true;
         this.camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
 

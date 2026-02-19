@@ -1,6 +1,7 @@
 import * as BABYLON from "@babylonjs/core";
 import { Player } from "../Player/Player";
 import { DummyEnemy } from "../Enemies/DummyEnemy";
+import { WaveManager } from "../Systems/WaveManager";
 
 export class GameScene {
   constructor(canvasId) {
@@ -68,7 +69,7 @@ export class GameScene {
     // Création du sol
     const ground = BABYLON.MeshBuilder.CreateGround(
       "ground",
-      { width: 50, height: 50 },
+      { width: 200, height: 200 },
       scene,
     );
     ground.checkCollisions = true;
@@ -87,10 +88,12 @@ export class GameScene {
     // Instanciation du joueur
     this.player = new Player(scene, canvas);
 
-    // Instanciation des ennemis de test
-    new DummyEnemy(scene, new BABYLON.Vector3(0, 1.25, 10));
-    new DummyEnemy(scene, new BABYLON.Vector3(-8, 1.25, 15));
-    new DummyEnemy(scene, new BABYLON.Vector3(8, 1.25, 12));
+    // Initialisation du gestionnaire de vagues
+    const waveManager = new WaveManager(scene, this.player, this.player.hud);
+    
+    setTimeout(() => {
+        waveManager.startNextWave();
+    }, 2000);
 
     return scene;
   }

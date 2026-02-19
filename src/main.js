@@ -1,6 +1,6 @@
 import '../src/Styles/Game.css';
-import { Game } from './Core/Game';
+import { GameScene } from './Scenes/GameScene';
 
 window.addEventListener('DOMContentLoaded', () => {
-    new Game('renderCanvas');
+    new GameScene('renderCanvas');
 });

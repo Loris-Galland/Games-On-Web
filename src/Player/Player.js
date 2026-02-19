@@ -9,7 +9,7 @@ export class Player {
     this.canvas = canvas;
 
     // Configuration du joueur
-    this.speed = 0.5;
+    this.speed = 0.3;
     this.inputMap = {};
     this.maxHealth = 10;
 
@@ -25,7 +25,7 @@ export class Player {
     this.camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
     this.camera.minZ = 0.1;
     this.camera.speed = this.speed;
-    this.camera.angularSensibility = 3000;
+    this.camera.angularSensibility = 5000;
 
     // Configuration des touches
     this.camera.keysUp = [90, 87];

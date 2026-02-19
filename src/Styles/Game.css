@@ -6,3 +6,94 @@ html, body, #app, canvas {
   overflow: hidden;
   outline: none;
 }
+
+/* HUD Sci-Fi */
+#hud {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    pointer-events: none; 
+    font-family: 'Courier New', Courier, monospace; 
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+    background: rgba(0, 20, 30, 0.7);
+    padding: 15px 25px;
+    border-left: 4px solid #00ffff;
+    border-radius: 4px;
+    transition: all 0.2s ease-out;
+}
+
+#hud.warning {
+    color: #ffaa00;
+    text-shadow: 0 0 10px #ffaa00;
+    border-left-color: #ffaa00;
+}
+
+#hud.critical {
+    color: #ff0000;
+    text-shadow: 0 0 10px #ff0000;
+    border-left-color: #ff0000;
+    animation: glitch 0.2s infinite; 
+}
+
+.hud-title {
+    font-size: 14px;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    opacity: 0.8;
+}
+
+.hud-bar-container {
+    display: flex;
+    gap: 4px;
+}
+
+.hud-segment {
+    width: 15px;
+    height: 25px;
+    background-color: currentColor; 
+    box-shadow: 0 0 5px currentColor;
+}
+
+/* HUD Munitions (Bas Droite) */
+#ammo-hud {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    pointer-events: none;
+    font-family: 'Courier New', Courier, monospace;
+    color: #ff00ff; /* Magenta Néon */
+    text-shadow: 0 0 10px #ff00ff;
+    background: rgba(30, 0, 30, 0.7);
+    padding: 15px 25px;
+    border-right: 4px solid #ff00ff;
+    border-radius: 4px;
+    text-align: right;
+    transition: all 0.2s ease-out;
+}
+
+#ammo-hud .hud-bar-container {
+    justify-content: flex-end; 
+}
+
+.ammo-segment {
+    background-color: currentColor;
+    box-shadow: 0 0 5px currentColor;
+    transition: all 0.1s ease-out;
+}
+
+#ammo-hud.empty {
+    color: #555555;
+    text-shadow: none;
+    border-right-color: #ff0000;
+    animation: glitch 0.2s infinite;
+}
+
+@keyframes glitch {
+    0% { transform: translate(0) }
+    20% { transform: translate(-2px, 2px) }
+    40% { transform: translate(-2px, -2px) }
+    60% { transform: translate(2px, 2px) }
+    80% { transform: translate(2px, -2px) }
+    100% { transform: translate(0) }
+}

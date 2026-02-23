@@ -22,7 +22,8 @@ export class Player {
     this.camera.attachControl(this.canvas, true);
     this.camera.checkCollisions = true; // Active la physique
     this.camera.applyGravity = true;
-    this.camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
+    this.camera.ellipsoid = new BABYLON.Vector3(0.5, 0.9, 0.5); // plus fin
+    this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.9, 0); // le bas de l'ellipsoïde touche pile le sol
     this.camera.minZ = 0.1;
     this.camera.speed = this.speed;
     this.camera.angularSensibility = 5000;

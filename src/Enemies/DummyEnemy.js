@@ -6,15 +6,23 @@ export class DummyEnemy {
     this.player = player;
     this.speed = 3;
 
+    this.gravity = -9.81; // valeur réaliste
+    this.verticalVelocity = 0;
+    this.isGrounded = false;
+
     // Creation du corps principal
     this.body = BABYLON.MeshBuilder.CreateBox(
       "enemyBody",
       { width: 1.5, height: 2.5, depth: 1.5 },
       scene,
     );
-    this.body.position = position;
-    this.body.checkCollisions = true;
+
+    this.body.position = new BABYLON.Vector3(position.x, position.y + 1.25, position.z);
     this.body.ellipsoid = new BABYLON.Vector3(0.75, 1.25, 0.75);
+    this.body.refreshBoundingInfo();
+    this.body.showBoundingBox = true;
+    this.body.showSubMeshesBoundingBox = true;
+    this.body.checkCollisions = true;
 
     const bodyMat = new BABYLON.StandardMaterial("bodyMat", scene);
     bodyMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.25);
@@ -46,26 +54,52 @@ export class DummyEnemy {
     });
   }
 
-  update() {
-    if (!this.player || !this.player.camera) return;
+    update() {
+        if (!this.player || !this.player.camera) return;
 
-    const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
+        const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
 
-    // On recupere la position du joueur (mais on garde la hauteur de l'ennemi)
-    const targetPos = this.player.camera.globalPosition.clone();
-    targetPos.y = this.body.position.y;
+        // Gravité accumulée
+        this.verticalVelocity += this.gravity * deltaTime;
+        this.verticalVelocity = Math.max(this.verticalVelocity, -20); // cap la chute
 
-    this.body.lookAt(targetPos);
+        // Déplacement horizontal
+        let horizontalVelocity = BABYLON.Vector3.Zero();
+        const targetPos = this.player.camera.globalPosition.clone();
+        targetPos.y = this.body.position.y;
 
-    const distance = BABYLON.Vector3.Distance(this.body.position, targetPos);
+        const distance = BABYLON.Vector3.Distance(this.body.position, targetPos);
+        if (distance > 2) {
+            const direction = targetPos.subtract(this.body.position).normalize();
+            horizontalVelocity = direction.scale(this.speed * deltaTime);
+        }
 
-    // Si l'ennemi est loin, il avance
-    if (distance > 2) {
-      const direction = targetPos.subtract(this.body.position).normalize();
-      const velocity = direction.scale(this.speed * deltaTime);
+        const finalVelocity = new BABYLON.Vector3(
+            horizontalVelocity.x,
+            this.verticalVelocity * deltaTime,
+            horizontalVelocity.z
+        );
 
-      this.body.moveWithCollisions(velocity);
-    } else {
+        this.body.moveWithCollisions(finalVelocity);
+
+        // Raycast sol — longueur = demi-hauteur ellipsoïde + petit buffer
+        const ray = new BABYLON.Ray(
+            this.body.position,
+            new BABYLON.Vector3(0, -1, 0),
+            1.35 // 1.25 + 0.1 buffer
+        );
+        const hit = this.scene.pickWithRay(
+            ray,
+            (mesh) => mesh.checkCollisions && mesh !== this.body
+        );
+
+        if (hit.hit && this.verticalVelocity < 0) {
+            this.verticalVelocity = 0;
+            this.isGrounded = true;
+        } else {
+            this.isGrounded = false;
+        }
+
+        this.body.lookAt(targetPos);
     }
-  }
 }

@@ -70,7 +70,7 @@ export class GameScene {
 
       BABYLON.SceneLoader.Append(
           "assets/",
-          "Game.gltf",
+          "GameV3.gltf",
           scene,
           function (loadedScene) {
               console.log("GLTF model loaded successfully!");
@@ -79,7 +79,7 @@ export class GameScene {
               loadedScene.meshes.forEach((mesh) => {
                   if (mesh.name !== "__root__") { // le nœud racine gltf n'a pas besoin de collision
                       mesh.checkCollisions = true;
-                      mesh.showBoundingBox = true;
+                      //mesh.showBoundingBox = true;
                       console.log("Collision activée sur :", mesh.name);
                   }
               });
@@ -96,15 +96,15 @@ export class GameScene {
     this.player = new Player(scene, canvas);
 
     // Initialisation du gestionnaire de vagues
-    const waveManager = new WaveManager(scene, this.player, this.player.hud);
+     const waveManager = new WaveManager(scene, this.player, this.player.hud);
 
     setTimeout(() => {
         waveManager.startNextWave();
     }, 2000);
 
-      scene.debugLayer.show({
+      /*scene.debugLayer.show({
           embedMode: true, // s'affiche dans la page
-      });
+      });*/
     return scene;
   }
 }

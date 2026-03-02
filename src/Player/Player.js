@@ -9,14 +9,14 @@ export class Player {
     this.canvas = canvas;
 
     // Configuration du joueur
-    this.speed = 0.3;
+    this.speed = 1;
     this.inputMap = {};
     this.maxHealth = 10;
 
     // Création de la caméra
     this.camera = new BABYLON.UniversalCamera(
       "playerCam",
-      new BABYLON.Vector3(0, 0, 0),
+      new BABYLON.Vector3(0, 2, 0),
       this.scene,
     );
     this.camera.attachControl(this.canvas, true);

@@ -2,6 +2,8 @@ import * as BABYLON from "@babylonjs/core";
 import { Player } from "../Player/Player";
 import { DummyEnemy } from "../Enemies/DummyEnemy";
 import { WaveManager } from "../Systems/WaveManager";
+import "@babylonjs/loaders/glTF";
+import "@babylonjs/inspector";
 
 export class GameScene {
   constructor(canvasId) {
@@ -64,37 +66,45 @@ export class GameScene {
       new BABYLON.Vector3(0, 1, 0),
       scene,
     );
-    light.intensity = 0.7;
+    light.intensity = 1;
 
-    // Création du sol
-    const ground = BABYLON.MeshBuilder.CreateGround(
-      "ground",
-      { width: 200, height: 200 },
-      scene,
-    );
-    ground.checkCollisions = true;
-    const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
-    groundMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
-    ground.material = groundMat;
+      BABYLON.SceneLoader.Append(
+          "assets/",
+          "GameV3.gltf",
+          scene,
+          function (loadedScene) {
+              console.log("GLTF model loaded successfully!");
 
-    // Création d'une caisse de test
-    const box = BABYLON.MeshBuilder.CreateBox("crate", { size: 2 }, scene);
-    box.position = new BABYLON.Vector3(5, 1, 5);
-    box.checkCollisions = true;
-    const boxMat = new BABYLON.StandardMaterial("boxMat", scene);
-    boxMat.diffuseColor = new BABYLON.Color3(1, 0, 0);
-    box.material = boxMat;
+              // On parcourt tous les meshes nouvellement importés
+              loadedScene.meshes.forEach((mesh) => {
+                  if (mesh.name !== "__root__") { // le nœud racine gltf n'a pas besoin de collision
+                      mesh.checkCollisions = true;
+                      //mesh.showBoundingBox = true;
+                      console.log("Collision activée sur :", mesh.name);
+                  }
+              });
+          },
+          function () {
+              console.log("GLTF model is loading ...");
+          },
+          function (scene, message) {
+              console.error("GLTF model not loaded!", message);
+          }
+      );
 
     // Instanciation du joueur
     this.player = new Player(scene, canvas);
 
     // Initialisation du gestionnaire de vagues
-    const waveManager = new WaveManager(scene, this.player, this.player.hud);
-    
+     const waveManager = new WaveManager(scene, this.player, this.player.hud);
+
     setTimeout(() => {
         waveManager.startNextWave();
     }, 2000);
 
+      /*scene.debugLayer.show({
+          embedMode: true, // s'affiche dans la page
+      });*/
     return scene;
   }
 }

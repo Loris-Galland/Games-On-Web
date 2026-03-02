@@ -9,20 +9,23 @@ export class Player {
     this.canvas = canvas;
 
     // Configuration du joueur
-    this.speed = 0.3;
+    this.speed = 1;
     this.inputMap = {};
     this.maxHealth = 10;
 
     // Création de la caméra
     this.camera = new BABYLON.UniversalCamera(
       "playerCam",
-      new BABYLON.Vector3(0, 2.5, -5),
+      new BABYLON.Vector3(0, 2, 0),
       this.scene,
     );
     this.camera.attachControl(this.canvas, true);
     this.camera.checkCollisions = true; // Active la physique
     this.camera.applyGravity = true;
-    this.camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
+    this.camera.ellipsoid = new BABYLON.Vector3(0.25, 1, 0.25);
+    this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0); // le bas de l'ellipsoïde touche pile le sol
+    this.camera.slopLimit = 90; // angle max des pentes franchissables
+    this.camera.stepOffset = 0.4; // hauteur max franchissable sans sauter (en unités)
     this.camera.minZ = 0.1;
     this.camera.speed = this.speed;
     this.camera.angularSensibility = 5000;
@@ -81,7 +84,7 @@ export class Player {
     const ray = new BABYLON.Ray(
       this.camera.position,
       new BABYLON.Vector3(0, -1, 0),
-      1.6,
+      1.15,
     );
     const hit = this.scene.pickWithRay(
       ray,
@@ -96,7 +99,7 @@ export class Player {
   // Physique du saut
   _updateJump() {
     if (this.jumpForce > 0) {
-      this.camera.cameraDirection.y = this.jumpForce;
+      this.camera.cameraDirection.y += this.jumpForce;
       this.jumpForce -= 0.02; // Gravité
       if (this.jumpForce <= 0) this.jumpForce = 0;
     }

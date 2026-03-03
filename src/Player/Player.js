@@ -9,7 +9,7 @@ export class Player {
     this.canvas = canvas;
 
     // Configuration du joueur
-    this.speed = 1;
+    this.speed = 0.3;
     this.inputMap = {};
     this.maxHealth = 10;
 

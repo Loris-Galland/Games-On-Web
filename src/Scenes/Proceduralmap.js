@@ -46,13 +46,13 @@ const ASSETS = {
 
 // Salles plus grandes : 6×6 à 8×8 tuiles
 const ROOM_TYPES = [
-    { type: "command",   cols: 8, rows: 8, color: "blue"   },
-    { type: "medbay",    cols: 6, rows: 7, color: "green"  },
-    { type: "engine",    cols: 7, rows: 6, color: "orange" },
-    { type: "cafeteria", cols: 8, rows: 6, color: "grey"   },
-    { type: "hydro",     cols: 6, rows: 6, color: "green"  },
-    { type: "quarters",  cols: 7, rows: 7, color: "blue"   },
-    { type: "storage",   cols: 6, rows: 6, color: "red"    },
+    { type: "command",   cols: 12, rows: 12, color: "blue"   },
+    { type: "medbay",    cols: 10, rows: 12, color: "green"  },
+    { type: "engine",    cols: 12, rows: 10, color: "orange" },
+    { type: "cafeteria", cols: 12, rows: 12, color: "grey"   },
+    { type: "hydro",     cols: 10, rows: 10, color: "green"  },
+    { type: "quarters",  cols: 12, rows: 10, color: "blue"   },
+    { type: "storage",   cols: 10, rows: 10, color: "red"    },
 ];
 
 // Salle de spawn : grande, vide, grise
@@ -306,10 +306,51 @@ export class ProceduralMap {
 
         // ── PROP ── (seulement si pas spawn)
         if (!room.isSpawn) {
-            ps.push(this._place(
-                pick(propAssets, this.rand),
-                new BABYLON.Vector3(ox + (room.cols / 2) * T, 0, oz + (room.rows / 2) * T),
-            ));
+            const patterns = {
+                command:   [
+                    [{a:"Command_Console.glb",ox:0.25,oz:0.25},{a:"Command_Console.glb",ox:0.75,oz:0.25},
+                        {a:"Command_Console.glb",ox:0.25,oz:0.75},{a:"Command_Console.glb",ox:0.75,oz:0.75},
+                        {a:"Large_Monitor_Blue.glb",ox:0.5,oz:0.5}],
+                    [{a:"Command_Wall.glb",ox:0.5,oz:0.25},{a:"Command_Wall.glb",ox:0.5,oz:0.5},
+                        {a:"Command_Wall.glb",ox:0.5,oz:0.75},{a:"Command_Console.glb",ox:0.2,oz:0.5},
+                        {a:"Command_Console.glb",ox:0.8,oz:0.5}],
+                ],
+                medbay:    [
+                    [{a:"Cryo_Tube_ON.glb",ox:0.2,oz:0.2},{a:"Cryo_Tube_ON.glb",ox:0.8,oz:0.2},
+                        {a:"Cryo_Tube_OFF.glb",ox:0.2,oz:0.8},{a:"Cryo_Tube_OFF.glb",ox:0.8,oz:0.8},
+                        {a:"BioMonitor_Blue.glb",ox:0.5,oz:0.5}],
+                ],
+                cafeteria: [
+                    [{a:"Cafeteria_Table.glb",ox:0.25,oz:0.25},{a:"Cafeteria_Table.glb",ox:0.75,oz:0.25},
+                        {a:"Cafeteria_Table.glb",ox:0.25,oz:0.75},{a:"Cafeteria_Table.glb",ox:0.75,oz:0.75},
+                        {a:"Octo_Table.glb",ox:0.5,oz:0.5}],
+                ],
+                engine:    [[{a:"Generator_Pile_Chonky.glb",ox:0.25,oz:0.3},{a:"Generator_Pile_Chonky.glb",ox:0.75,oz:0.3},
+                    {a:"Generator_Pile_Chonky.glb",ox:0.25,oz:0.7},{a:"Generator_Pile_Chonky.glb",ox:0.75,oz:0.7},
+                    {a:"Generator.glb",ox:0.5,oz:0.5}]],
+                storage:   [[{a:"Battery_Blue.glb",ox:0.2,oz:0.2},{a:"Battery_Red.glb",ox:0.8,oz:0.2},
+                    {a:"Battery_Grey.glb",ox:0.2,oz:0.8},{a:"Battery_Orange.glb",ox:0.8,oz:0.8},
+                    {a:"Battery_Green.glb",ox:0.5,oz:0.5}]],
+                quarters:  [[{a:"Bunk_Double_Blue.glb",ox:0.2,oz:0.25},{a:"Bunk_Double_Blue.glb",ox:0.8,oz:0.25},
+                    {a:"Bunk_Single_Grey.glb",ox:0.2,oz:0.75},{a:"Bunk_Single_Grey.glb",ox:0.8,oz:0.75},
+                    {a:"End_Table.glb",ox:0.5,oz:0.5}]],
+                hydro:     [[{a:"Hydroponic_Bay.glb",ox:0.25,oz:0.25},{a:"Hydroponic_Bay.glb",ox:0.75,oz:0.25},
+                    {a:"Hydroponics_Full.glb",ox:0.25,oz:0.75},{a:"Hydroponics_Full.glb",ox:0.75,oz:0.75},
+                    {a:"Plant_1.glb",ox:0.5,oz:0.5}]],
+                default:   [[{a:"End_Table.glb",ox:0.25,oz:0.25},{a:"End_Table.glb",ox:0.75,oz:0.75}]],
+            };
+
+            const roomPatterns = patterns[room.type] ?? patterns.default;
+            const pattern = roomPatterns[Math.floor(this.rand() * roomPatterns.length)];
+            const margin = T * 1.5;
+            const roomW = room.cols * T, roomD = room.rows * T;
+
+            for (const item of pattern) {
+                const px  = ox + margin + item.ox * (roomW - margin * 2);
+                const pz  = oz + margin + item.oz * (roomD - margin * 2);
+                const rot = Math.floor(this.rand() * 4) * (Math.PI / 2);
+                ps.push(this._place(item.a, new BABYLON.Vector3(px, 0, pz), new BABYLON.Vector3(0, rot, 0)));
+            }
         }
 
         await Promise.all(ps);

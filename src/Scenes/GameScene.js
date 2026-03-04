@@ -9,6 +9,7 @@ export class GameScene {
     constructor(canvasId) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
+        this.canvas = canvas;
 
         this.engine = new BABYLON.Engine(canvas, true, {
             limitDeviceRatio: 1,
@@ -18,26 +19,34 @@ export class GameScene {
         // Résolution réduite = gain de perf majeur
         this.engine.setHardwareScalingLevel(2);
 
-        this.scene = this._createScene(canvas);
+    }
 
-        this.engine.runRenderLoop(() => this.scene.render());
+    async init(){
+        this.scene = await this._createScene(this.canvas);
+        this.engine.runRenderLoop(() => {
+            this.scene.render();
+
+            if (this.player) {
+                this.player.hud.updateFps(this.engine);
+            }
+        });
         window.addEventListener("resize", () => this.engine.resize());
     }
 
-    _createScene(canvas) {
+    async _createScene(canvas) {
         const scene = new BABYLON.Scene(this.engine);
 
-        scene.gravity           = new BABYLON.Vector3(0, -0.9, 0);
+        scene.gravity = new BABYLON.Vector3(0, -0.9, 0);
         scene.collisionsEnabled = true;
 
         // Désactiver le picking inutile à chaque frame
         scene.skipPointerMovePicking = true;
-        scene.pointerMovePredicate   = () => false;
+        scene.pointerMovePredicate = () => false;
 
         // UNE seule lumière, pas de shadows, pas de HDR, pas de post-process
         const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
-        light.intensity   = 1.0;
-        light.diffuse     = new BABYLON.Color3(0.9, 0.95, 1.0);
+        light.intensity = 1.0;
+        light.diffuse = new BABYLON.Color3(0.9, 0.95, 1.0);
         light.groundColor = new BABYLON.Color3(0.2, 0.2, 0.3);
 
         scene.imageProcessingConfiguration.toneMappingEnabled = false;
@@ -45,11 +54,11 @@ export class GameScene {
         // Caméra temporaire pendant le chargement async
         this._tempCamera = new BABYLON.FreeCamera("tempCam", new BABYLON.Vector3(0, 2, 0), scene);
 
-        this._generateMap(scene, canvas);
+        await this._generateMap(scene, canvas);
 
-        scene.debugLayer.show({
+        /*scene.debugLayer.show({
             embedMode: true, // s'affiche dans la page
-        });
+        });*/
 
         return scene;
     }

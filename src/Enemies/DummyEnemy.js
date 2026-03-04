@@ -4,7 +4,7 @@ export class DummyEnemy {
   constructor(scene, position, player) {
     this.scene = scene;
     this.player = player;
-    this.speed = 10;
+    this.speed = 0.3;
 
     this.gravity = -9.81; // valeur réaliste
     this.verticalVelocity = 0;

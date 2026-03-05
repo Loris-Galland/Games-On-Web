@@ -5,7 +5,6 @@ const T  = 4;
 const H1 = 0;
 const H2 = 4;
 
-// Sol uniforme par COULEUR (pas par type de salle)
 const FLOOR_BY_COLOR = {
     blue:   ["Floor_Tile_Carpet_Blue.glb"],
     green:  ["Hydroponics_Floor.glb"],
@@ -56,7 +55,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"SW",
     }],
-
     medbay: [{
         floor1:[
             {a:"Cryo_Tube_ON.glb",           ox:0.15, oz:0.15},
@@ -81,7 +79,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"NE",
     }],
-
     engine: [{
         floor1:[
             {a:"Generator.glb",              ox:0.15, oz:0.15},
@@ -105,7 +102,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"SE",
     }],
-
     cafeteria: [{
         floor1:[
             {a:"Cafeteria_Table.glb",           ox:0.18, oz:0.2 },
@@ -133,7 +129,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"NW",
     }],
-
     hydro: [{
         floor1:[
             {a:"Hydroponic_Bay.glb",    ox:0.15, oz:0.15},
@@ -157,7 +152,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"SW",
     }],
-
     quarters: [{
         floor1:[
             {a:"Bunk_Double_Blue.glb",   ox:0.15, oz:0.18},
@@ -181,7 +175,6 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"SE",
     }],
-
     storage: [{
         floor1:[
             {a:"Battery_Blue.glb",           ox:0.15, oz:0.15},
@@ -205,14 +198,12 @@ const LAYOUTS = {
         ],
         hasFloor2:false, rampCorner:"NE",
     }],
-
     default:[{
         floor1:[{a:"End_Table.glb",ox:0.3,oz:0.3},{a:"End_Table.glb",ox:0.7,oz:0.7}],
         floor2:[], hasFloor2:false,
     }],
 };
 
-// Toutes les arènes = même taille (16×16), différenciées uniquement par la couleur
 const ROOM_TYPES = [
     {type:"command",   cols:16, rows:16, color:"blue"  },
     {type:"medbay",    cols:16, rows:16, color:"green" },
@@ -234,19 +225,20 @@ export class ProceduralMap {
         this.scene      = scene;
         this.seed       = options.seed      ?? Date.now();
         this.roomCount  = options.roomCount ?? 6;
-        this.assetBase  = options.assetBase ?? "assets/";
+        this.assetBase  = options.assetBase ?? "assets/models/";
         this.rand       = rng(this.seed);
         this._cache     = new Map();
         this._root      = new BABYLON.TransformNode("ProceduralMap", scene);
         this.rooms      = [];
         this.corridors  = [];
         this.spawnPoint = BABYLON.Vector3.Zero();
-        this._activeNode   = null;
-        this._corridorNode = null;
-        this._activeIdx    = -1;
-        this._loading      = false;
-        this._camera       = null;
-        this._onRoomReady  = null;
+        this._activeNode    = null;
+        this._corridorNode  = null;  // couloir sortant (aller)
+        this._corridorInNode= null;  // couloir entrant (retour)
+        this._activeIdx     = -1;
+        this._loading       = false;
+        this._camera        = null;
+        this._onRoomReady   = null;
     }
 
     async generate() {
@@ -299,8 +291,8 @@ export class ProceduralMap {
         const newNode=new BABYLON.TransformNode(`room_${idx}`,this.scene);
         newNode.parent=this._root;
         const room=this.rooms[idx];
-        const cIn =idx>0                    ?this.corridors[idx-1]:null;
-        const cOut=idx<this.corridors.length?this.corridors[idx]  :null;
+        const cIn =idx>0 ? this.corridors[idx-1]:null;
+        const cOut=idx<this.corridors.length ? this.corridors[idx]  :null;
 
         await this._buildRoom(room,cIn,cOut,newNode);
 
@@ -311,16 +303,21 @@ export class ProceduralMap {
         }
         this._activeNode=newNode;
         this._activeIdx=idx;
+
+        // Couloir sortant (aller vers salle suivante)
         await this._buildCorridorDisplay(idx);
+        // Couloir entrant (retour vers salle précédente) — même apparence, sens inversé
+        await this._buildCorridorInDisplay(idx);
 
         console.log(`[Map] Salle ${idx} prête.`);
         this._loading=false;
 
-        // Calcul du point de spawn : 3 tuiles en retrait depuis la porte d'entrée
-        const spawnPos = this._calcEntrySpawn(room, cIn);
-        if(this._onRoomReady) setTimeout(()=>this._onRoomReady(room,idx,spawnPos),50);
+        const spawnPosIn = this._calcEntrySpawn(room, cIn);
+        const spawnPosOut = this._calcExitSpawn(room, cOut);
+        if(this._onRoomReady) setTimeout(()=>this._onRoomReady(room,idx,spawnPosIn),50);
     }
 
+    // ── Couloir SORTANT (aller) ─────────────────
     async _buildCorridorDisplay(roomIdx){
         if(this._corridorNode){
             this._corridorNode.getChildMeshes().forEach(m=>m.dispose());
@@ -330,14 +327,40 @@ export class ProceduralMap {
         if(roomIdx>=this.corridors.length)return;
 
         const corridor=this.corridors[roomIdx];
-        const node=new BABYLON.TransformNode(`corr_${roomIdx}`,this.scene);
+        const node=new BABYLON.TransformNode(`corrOut_${roomIdx}`,this.scene);
         node.parent=this._root;
         this._corridorNode=node;
 
-        const tiles=corridor.tiles,tileSet=new Set(tiles.map(t=>`${t.x},${t.z}`));
+        await this._buildCorridorGeometry(corridor.tiles, node, roomIdx, false);
+    }
+
+    // ── Couloir ENTRANT (retour) ────────────────
+    // Même apparence que le sortant, tuiles parcourues en sens inverse
+    // pour que le brouillard s'épaississe vers la salle précédente
+    async _buildCorridorInDisplay(roomIdx){
+        if(this._corridorInNode){
+            this._corridorInNode.getChildMeshes().forEach(m=>m.dispose());
+            this._corridorInNode.dispose();
+            this._corridorInNode=null;
+        }
+        if(roomIdx===0)return; // salle spawn : pas de retour
+
+        const corridor=this.corridors[roomIdx-1];
+        const node=new BABYLON.TransformNode(`corrIn_${roomIdx}`,this.scene);
+        node.parent=this._root;
+        this._corridorInNode=node;
+
+        // Sens inversé : prog=0 côté salle courante, prog=1 côté salle précédente
+        const tilesRev=[...corridor.tiles].reverse();
+        await this._buildCorridorGeometry(tilesRev, node, roomIdx, true);
+    }
+
+    // ── Géométrie commune aux deux couloirs ─────
+    async _buildCorridorGeometry(tiles, node, roomIdx, isReturn){
+        const tileSet=new Set(tiles.map(t=>`${t.x},${t.z}`));
         const ps=[];
 
-        const darkMat=new BABYLON.StandardMaterial(`cMat_${roomIdx}`,this.scene);
+        const darkMat=new BABYLON.StandardMaterial(`cMat_${roomIdx}_${isReturn}`,this.scene);
         darkMat.diffuseColor=new BABYLON.Color3(0.08,0.08,0.1);
         darkMat.emissiveColor=new BABYLON.Color3(0.03,0.03,0.05);
 
@@ -346,57 +369,79 @@ export class ProceduralMap {
             const prev=tiles[i-1],next=tiles[i+1];
             const gX=next?next.x!==tile.x:prev?prev.x!==tile.x:false;
             const gZ=next?next.z!==tile.z:prev?prev.z!==tile.z:false;
-            const prog=i/tiles.length;
+            const prog=i/tiles.length; // 0=entrée du couloir, 1=sortie
 
-            const fb=BABYLON.MeshBuilder.CreateBox(`cf_${i}`,{width:T,height:0.1,depth:T},this.scene);
+            const fb=BABYLON.MeshBuilder.CreateBox(`cf_${i}_${roomIdx}_${isReturn}`,{width:T,height:0.1,depth:T},this.scene);
             fb.position=new BABYLON.Vector3(wx+T/2,-0.05,wz+T/2);
             fb.material=darkMat;fb.checkCollisions=false;fb.isPickable=false;fb.parent=node;
-            this._mkCol(`ccF_${i}`,wx+T/2,-0.1,wz+T/2,T,0.2,T,node);
+            this._mkCol(`cF_${i}_${roomIdx}_${isReturn}`,wx+T/2,-0.1,wz+T/2,T,0.2,T,node);
 
             if(gX){
-                if(!tileSet.has(`${tile.x},${tile.z-1}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T/2,0,wz),new BABYLON.Vector3(0,Math.PI,0),node));this._mkCol(`ccWN_${i}`,wx+T/2,1.5,wz,T,3,0.3,node);}
-                if(!tileSet.has(`${tile.x},${tile.z+1}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T/2,0,wz+T),BABYLON.Vector3.Zero(),node));this._mkCol(`ccWS_${i}`,wx+T/2,1.5,wz+T,T,3,0.3,node);}
+                if(!tileSet.has(`${tile.x},${tile.z-1}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T/2,0,wz),new BABYLON.Vector3(0,Math.PI,0),node));this._mkCol(`cWN_${i}_${roomIdx}_${isReturn}`,wx+T/2,1.5,wz,T,3,0.3,node);}
+                if(!tileSet.has(`${tile.x},${tile.z+1}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T/2,0,wz+T),BABYLON.Vector3.Zero(),node));this._mkCol(`cWS_${i}_${roomIdx}_${isReturn}`,wx+T/2,1.5,wz+T,T,3,0.3,node);}
             }
             if(gZ){
-                if(!tileSet.has(`${tile.x-1},${tile.z}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx,0,wz+T/2),new BABYLON.Vector3(0,-Math.PI/2,0),node));this._mkCol(`ccWW_${i}`,wx,1.5,wz+T/2,0.3,3,T,node);}
-                if(!tileSet.has(`${tile.x+1},${tile.z}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T,0,wz+T/2),new BABYLON.Vector3(0,Math.PI/2,0),node));this._mkCol(`ccWE_${i}`,wx+T,1.5,wz+T/2,0.3,3,T,node);}
+                if(!tileSet.has(`${tile.x-1},${tile.z}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx,0,wz+T/2),new BABYLON.Vector3(0,-Math.PI/2,0),node));this._mkCol(`cWW_${i}_${roomIdx}_${isReturn}`,wx,1.5,wz+T/2,0.3,3,T,node);}
+                if(!tileSet.has(`${tile.x+1},${tile.z}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T,0,wz+T/2),new BABYLON.Vector3(0,Math.PI/2,0),node));this._mkCol(`cWE_${i}_${roomIdx}_${isReturn}`,wx+T,1.5,wz+T/2,0.3,3,T,node);}
             }
 
+            // Brouillard progressif : s'épaissit vers la sortie du couloir (prog > 0.3)
             if(prog>0.3){
                 const alpha=Math.min(0.97,(prog-0.3)*1.5);
-                const fm=new BABYLON.StandardMaterial(`fm_${i}`,this.scene);
+                const fm=new BABYLON.StandardMaterial(`fm_${i}_${roomIdx}_${isReturn}`,this.scene);
                 fm.diffuseColor=new BABYLON.Color3(0,0,0);
                 fm.emissiveColor=new BABYLON.Color3(0,0,0);
                 fm.alpha=alpha;fm.backFaceCulling=false;
                 fm.alphaMode=BABYLON.Engine.ALPHA_COMBINE;
-                const fp=BABYLON.MeshBuilder.CreateBox(`fp_${i}`,{width:T*0.98,height:3.5,depth:T*0.98},this.scene);
+                const fp=BABYLON.MeshBuilder.CreateBox(`fp_${i}_${roomIdx}_${isReturn}`,{width:T*0.98,height:3.5,depth:T*0.98},this.scene);
                 fp.position=new BABYLON.Vector3(wx+T/2,1.75,wz+T/2);
                 fp.material=fm;fp.isPickable=false;fp.checkCollisions=false;fp.parent=node;
             }
         }
 
+        // Trigger : 2 tuiles avant la sortie du couloir
         if(tiles.length>=2){
             const tTile=tiles[tiles.length-2];
-            const trigger=BABYLON.MeshBuilder.CreateBox(`trig_${roomIdx}`,{width:T*1.5,height:4,depth:T*1.5},this.scene);
+            const prefix=isReturn?"trigIn":"trig";
+            const trigger=BABYLON.MeshBuilder.CreateBox(`${prefix}_${roomIdx}`,{width:T*1.5,height:4,depth:T*1.5},this.scene);
             trigger.position=new BABYLON.Vector3(tTile.x*T+T/2,1,tTile.z*T+T/2);
             trigger.isVisible=false;trigger.checkCollisions=false;trigger.isPickable=false;trigger.parent=node;
-            trigger._toRoom=roomIdx+1;
+            // Aller → salle suivante, Retour → salle précédente
+            trigger._toRoom = isReturn ? roomIdx-1 : roomIdx+1;
         }
 
         await Promise.all(ps);
     }
 
+    // ── Trigger loop : surveille les deux couloirs ──
     _setupTriggerLoop(){
         this.scene.registerBeforeRender(()=>{
-            if(!this._camera||this._loading||!this._corridorNode)return;
+            if(!this._camera||this._loading)return;
             const cam=this._camera.position;
-            for(const m of this._corridorNode.getChildMeshes()){
-                if(!m.name.startsWith("trig_"))continue;
-                const p=m.getAbsolutePosition();
-                if(Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2){
-                    const to=m._toRoom;
-                    if(to!==undefined&&to<this.rooms.length)this._activateRoom(to);
-                    break;
+
+            // Couloir sortant (aller)
+            if(this._corridorNode){
+                for(const m of this._corridorNode.getChildMeshes()){
+                    if(!m.name.startsWith("trig_"))continue;
+                    const p=m.getAbsolutePosition();
+                    if(Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2){
+                        const to=m._toRoom;
+                        if(to!==undefined&&to<this.rooms.length)this._activateRoom(to);
+                        break;
+                    }
+                }
+            }
+
+            // Couloir entrant (retour)
+            if(this._corridorInNode){
+                for(const m of this._corridorInNode.getChildMeshes()){
+                    if(!m.name.startsWith("trigIn_"))continue;
+                    const p=m.getAbsolutePosition();
+                    if(Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2){
+                        const to=m._toRoom;
+                        if(to!==undefined&&to>=0)this._activateRoom(to);
+                        break;
+                    }
                 }
             }
         });
@@ -413,13 +458,11 @@ export class ProceduralMap {
 
         const ps=[];
 
-        // Sol uniforme par couleur
         for(let tx=0;tx<room.cols;tx++)
             for(let tz=0;tz<room.rows;tz++)
                 ps.push(this._vis(pick(floors,this.rand),new BABYLON.Vector3(ox+tx*T+T/2,H1,oz+tz*T+T/2),BABYLON.Vector3.Zero(),parent));
         this._mkCol(`fRDC_${ox}_${oz}`,ox+rW/2,-0.1,oz+rD/2,rW,0.2,rD,parent);
 
-        // Murs de la couleur de la salle
         for(let tx=0;tx<room.cols;tx++){
             const wx=ox+tx*T+T/2,tX=room.worldX+tx;
             const dN=openings.has("N")&&((cIn&&this._at(cIn.tiles,tX,room.worldZ-1))||(cOut&&this._at(cOut.tiles,tX,room.worldZ-1)));
@@ -529,24 +572,19 @@ export class ProceduralMap {
         await Promise.all(ps);
     }
 
-    // Calcule un point de spawn 3 tuiles en retrait depuis la porte d'entrée.
-    // Si pas de couloir entrant (salle 0), retourne le centre de la salle.
     _calcEntrySpawn(room, cIn) {
-        const OFFSET = 3; // tuiles en retrait depuis le mur d'entrée
+        const OFFSET = 3;
         const ox = room.worldX * T, oz = room.worldZ * T;
         const cx = (room.worldX + room.cols / 2) * T;
         const cz = (room.worldZ + room.rows / 2) * T;
 
         if (!cIn || !cIn.tiles.length) {
-            // Salle spawn : centre
             return new BABYLON.Vector3(cx, 2, cz);
         }
 
-        // La dernière tuile du couloir entrant est contre le mur d'entrée
         const entryTile = cIn.tiles[cIn.tiles.length - 1];
         const side = this._side(room, entryTile);
 
-        // On place le joueur OFFSET tuiles à l'intérieur depuis ce mur
         switch(side) {
             case "N": return new BABYLON.Vector3((entryTile.x + 0.5) * T, 2, oz + OFFSET * T);
             case "S": return new BABYLON.Vector3((entryTile.x + 0.5) * T, 2, oz + (room.rows - OFFSET) * T);
@@ -554,6 +592,44 @@ export class ProceduralMap {
             case "E": return new BABYLON.Vector3(ox + (room.cols - OFFSET) * T, 2, (entryTile.z + 0.5) * T);
             default:  return new BABYLON.Vector3(cx, 2, cz);
         }
+    }
+
+    _calcExitSpawn(room, cOut){
+
+        const ox = room.worldX * T, oz = room.worldZ * T;
+        const cx = (room.worldX + room.cols / 2) * T;
+        const cz = (room.worldZ + room.rows / 2) * T;
+
+        if (!cOut || !cOut.tiles.length) {
+            return new BABYLON.Vector3(cx, 2, cz);
+        }
+        const tile = cOut.tiles[0]; // premier tile du couloir
+        const rx = room.worldX;
+        const rz = room.worldZ;
+        const rMaxX = room.worldX + room.cols - 1;
+        const rMaxZ = room.worldZ + room.rows - 1;
+        let x, z;
+        if(tile.z === rz - 1){
+            x = (tile.x + 0.5) * T;
+            z = (rz + 0.5) * T;
+        }
+        else if(tile.z === rMaxZ + 1){
+            x = (tile.x + 0.5) * T;
+            z = (rMaxZ + 0.5) * T;
+        }
+        else if(tile.x === rx - 1){
+            x = (rx + 0.5) * T;
+            z = (tile.z + 0.5) * T;
+        }
+        else if(tile.x === rMaxX + 1){
+            x = (rMaxX + 0.5) * T;
+            z = (tile.z + 0.5) * T;
+        }
+        else{
+            x = (room.worldX + room.cols/2) * T;
+            z = (room.worldZ + room.rows/2) * T;
+        }
+        return new BABYLON.Vector3(x, 2, z);
     }
 
     _side(room,tile){
@@ -572,14 +648,6 @@ export class ProceduralMap {
         b.parent=parent;b.freezeWorldMatrix();
     }
 
-    // ─────────────────────────────────────────────
-    //  OCCLUSION CULLING
-    //  Babylon.js supporte l'occlusion culling via des requêtes GPU (WebGL occlusion queries).
-    //  OCCLUSION_TYPE_OPTIMISTIC = le GPU teste si le mesh est caché derrière d'autres géométries.
-    //  Si oui, il n'est pas rendu. En mode OPTIMISTIC, le mesh est quand même rendu 1 frame
-    //  avant que le test soit confirmé, ce qui évite le flickering.
-    //  Résultat : tous les murs/props derrière le joueur et hors de vue sont ignorés par le GPU.
-    // ─────────────────────────────────────────────
     _applyOcclusion(mesh){
         if(!mesh.isVisible)return;
         mesh.occlusionType               = BABYLON.AbstractMesh.OCCLUSION_TYPE_OPTIMISTIC;

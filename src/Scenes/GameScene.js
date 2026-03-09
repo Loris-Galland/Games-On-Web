@@ -2,7 +2,6 @@ import * as BABYLON from "@babylonjs/core";
 import { Player } from "../Player/Player";
 import { ProceduralMap } from "./ProceduralMap";
 import "@babylonjs/loaders/glTF";
-import "@babylonjs/inspector";
 
 export class GameScene {
     constructor(canvasId) {
@@ -46,10 +45,6 @@ export class GameScene {
         this._tempCamera = new BABYLON.FreeCamera("tempCam", new BABYLON.Vector3(0,2,0), scene);
 
         await this._generateMap(scene, canvas);
-
-        /*scene.debugLayer.show({
-            embedMode: true, // s'affiche dans la page
-        });*/
 
         return scene;
     }
@@ -148,10 +143,12 @@ export class GameScene {
         });
 
         // Callback appelé quand une salle est prête → téléporte le joueur
-        this.map._onRoomReady = (room, idx, spawnPos) => {
+        this.map._onRoomReady = (room, idx, spawnPos, spawnInfo) => {
             if (!this.player) return;
 
-            // Téléportation près de la porte d'entrée (calculé dans ProceduralMap)
+            // spawnPos est déjà sélectionné par ProceduralMap selon la direction d'arrivée :
+            //   spawnInfo.comingBack = true  → spawnExit  (arrivée côté porte de sortie)
+            //   spawnInfo.comingBack = false → spawnEntry (arrivée côté porte d'entrée)
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
                 (room.worldX + room.cols / 2) * 4, 5, (room.worldZ + room.rows / 2) * 4,
             );
@@ -186,12 +183,12 @@ export class GameScene {
 
         // Intercepter les changements de salle pour afficher l'écran
         const origActivate = this.map._activateRoom.bind(this.map);
-        this.map._activateRoom = async (idx) => {
+        this.map._activateRoom = async (idx, comingFromIdx = null) => {
             if (this.map._loading || idx === this.map._activeIdx) return;
             const room = this.map.rooms[idx];
             // Montrer l'écran de chargement AVANT le chargement
             this._showLoading(room.type, idx);
-            await origActivate(idx);
+            await origActivate(idx, comingFromIdx);
         };
 
         this._finishLoading();

@@ -225,7 +225,7 @@ export class ProceduralMap {
         this.scene      = scene;
         this.seed       = options.seed      ?? Date.now();
         this.roomCount  = options.roomCount ?? 6;
-        this.assetBase  = options.assetBase ?? "assets/models/";
+        this.assetBase  = options.assetBase ?? "assets/";
         this.rand       = rng(this.seed);
         this._cache     = new Map();
         this._root      = new BABYLON.TransformNode("ProceduralMap", scene);
@@ -239,6 +239,15 @@ export class ProceduralMap {
         this._loading       = false;
         this._camera        = null;
         this._onRoomReady   = null;
+        // Cache des salles déjà construites : idx → TransformNode
+        // On ne construit chaque salle qu'une seule fois, puis on show/hide
+        this._builtRooms    = new Map();
+        // Anti-spam : timestamp de la dernière transition + cooldown en ms
+        this._lastTransition  = 0;
+        this._cooldownMs      = 1500; // 1.5s minimum entre deux transitions
+        // Zone du dernier trigger déclenché — on ne re-déclenche pas tant
+        // que le joueur n'est pas sorti puis rentré à nouveau
+        this._lastTriggerKey  = null;
     }
 
     async generate() {
@@ -283,38 +292,73 @@ export class ProceduralMap {
         return{from,to,exitSide,tiles};
     }
 
-    async _activateRoom(idx){
+    async _activateRoom(idx, comingFromIdx = null){
         if(this._loading||idx===this._activeIdx)return;
         this._loading=true;
-        console.log(`[Map] Chargement salle ${idx}...`);
 
-        const newNode=new BABYLON.TransformNode(`room_${idx}`,this.scene);
-        newNode.parent=this._root;
         const room=this.rooms[idx];
-        const cIn =idx>0 ? this.corridors[idx-1]:null;
-        const cOut=idx<this.corridors.length ? this.corridors[idx]  :null;
+        const cIn =idx>0                    ?this.corridors[idx-1]:null;
+        const cOut=idx<this.corridors.length?this.corridors[idx]  :null;
 
-        await this._buildRoom(room,cIn,cOut,newNode);
-
-        if(this._activeNode){
-            this._activeNode.getChildMeshes().forEach(m=>m.dispose());
-            this._activeNode.dispose();
-            this._activeNode=null;
+        // ── Construire la salle une seule fois ──
+        let roomNode;
+        if(this._builtRooms.has(idx)){
+            // Salle déjà connue : on la réaffiche sans la reconstruire
+            roomNode = this._builtRooms.get(idx);
+            console.log(`[Map] Salle ${idx} restaurée depuis le cache.`);
+        } else {
+            console.log(`[Map] Construction salle ${idx} (première visite)...`);
+            roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
+            roomNode.parent = this._root;
+            await this._buildRoom(room, cIn, cOut, roomNode);
+            this._builtRooms.set(idx, roomNode);
         }
-        this._activeNode=newNode;
-        this._activeIdx=idx;
 
-        // Couloir sortant (aller vers salle suivante)
+        // Cacher l'ancienne salle (sans la détruire)
+        if(this._activeNode && this._activeNode !== roomNode){
+            this._activeNode.setEnabled(false);
+        }
+
+        // Afficher la nouvelle
+        roomNode.setEnabled(true);
+        this._activeNode = roomNode;
+        this._activeIdx  = idx;
+
+        // Couloirs (toujours reconstruits car légers et dépendent de l'état courant)
         await this._buildCorridorDisplay(idx);
-        // Couloir entrant (retour vers salle précédente) — même apparence, sens inversé
         await this._buildCorridorInDisplay(idx);
 
-        console.log(`[Map] Salle ${idx} prête.`);
-        this._loading=false;
+        console.log(`[Map] Salle ${idx} active.`);
 
-        const spawnPosIn = this._calcEntrySpawn(room, cIn);
-        const spawnPosOut = this._calcExitSpawn(room, cOut);
-        if(this._onRoomReady) setTimeout(()=>this._onRoomReady(room,idx,spawnPosIn),50);
+        // ── Spawn cohérent selon la direction d'arrivée ──
+        // Si on vient de idx+1 (on revient en arrière) → spawner côté sortie
+        // Si on vient de idx-1 (on avance) ou première visite → spawner côté entrée
+        console.log("comingFromIdx : ", comingFromIdx);
+        const comingBack = comingFromIdx !== null && comingFromIdx > idx;
+        const spawnEntry = this._calcEntrySpawn(room, cIn);
+        const spawnExit  = this._calcExitSpawn(room, cOut);
+        console.log("coming back : ", comingBack);
+        const spawnPos   = comingBack ? spawnExit : spawnEntry;
+
+        // Téléporter le joueur EN PREMIER, puis libérer le lock.
+        // L'ordre est critique : si on libère _loading avant la téléportation,
+        // le trigger loop peut re-déclencher pendant les 50ms du setTimeout
+        // et provoquer un conflit de génération.
+        if(this._onRoomReady){
+            // On attend 1 frame que Babylon enregistre les nouveaux meshes
+            await new Promise(resolve => setTimeout(resolve, 50));
+            this._onRoomReady(room, idx, spawnPos, {spawnEntry, spawnExit, comingBack});
+        }
+
+        // Réinitialiser la clé du trigger et repartir le cooldown depuis le spawn.
+        // Le joueur doit sortir de toute zone trigger puis y re-entrer avant
+        // qu'une nouvelle transition soit possible — évite le spawn DANS un trigger
+        // qui se déclencherait immédiatement (ex: spawn côté sortie = zone trigger sortant).
+        this._lastTriggerKey = null;
+        this._lastTransition = performance.now();
+
+        // Lock libéré APRÈS la téléportation — aucune transition possible avant
+        this._loading=false;
     }
 
     // ── Couloir SORTANT (aller) ─────────────────
@@ -407,43 +451,66 @@ export class ProceduralMap {
             trigger.position=new BABYLON.Vector3(tTile.x*T+T/2,1,tTile.z*T+T/2);
             trigger.isVisible=false;trigger.checkCollisions=false;trigger.isPickable=false;trigger.parent=node;
             // Aller → salle suivante, Retour → salle précédente
-            trigger._toRoom = isReturn ? roomIdx-1 : roomIdx+1;
+            trigger._toRoom    = isReturn ? roomIdx-1 : roomIdx+1;
+            // La salle d'origine est stockée dans le trigger pour calculer comingBack
+            // indépendamment de _activeIdx au moment du déclenchement
+            trigger._fromRoom  = roomIdx;
         }
 
         await Promise.all(ps);
     }
 
     // ── Trigger loop : surveille les deux couloirs ──
+    // Anti-spam : cooldown + détection sortie de zone avant re-déclenchement
     _setupTriggerLoop(){
         this.scene.registerBeforeRender(()=>{
             if(!this._camera||this._loading)return;
             const cam=this._camera.position;
+            const now=performance.now();
 
-            // Couloir sortant (aller)
-            if(this._corridorNode){
-                for(const m of this._corridorNode.getChildMeshes()){
-                    if(!m.name.startsWith("trig_"))continue;
+            // Collecter tous les triggers actifs (sortant + entrant)
+            const triggerSources=[];
+            if(this._corridorNode)   triggerSources.push({node:this._corridorNode,   prefix:"trig_"   });
+            if(this._corridorInNode) triggerSources.push({node:this._corridorInNode, prefix:"trigIn_" });
+
+            let inAnyTrigger=false;
+
+            for(const {node,prefix} of triggerSources){
+                for(const m of node.getChildMeshes()){
+                    if(!m.name.startsWith(prefix))continue;
                     const p=m.getAbsolutePosition();
-                    if(Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2){
-                        const to=m._toRoom;
-                        if(to!==undefined&&to<this.rooms.length)this._activateRoom(to);
-                        break;
+                    const inside=Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2;
+                    if(!inside)continue;
+
+                    inAnyTrigger=true;
+                    const key=m.name; // identifiant unique du trigger
+
+                    // Ne déclencher que si :
+                    // 1. Cooldown écoulé depuis la dernière transition
+                    // 2. Ce n'est pas le même trigger que celui qui vient de se déclencher
+                    //    (le joueur doit être sorti puis rentré à nouveau)
+                    if(now - this._lastTransition < this._cooldownMs) break;
+                    if(key === this._lastTriggerKey) break;
+
+                    const to=m._toRoom;
+                    const valid = prefix==="trig_"
+                        ? (to!==undefined&&to<this.rooms.length)
+                        : (to!==undefined&&to>=0);
+
+                    if(valid){
+                        this._lastTriggerKey = key;
+                        this._lastTransition = now;
+                        // Utiliser _fromRoom stocké dans le trigger plutôt que _activeIdx
+                        // _activeIdx peut avoir changé si plusieurs transitions rapides
+                        this._activateRoom(to, m._fromRoom);
                     }
+                    break;
                 }
             }
 
-            // Couloir entrant (retour)
-            if(this._corridorInNode){
-                for(const m of this._corridorInNode.getChildMeshes()){
-                    if(!m.name.startsWith("trigIn_"))continue;
-                    const p=m.getAbsolutePosition();
-                    if(Math.abs(cam.x-p.x)<T*1.2&&Math.abs(cam.z-p.z)<T*1.2){
-                        const to=m._toRoom;
-                        if(to!==undefined&&to>=0)this._activateRoom(to);
-                        break;
-                    }
-                }
-            }
+            // Dès que le joueur sort de toute zone trigger, on réinitialise la clé
+            // → il pourra re-déclencher le même trigger s'il repart dans le couloir
+            if(!inAnyTrigger) this._lastTriggerKey=null;
         });
     }
 
@@ -594,8 +661,9 @@ export class ProceduralMap {
         }
     }
 
-    _calcExitSpawn(room, cOut){
-
+    // Spawn côté sortie (porte de sortie) — utilisé quand on revient en arrière
+    _calcExitSpawn(room, cOut) {
+        const OFFSET = 3;
         const ox = room.worldX * T, oz = room.worldZ * T;
         const cx = (room.worldX + room.cols / 2) * T;
         const cz = (room.worldZ + room.rows / 2) * T;
@@ -603,33 +671,18 @@ export class ProceduralMap {
         if (!cOut || !cOut.tiles.length) {
             return new BABYLON.Vector3(cx, 2, cz);
         }
-        const tile = cOut.tiles[0]; // premier tile du couloir
-        const rx = room.worldX;
-        const rz = room.worldZ;
-        const rMaxX = room.worldX + room.cols - 1;
-        const rMaxZ = room.worldZ + room.rows - 1;
-        let x, z;
-        if(tile.z === rz - 1){
-            x = (tile.x + 0.5) * T;
-            z = (rz + 0.5) * T;
+
+        // La première tuile du couloir sortant est contre le mur de sortie
+        const exitTile = cOut.tiles[0];
+        const side = this._side(room, exitTile);
+
+        switch(side) {
+            case "N": return new BABYLON.Vector3((exitTile.x + 0.5) * T, 2, oz + OFFSET * T);
+            case "S": return new BABYLON.Vector3((exitTile.x + 0.5) * T, 2, oz + (room.rows - OFFSET) * T);
+            case "W": return new BABYLON.Vector3(ox + OFFSET * T, 2, (exitTile.z + 0.5) * T);
+            case "E": return new BABYLON.Vector3(ox + (room.cols - OFFSET) * T, 2, (exitTile.z + 0.5) * T);
+            default:  return new BABYLON.Vector3(cx, 2, cz);
         }
-        else if(tile.z === rMaxZ + 1){
-            x = (tile.x + 0.5) * T;
-            z = (rMaxZ + 0.5) * T;
-        }
-        else if(tile.x === rx - 1){
-            x = (rx + 0.5) * T;
-            z = (tile.z + 0.5) * T;
-        }
-        else if(tile.x === rMaxX + 1){
-            x = (rMaxX + 0.5) * T;
-            z = (tile.z + 0.5) * T;
-        }
-        else{
-            x = (room.worldX + room.cols/2) * T;
-            z = (room.worldZ + room.rows/2) * T;
-        }
-        return new BABYLON.Vector3(x, 2, z);
     }
 
     _side(room,tile){

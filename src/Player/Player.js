@@ -22,8 +22,8 @@ export class Player {
     this.camera.attachControl(this.canvas, true);
     this.camera.checkCollisions = true; // Active la physique
     this.camera.applyGravity = true;
-    this.camera.ellipsoid = new BABYLON.Vector3(0.25, 1, 0.25);
-    this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0); // le bas de l'ellipsoïde touche pile le sol
+    this.camera.ellipsoid = new BABYLON.Vector3(0.25, 2, 0.25);
+    this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 2, 0); // le bas de l'ellipsoïde touche pile le sol
     this.camera.slopLimit = 90; // angle max des pentes franchissables
     this.camera.stepOffset = 0.4; // hauteur max franchissable sans sauter (en unités)
     this.camera.minZ = 0.1;

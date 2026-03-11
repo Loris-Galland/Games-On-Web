@@ -2,6 +2,7 @@ import * as BABYLON from "@babylonjs/core";
 import { Player } from "../Player/Player";
 import { ProceduralMap } from "./ProceduralMap";
 import "@babylonjs/loaders/glTF";
+import "@babylonjs/inspector";
 
 export class GameScene {
     constructor(canvasId) {
@@ -45,6 +46,10 @@ export class GameScene {
         this._tempCamera = new BABYLON.FreeCamera("tempCam", new BABYLON.Vector3(0,2,0), scene);
 
         await this._generateMap(scene, canvas);
+
+        scene.debugLayer.show({
+            embedMode: true, // s'affiche dans la page
+        })
 
         return scene;
     }

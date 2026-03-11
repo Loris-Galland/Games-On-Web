@@ -5,6 +5,20 @@ const T  = 4;
 const H1 = 0;
 const H2 = 4;
 
+// ── Constantes de rotation ─────────────────────────────────────────────────
+// Utilise ces constantes dans les layouts pour définir les rotations des props.
+//
+// Dans chaque item de floor1 / floor2, le champ `rot` est OPTIONNEL :
+//   rot: R0              → rotation fixe à 0°
+//   rot: R90             → rotation fixe à 90°
+//   rot: [R0, R180]      → tirage aléatoire parmi les valeurs du tableau
+//   rot absent           → tirage aléatoire parmi 0° / 90° / 180° / 270° (comportement original)
+//
+const R0   = 0;
+const R90  = Math.PI / 2;
+const R180 = Math.PI;
+const R270 = Math.PI * 1.5;
+
 const FLOOR_BY_COLOR = {
     blue:   ["Floor_Tile_Carpet_Blue.glb"],
     green:  ["Hydroponics_Floor.glb"],
@@ -30,173 +44,170 @@ const RAMP = {
 const LAYOUTS = {
     command: [{
         floor1:[
-            {a:"Orrery_Tall.glb",           ox:0.5,  oz:0.5 },
-            {a:"Command_Console.glb",        ox:0.15, oz:0.15},
-            {a:"Command_Console.glb",        ox:0.5,  oz:0.1 },
-            {a:"Command_Console.glb",        ox:0.85, oz:0.15},
-            {a:"Command_Console.glb",        ox:0.15, oz:0.85},
-            {a:"Command_Console.glb",        ox:0.5,  oz:0.9 },
-            {a:"Command_Console.glb",        ox:0.85, oz:0.85},
-            {a:"Command_Wall.glb",           ox:0.1,  oz:0.5 },
-            {a:"Command_Wall.glb",           ox:0.9,  oz:0.5 },
-            {a:"Large_Monitor_Blue.glb",     ox:0.3,  oz:0.3 },
-            {a:"Large_Monitor_Blue.glb",     ox:0.7,  oz:0.3 },
-            {a:"Large_Monitor_Blue.glb",     ox:0.3,  oz:0.7 },
-            {a:"Large_Monitor_Blue.glb",     ox:0.7,  oz:0.7 },
+            {a:"Orrery_Tall.glb",           ox:0.5,  oz:0.3  /* rot absent → full random */ },
+            {a:"Command_Console.glb",        ox:0.5,  oz:0.5,  rot:R0   },
+            {a:"Command_Console.glb",        ox:0.5,  oz:0.1,  rot:R180 },
+            {a:"Command_Console.glb",        ox:0.3,  oz:0.3,  rot:R270 },
+            {a:"Command_Console.glb",        ox:0.7,  oz:0.3,  rot:R90  },
+            {a:"Command_Wall.glb",           ox:0.1,  oz:0.3,  rot:R270  },
+            {a:"Command_Wall.glb",           ox:0.9,  oz:0.3,  rot:R90 },
+
+            {a:"Large_Monitor_Blue.glb",     ox:0.8,  oz:0.9,  rot:R90 },
+            {a:"Command_Console.glb",        ox:0.6,  oz:0.9,  rot:R270  },
         ],
         floor2:[
-            {a:"Briefing_Screen_Blue.glb",   ox:0.2,  oz:0.2 },
-            {a:"Briefing_Screen_Purple.glb", ox:0.5,  oz:0.15},
-            {a:"Briefing_Screen_Orange.glb", ox:0.8,  oz:0.2 },
-            {a:"3D_Chess_Board.glb",         ox:0.5,  oz:0.5 },
-            {a:"Railing_Flat.glb",           ox:0.25, oz:0.8 },
-            {a:"Railing_Flat.glb",           ox:0.5,  oz:0.8 },
-            {a:"Railing_Flat.glb",           ox:0.75, oz:0.8 },
+            {a:"Briefing_Screen_Blue.glb",   ox:0.2,  oz:0.2,  rot:R0   },
+            {a:"Briefing_Screen_Purple.glb", ox:0.5,  oz:0.15, rot:R0   },
+            {a:"Briefing_Screen_Orange.glb", ox:0.8,  oz:0.2,  rot:R0   },
+            {a:"3D_Chess_Board.glb",         ox:0.5,  oz:0.5              },
+            {a:"Railing_Flat.glb",           ox:0.25, oz:0.8,  rot:R0   },
+            {a:"Railing_Flat.glb",           ox:0.5,  oz:0.8,  rot:R0   },
+            {a:"Railing_Flat.glb",           ox:0.75, oz:0.8,  rot:R0   },
         ],
-        hasFloor2:false, rampCorner:"SW",
+        hasFloor2:true, rampCorner:"SW",
     }],
     medbay: [{
         floor1:[
-            {a:"Cryo_Tube_ON.glb",           ox:0.15, oz:0.15},
-            {a:"Cryo_Tube_ON.glb",           ox:0.5,  oz:0.15},
-            {a:"Cryo_Tube_ON.glb",           ox:0.85, oz:0.15},
-            {a:"Cryo_Tube_OFF.glb",          ox:0.15, oz:0.85},
-            {a:"Cryo_Tube_OFF.glb",          ox:0.5,  oz:0.85},
-            {a:"Cryo_Tube_OFF.glb",          ox:0.85, oz:0.85},
-            {a:"BioMonitor_Blue.glb",        ox:0.25, oz:0.5 },
-            {a:"BioMonitor_Green.glb",       ox:0.5,  oz:0.5 },
-            {a:"BioMonitor_Red.glb",         ox:0.75, oz:0.5 },
-            {a:"Sleeper Casket Static.glb",  ox:0.15, oz:0.5 },
-            {a:"Sleeper Casket Static.glb",  ox:0.85, oz:0.5 },
-            {a:"Table_Light.glb",            ox:0.5,  oz:0.35},
+            {a:"Cryo_Tube_ON.glb",           ox:0.15, oz:0.15, rot:R0   },
+            {a:"Cryo_Tube_ON.glb",           ox:0.5,  oz:0.15, rot:R0   },
+            {a:"Cryo_Tube_ON.glb",           ox:0.85, oz:0.15, rot:R0   },
+            {a:"Cryo_Tube_OFF.glb",          ox:0.15, oz:0.85, rot:R180 },
+            {a:"Cryo_Tube_OFF.glb",          ox:0.5,  oz:0.85, rot:R180 },
+            {a:"Cryo_Tube_OFF.glb",          ox:0.85, oz:0.85, rot:R180 },
+            {a:"BioMonitor_Blue.glb",        ox:0.25, oz:0.5,  rot:R90  },
+            {a:"BioMonitor_Green.glb",       ox:0.5,  oz:0.5,  rot:[R0, R90, R180, R270] },
+            {a:"BioMonitor_Red.glb",         ox:0.75, oz:0.5,  rot:R270 },
+            {a:"Sleeper Casket Static.glb",  ox:0.15, oz:0.5,  rot:R90  },
+            {a:"Sleeper Casket Static.glb",  ox:0.85, oz:0.5,  rot:R270 },
+            {a:"Table_Light.glb",            ox:0.5,  oz:0.35             },
         ],
         floor2:[
-            {a:"Cryo_Tube_OFF.glb",    ox:0.5,  oz:0.2 },
-            {a:"BioMonitor_Blue.glb",  ox:0.2,  oz:0.35},
-            {a:"BioMonitor_Red.glb",   ox:0.8,  oz:0.35},
-            {a:"Railing_Flat.glb",     ox:0.25, oz:0.7 },
-            {a:"Railing_Flat.glb",     ox:0.75, oz:0.7 },
+            {a:"Cryo_Tube_OFF.glb",    ox:0.5,  oz:0.2,  rot:R0   },
+            {a:"BioMonitor_Blue.glb",  ox:0.2,  oz:0.35, rot:R90  },
+            {a:"BioMonitor_Red.glb",   ox:0.8,  oz:0.35, rot:R270 },
+            {a:"Railing_Flat.glb",     ox:0.25, oz:0.7,  rot:R0   },
+            {a:"Railing_Flat.glb",     ox:0.75, oz:0.7,  rot:R0   },
         ],
-        hasFloor2:false, rampCorner:"NE",
+        hasFloor2:true, rampCorner:"NE",
     }],
     engine: [{
         floor1:[
-            {a:"Generator.glb",              ox:0.15, oz:0.15},
-            {a:"Generator.glb",              ox:0.85, oz:0.15},
-            {a:"Generator.glb",              ox:0.15, oz:0.85},
-            {a:"Generator.glb",              ox:0.85, oz:0.85},
-            {a:"Generator_Pile_Chonky.glb",  ox:0.5,  oz:0.5 },
-            {a:"Generator_Pile_Small.glb",   ox:0.35, oz:0.35},
-            {a:"Generator_Pile_Small.glb",   ox:0.65, oz:0.35},
-            {a:"Generator_Pile_Small.glb",   ox:0.35, oz:0.65},
-            {a:"Generator_Pile_Small.glb",   ox:0.65, oz:0.65},
-            {a:"Air_Con.glb",                ox:0.5,  oz:0.2 },
-            {a:"Air_Con.glb",                ox:0.5,  oz:0.8 },
+            {a:"Generator.glb",              ox:0.15, oz:0.15, rot:R0   },
+            {a:"Generator.glb",              ox:0.85, oz:0.15, rot:R90  },
+            {a:"Generator.glb",              ox:0.15, oz:0.85, rot:R270 },
+            {a:"Generator.glb",              ox:0.85, oz:0.85, rot:R180 },
+            {a:"Generator_Pile_Chonky.glb",  ox:0.5,  oz:0.5              },
+            {a:"Generator_Pile_Small.glb",   ox:0.35, oz:0.35             },
+            {a:"Generator_Pile_Small.glb",   ox:0.65, oz:0.35             },
+            {a:"Generator_Pile_Small.glb",   ox:0.35, oz:0.65             },
+            {a:"Generator_Pile_Small.glb",   ox:0.65, oz:0.65             },
+            {a:"Air_Con.glb",                ox:0.5,  oz:0.2,  rot:R0   },
+            {a:"Air_Con.glb",                ox:0.5,  oz:0.8,  rot:R180 },
         ],
         floor2:[
-            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.3 },
-            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.3 },
-            {a:"Briefing_Screen_Orange.glb", ox:0.5,  oz:0.2 },
-            {a:"Railing_Flat.glb",           ox:0.3,  oz:0.7 },
-            {a:"Railing_Flat.glb",           ox:0.7,  oz:0.7 },
+            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.3             },
+            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.3             },
+            {a:"Briefing_Screen_Orange.glb", ox:0.5,  oz:0.2,  rot:R0   },
+            {a:"Railing_Flat.glb",           ox:0.3,  oz:0.7,  rot:R0   },
+            {a:"Railing_Flat.glb",           ox:0.7,  oz:0.7,  rot:R0   },
         ],
-        hasFloor2:false, rampCorner:"SE",
+        hasFloor2:true, rampCorner:"SE",
     }],
     cafeteria: [{
         floor1:[
-            {a:"Cafeteria_Table.glb",           ox:0.18, oz:0.2 },
-            {a:"Cafeteria_Table.glb",           ox:0.5,  oz:0.2 },
-            {a:"Cafeteria_Table.glb",           ox:0.82, oz:0.2 },
-            {a:"Cafeteria_Table.glb",           ox:0.18, oz:0.8 },
-            {a:"Cafeteria_Table.glb",           ox:0.5,  oz:0.8 },
-            {a:"Cafeteria_Table.glb",           ox:0.82, oz:0.8 },
-            {a:"Octo_Table.glb",                ox:0.5,  oz:0.5 },
-            {a:"Chair_1.glb",                   ox:0.32, oz:0.5 },
-            {a:"Chair_1.glb",                   ox:0.68, oz:0.5 },
-            {a:"Space_Ketchup.glb",             ox:0.42, oz:0.5 },
-            {a:"Space_Mayo_Naise.glb",          ox:0.58, oz:0.5 },
-            {a:"Meeting_Table.glb",             ox:0.18, oz:0.5 },
-            {a:"Cafeteria_Table_Inset_Red.glb", ox:0.82, oz:0.5 },
+            {a:"Cafeteria_Table.glb",           ox:0.18, oz:0.2,  rot:R0   },
+            {a:"Cafeteria_Table.glb",           ox:0.5,  oz:0.2,  rot:R0   },
+            {a:"Cafeteria_Table.glb",           ox:0.82, oz:0.2,  rot:R0   },
+            {a:"Cafeteria_Table.glb",           ox:0.18, oz:0.8,  rot:R180 },
+            {a:"Cafeteria_Table.glb",           ox:0.5,  oz:0.8,  rot:R180 },
+            {a:"Cafeteria_Table.glb",           ox:0.82, oz:0.8,  rot:R180 },
+            {a:"Octo_Table.glb",                ox:0.5,  oz:0.5              },
+            {a:"Chair_1.glb",                   ox:0.32, oz:0.5,  rot:R90  },
+            {a:"Chair_1.glb",                   ox:0.68, oz:0.5,  rot:R270 },
+            {a:"Space_Ketchup.glb",             ox:0.42, oz:0.5,  rot:[R0, R90, R180, R270] },
+            {a:"Space_Mayo_Naise.glb",          ox:0.58, oz:0.5,  rot:[R0, R90, R180, R270] },
+            {a:"Meeting_Table.glb",             ox:0.18, oz:0.5,  rot:R90  },
+            {a:"Cafeteria_Table_Inset_Red.glb", ox:0.82, oz:0.5,  rot:R90  },
         ],
         floor2:[
-            {a:"Meeting_Table.glb", ox:0.3,  oz:0.3 },
-            {a:"Meeting_Table.glb", ox:0.7,  oz:0.3 },
-            {a:"Chair_1.glb",       ox:0.3,  oz:0.5 },
-            {a:"Chair_1.glb",       ox:0.7,  oz:0.5 },
-            {a:"Lava_Lamp.glb",     ox:0.5,  oz:0.3 },
-            {a:"Railing_Flat.glb",  ox:0.25, oz:0.75},
-            {a:"Railing_Flat.glb",  ox:0.75, oz:0.75},
+            {a:"Meeting_Table.glb", ox:0.3,  oz:0.3, rot:R0  },
+            {a:"Meeting_Table.glb", ox:0.7,  oz:0.3, rot:R0  },
+            {a:"Chair_1.glb",       ox:0.3,  oz:0.5, rot:R90 },
+            {a:"Chair_1.glb",       ox:0.7,  oz:0.5, rot:R90 },
+            {a:"Lava_Lamp.glb",     ox:0.5,  oz:0.3           },
+            {a:"Railing_Flat.glb",  ox:0.25, oz:0.75,rot:R0  },
+            {a:"Railing_Flat.glb",  ox:0.75, oz:0.75,rot:R0  },
         ],
         hasFloor2:false, rampCorner:"NW",
     }],
     hydro: [{
         floor1:[
-            {a:"Hydroponic_Bay.glb",    ox:0.15, oz:0.15},
-            {a:"Hydroponic_Bay.glb",    ox:0.5,  oz:0.15},
-            {a:"Hydroponic_Bay.glb",    ox:0.85, oz:0.15},
-            {a:"Hydroponics_Full.glb",  ox:0.15, oz:0.85},
-            {a:"Hydroponics_Full.glb",  ox:0.5,  oz:0.85},
-            {a:"Hydroponics_Full.glb",  ox:0.85, oz:0.85},
-            {a:"Hydroponics_Lamp.glb",  ox:0.3,  oz:0.5 },
-            {a:"Hydroponics_Lamp.glb",  ox:0.7,  oz:0.5 },
-            {a:"Plant_1.glb",           ox:0.5,  oz:0.5 },
-            {a:"Plant_1.glb",           ox:0.33, oz:0.35},
-            {a:"Plant_1.glb",           ox:0.67, oz:0.65},
+            {a:"Hydroponic_Bay.glb",    ox:0.15, oz:0.15, rot:R0   },
+            {a:"Hydroponic_Bay.glb",    ox:0.5,  oz:0.15, rot:R0   },
+            {a:"Hydroponic_Bay.glb",    ox:0.85, oz:0.15, rot:R0   },
+            {a:"Hydroponics_Full.glb",  ox:0.15, oz:0.85, rot:R180 },
+            {a:"Hydroponics_Full.glb",  ox:0.5,  oz:0.85, rot:R180 },
+            {a:"Hydroponics_Full.glb",  ox:0.85, oz:0.85, rot:R180 },
+            {a:"Hydroponics_Lamp.glb",  ox:0.3,  oz:0.5              },
+            {a:"Hydroponics_Lamp.glb",  ox:0.7,  oz:0.5              },
+            {a:"Plant_1.glb",           ox:0.5,  oz:0.5              },
+            {a:"Plant_1.glb",           ox:0.33, oz:0.35             },
+            {a:"Plant_1.glb",           ox:0.67, oz:0.65             },
         ],
         floor2:[
-            {a:"Hydroponics_Full.glb", ox:0.25, oz:0.25},
-            {a:"Hydroponics_Full.glb", ox:0.75, oz:0.25},
-            {a:"Plant_1.glb",          ox:0.5,  oz:0.3 },
-            {a:"Railing_Flat.glb",     ox:0.25, oz:0.75},
-            {a:"Railing_Flat.glb",     ox:0.75, oz:0.75},
+            {a:"Hydroponics_Full.glb", ox:0.25, oz:0.25, rot:R0  },
+            {a:"Hydroponics_Full.glb", ox:0.75, oz:0.25, rot:R0  },
+            {a:"Plant_1.glb",          ox:0.5,  oz:0.3            },
+            {a:"Railing_Flat.glb",     ox:0.25, oz:0.75, rot:R0  },
+            {a:"Railing_Flat.glb",     ox:0.75, oz:0.75, rot:R0  },
         ],
-        hasFloor2:false, rampCorner:"SW",
+        hasFloor2:true, rampCorner:"SW",
     }],
     quarters: [{
         floor1:[
-            {a:"Bunk_Double_Blue.glb",   ox:0.15, oz:0.18},
-            {a:"Bunk_Double_Blue.glb",   ox:0.85, oz:0.18},
-            {a:"Bunk_Double_Orange.glb", ox:0.15, oz:0.82},
-            {a:"Bunk_Double_Orange.glb", ox:0.85, oz:0.82},
-            {a:"Bunk_Single_Grey.glb",   ox:0.5,  oz:0.18},
-            {a:"Bunk_Single_Grey.glb",   ox:0.5,  oz:0.82},
-            {a:"End_Table.glb",          ox:0.35, oz:0.5 },
-            {a:"End_Table.glb",          ox:0.65, oz:0.5 },
-            {a:"Floor_Lamp.glb",         ox:0.5,  oz:0.5 },
-            {a:"Table_Light.glb",        ox:0.27, oz:0.18},
-            {a:"Lava_Lamp.glb",          ox:0.5,  oz:0.37},
+            {a:"Bunk_Double_Blue.glb",   ox:0.15, oz:0.18, rot:R0   },
+            {a:"Bunk_Double_Blue.glb",   ox:0.85, oz:0.18, rot:R0   },
+            {a:"Bunk_Double_Orange.glb", ox:0.15, oz:0.82, rot:R180 },
+            {a:"Bunk_Double_Orange.glb", ox:0.85, oz:0.82, rot:R180 },
+            {a:"Bunk_Single_Grey.glb",   ox:0.5,  oz:0.18, rot:R0   },
+            {a:"Bunk_Single_Grey.glb",   ox:0.5,  oz:0.82, rot:R180 },
+            {a:"End_Table.glb",          ox:0.35, oz:0.5,  rot:[R0, R90, R180, R270] },
+            {a:"End_Table.glb",          ox:0.65, oz:0.5,  rot:[R0, R90, R180, R270] },
+            {a:"Floor_Lamp.glb",         ox:0.5,  oz:0.5              },
+            {a:"Table_Light.glb",        ox:0.27, oz:0.18, rot:R0   },
+            {a:"Lava_Lamp.glb",          ox:0.5,  oz:0.37             },
         ],
         floor2:[
-            {a:"Bunk_Single_Grey.glb", ox:0.2,  oz:0.2 },
-            {a:"Bunk_Single_Grey.glb", ox:0.8,  oz:0.2 },
-            {a:"Floor_Lamp.glb",       ox:0.5,  oz:0.3 },
-            {a:"Railing_Flat.glb",     ox:0.25, oz:0.75},
-            {a:"Railing_Flat.glb",     ox:0.75, oz:0.75},
+            {a:"Bunk_Single_Grey.glb", ox:0.2,  oz:0.2,  rot:R0   },
+            {a:"Bunk_Single_Grey.glb", ox:0.8,  oz:0.2,  rot:R0   },
+            {a:"Floor_Lamp.glb",       ox:0.5,  oz:0.3              },
+            {a:"Railing_Flat.glb",     ox:0.25, oz:0.75, rot:R0   },
+            {a:"Railing_Flat.glb",     ox:0.75, oz:0.75, rot:R0   },
         ],
-        hasFloor2:false, rampCorner:"SE",
+        hasFloor2:true, rampCorner:"SE",
     }],
     storage: [{
         floor1:[
-            {a:"Battery_Blue.glb",           ox:0.15, oz:0.15},
-            {a:"Battery_Red.glb",            ox:0.85, oz:0.15},
-            {a:"Battery_Green.glb",          ox:0.5,  oz:0.15},
-            {a:"Battery_Grey.glb",           ox:0.15, oz:0.85},
-            {a:"Battery_Orange.glb",         ox:0.85, oz:0.85},
-            {a:"Battery_Blue.glb",           ox:0.5,  oz:0.85},
-            {a:"Generator_Pile_Chonky.glb",  ox:0.5,  oz:0.5 },
-            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.35},
-            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.35},
-            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.65},
-            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.65},
+            {a:"Battery_Blue.glb",           ox:0.15, oz:0.15, rot:R0   },
+            {a:"Battery_Red.glb",            ox:0.85, oz:0.15, rot:R0   },
+            {a:"Battery_Green.glb",          ox:0.5,  oz:0.15, rot:R0   },
+            {a:"Battery_Grey.glb",           ox:0.15, oz:0.85, rot:R180 },
+            {a:"Battery_Orange.glb",         ox:0.85, oz:0.85, rot:R180 },
+            {a:"Battery_Blue.glb",           ox:0.5,  oz:0.85, rot:R180 },
+            {a:"Generator_Pile_Chonky.glb",  ox:0.5,  oz:0.5              },
+            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.35             },
+            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.35             },
+            {a:"Generator_Pile_Small.glb",   ox:0.3,  oz:0.65             },
+            {a:"Generator_Pile_Small.glb",   ox:0.7,  oz:0.65             },
         ],
         floor2:[
-            {a:"Battery_Red.glb",           ox:0.3,  oz:0.3 },
-            {a:"Battery_Blue.glb",          ox:0.7,  oz:0.3 },
-            {a:"Generator_Pile_Small.glb",  ox:0.5,  oz:0.25},
-            {a:"Railing_Flat.glb",          ox:0.25, oz:0.75},
-            {a:"Railing_Flat.glb",          ox:0.75, oz:0.75},
+            {a:"Battery_Red.glb",           ox:0.3,  oz:0.3,  rot:R0   },
+            {a:"Battery_Blue.glb",          ox:0.7,  oz:0.3,  rot:R0   },
+            {a:"Generator_Pile_Small.glb",  ox:0.5,  oz:0.25             },
+            {a:"Railing_Flat.glb",          ox:0.25, oz:0.75, rot:R0   },
+            {a:"Railing_Flat.glb",          ox:0.75, oz:0.75, rot:R0   },
         ],
-        hasFloor2:false, rampCorner:"NE",
+        hasFloor2:true, rampCorner:"NE",
     }],
     default:[{
         floor1:[{a:"End_Table.glb",ox:0.3,oz:0.3},{a:"End_Table.glb",ox:0.7,oz:0.7}],
@@ -220,6 +231,16 @@ const CORRIDOR_LEN = 4;
 function rng(seed){let s=seed;return()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/0xffffffff;};}
 function pick(arr,rand){return arr[Math.floor(rand()*arr.length)];}
 
+// Résout la rotation d'un item de layout :
+//   - nombre  → rotation fixe (ex: R90)
+//   - tableau → tirage aléatoire parmi les valeurs (ex: [R0, R180])
+//   - absent  → tirage aléatoire parmi 0 / 90 / 180 / 270°
+function resolveRot(rot, rand) {
+    if (Array.isArray(rot)) return rot[Math.floor(rand() * rot.length)];
+    if (rot !== undefined)  return rot;
+    return Math.floor(rand() * 4) * (Math.PI / 2);
+}
+
 export class ProceduralMap {
     constructor(scene, options={}) {
         this.scene      = scene;
@@ -233,20 +254,15 @@ export class ProceduralMap {
         this.corridors  = [];
         this.spawnPoint = BABYLON.Vector3.Zero();
         this._activeNode    = null;
-        this._corridorNode  = null;  // couloir sortant (aller)
-        this._corridorInNode= null;  // couloir entrant (retour)
+        this._corridorNode  = null;
+        this._corridorInNode= null;
         this._activeIdx     = -1;
         this._loading       = false;
         this._camera        = null;
         this._onRoomReady   = null;
-        // Cache des salles déjà construites : idx → TransformNode
-        // On ne construit chaque salle qu'une seule fois, puis on show/hide
         this._builtRooms    = new Map();
-        // Anti-spam : timestamp de la dernière transition + cooldown en ms
         this._lastTransition  = 0;
-        this._cooldownMs      = 1500; // 1.5s minimum entre deux transitions
-        // Zone du dernier trigger déclenché — on ne re-déclenche pas tant
-        // que le joueur n'est pas sorti puis rentré à nouveau
+        this._cooldownMs      = 1500;
         this._lastTriggerKey  = null;
     }
 
@@ -300,10 +316,8 @@ export class ProceduralMap {
         const cIn =idx>0                    ?this.corridors[idx-1]:null;
         const cOut=idx<this.corridors.length?this.corridors[idx]  :null;
 
-        // ── Construire la salle une seule fois ──
         let roomNode;
         if(this._builtRooms.has(idx)){
-            // Salle déjà connue : on la réaffiche sans la reconstruire
             roomNode = this._builtRooms.get(idx);
             console.log(`[Map] Salle ${idx} restaurée depuis le cache.`);
         } else {
@@ -314,54 +328,34 @@ export class ProceduralMap {
             this._builtRooms.set(idx, roomNode);
         }
 
-        // Cacher l'ancienne salle (sans la détruire)
         if(this._activeNode && this._activeNode !== roomNode){
             this._activeNode.setEnabled(false);
         }
 
-        // Afficher la nouvelle
         roomNode.setEnabled(true);
         this._activeNode = roomNode;
         this._activeIdx  = idx;
 
-        // Couloirs (toujours reconstruits car légers et dépendent de l'état courant)
         await this._buildCorridorDisplay(idx);
         await this._buildCorridorInDisplay(idx);
 
         console.log(`[Map] Salle ${idx} active.`);
 
-        // ── Spawn cohérent selon la direction d'arrivée ──
-        // Si on vient de idx+1 (on revient en arrière) → spawner côté sortie
-        // Si on vient de idx-1 (on avance) ou première visite → spawner côté entrée
-        console.log("comingFromIdx : ", comingFromIdx);
         const comingBack = comingFromIdx !== null && comingFromIdx > idx;
         const spawnEntry = this._calcEntrySpawn(room, cIn);
         const spawnExit  = this._calcExitSpawn(room, cOut);
-        console.log("coming back : ", comingBack);
         const spawnPos   = comingBack ? spawnExit : spawnEntry;
 
-        // Téléporter le joueur EN PREMIER, puis libérer le lock.
-        // L'ordre est critique : si on libère _loading avant la téléportation,
-        // le trigger loop peut re-déclencher pendant les 50ms du setTimeout
-        // et provoquer un conflit de génération.
         if(this._onRoomReady){
-            // On attend 1 frame que Babylon enregistre les nouveaux meshes
             await new Promise(resolve => setTimeout(resolve, 50));
             this._onRoomReady(room, idx, spawnPos, {spawnEntry, spawnExit, comingBack});
         }
 
-        // Réinitialiser la clé du trigger et repartir le cooldown depuis le spawn.
-        // Le joueur doit sortir de toute zone trigger puis y re-entrer avant
-        // qu'une nouvelle transition soit possible — évite le spawn DANS un trigger
-        // qui se déclencherait immédiatement (ex: spawn côté sortie = zone trigger sortant).
         this._lastTriggerKey = null;
         this._lastTransition = performance.now();
-
-        // Lock libéré APRÈS la téléportation — aucune transition possible avant
         this._loading=false;
     }
 
-    // ── Couloir SORTANT (aller) ─────────────────
     async _buildCorridorDisplay(roomIdx){
         if(this._corridorNode){
             this._corridorNode.getChildMeshes().forEach(m=>m.dispose());
@@ -378,28 +372,23 @@ export class ProceduralMap {
         await this._buildCorridorGeometry(corridor.tiles, node, roomIdx, false);
     }
 
-    // ── Couloir ENTRANT (retour) ────────────────
-    // Même apparence que le sortant, tuiles parcourues en sens inverse
-    // pour que le brouillard s'épaississe vers la salle précédente
     async _buildCorridorInDisplay(roomIdx){
         if(this._corridorInNode){
             this._corridorInNode.getChildMeshes().forEach(m=>m.dispose());
             this._corridorInNode.dispose();
             this._corridorInNode=null;
         }
-        if(roomIdx===0)return; // salle spawn : pas de retour
+        if(roomIdx===0)return;
 
         const corridor=this.corridors[roomIdx-1];
         const node=new BABYLON.TransformNode(`corrIn_${roomIdx}`,this.scene);
         node.parent=this._root;
         this._corridorInNode=node;
 
-        // Sens inversé : prog=0 côté salle courante, prog=1 côté salle précédente
         const tilesRev=[...corridor.tiles].reverse();
         await this._buildCorridorGeometry(tilesRev, node, roomIdx, true);
     }
 
-    // ── Géométrie commune aux deux couloirs ─────
     async _buildCorridorGeometry(tiles, node, roomIdx, isReturn){
         const tileSet=new Set(tiles.map(t=>`${t.x},${t.z}`));
         const ps=[];
@@ -413,7 +402,7 @@ export class ProceduralMap {
             const prev=tiles[i-1],next=tiles[i+1];
             const gX=next?next.x!==tile.x:prev?prev.x!==tile.x:false;
             const gZ=next?next.z!==tile.z:prev?prev.z!==tile.z:false;
-            const prog=i/tiles.length; // 0=entrée du couloir, 1=sortie
+            const prog=i/tiles.length;
 
             const fb=BABYLON.MeshBuilder.CreateBox(`cf_${i}_${roomIdx}_${isReturn}`,{width:T,height:0.1,depth:T},this.scene);
             fb.position=new BABYLON.Vector3(wx+T/2,-0.05,wz+T/2);
@@ -429,7 +418,6 @@ export class ProceduralMap {
                 if(!tileSet.has(`${tile.x+1},${tile.z}`)){ps.push(this._vis("Wall_Grey.glb",new BABYLON.Vector3(wx+T,0,wz+T/2),new BABYLON.Vector3(0,Math.PI/2,0),node));this._mkCol(`cWE_${i}_${roomIdx}_${isReturn}`,wx+T,1.5,wz+T/2,0.3,3,T,node);}
             }
 
-            // Brouillard progressif : s'épaissit vers la sortie du couloir (prog > 0.3)
             if(prog>0.3){
                 const alpha=Math.min(0.97,(prog-0.3)*1.5);
                 const fm=new BABYLON.StandardMaterial(`fm_${i}_${roomIdx}_${isReturn}`,this.scene);
@@ -443,32 +431,25 @@ export class ProceduralMap {
             }
         }
 
-        // Trigger : 2 tuiles avant la sortie du couloir
         if(tiles.length>=2){
             const tTile=tiles[tiles.length-2];
             const prefix=isReturn?"trigIn":"trig";
             const trigger=BABYLON.MeshBuilder.CreateBox(`${prefix}_${roomIdx}`,{width:T*1.5,height:4,depth:T*1.5},this.scene);
             trigger.position=new BABYLON.Vector3(tTile.x*T+T/2,1,tTile.z*T+T/2);
             trigger.isVisible=false;trigger.checkCollisions=false;trigger.isPickable=false;trigger.parent=node;
-            // Aller → salle suivante, Retour → salle précédente
             trigger._toRoom    = isReturn ? roomIdx-1 : roomIdx+1;
-            // La salle d'origine est stockée dans le trigger pour calculer comingBack
-            // indépendamment de _activeIdx au moment du déclenchement
             trigger._fromRoom  = roomIdx;
         }
 
         await Promise.all(ps);
     }
 
-    // ── Trigger loop : surveille les deux couloirs ──
-    // Anti-spam : cooldown + détection sortie de zone avant re-déclenchement
     _setupTriggerLoop(){
         this.scene.registerBeforeRender(()=>{
             if(!this._camera||this._loading)return;
             const cam=this._camera.position;
             const now=performance.now();
 
-            // Collecter tous les triggers actifs (sortant + entrant)
             const triggerSources=[];
             if(this._corridorNode)   triggerSources.push({node:this._corridorNode,   prefix:"trig_"   });
             if(this._corridorInNode) triggerSources.push({node:this._corridorInNode, prefix:"trigIn_" });
@@ -483,12 +464,8 @@ export class ProceduralMap {
                     if(!inside)continue;
 
                     inAnyTrigger=true;
-                    const key=m.name; // identifiant unique du trigger
+                    const key=m.name;
 
-                    // Ne déclencher que si :
-                    // 1. Cooldown écoulé depuis la dernière transition
-                    // 2. Ce n'est pas le même trigger que celui qui vient de se déclencher
-                    //    (le joueur doit être sorti puis rentré à nouveau)
                     if(now - this._lastTransition < this._cooldownMs) break;
                     if(key === this._lastTriggerKey) break;
 
@@ -500,16 +477,12 @@ export class ProceduralMap {
                     if(valid){
                         this._lastTriggerKey = key;
                         this._lastTransition = now;
-                        // Utiliser _fromRoom stocké dans le trigger plutôt que _activeIdx
-                        // _activeIdx peut avoir changé si plusieurs transitions rapides
                         this._activateRoom(to, m._fromRoom);
                     }
                     break;
                 }
             }
 
-            // Dès que le joueur sort de toute zone trigger, on réinitialise la clé
-            // → il pourra re-déclencher le même trigger s'il repart dans le couloir
             if(!inAnyTrigger) this._lastTriggerKey=null;
         });
     }
@@ -563,7 +536,7 @@ export class ProceduralMap {
             const margin=T*2,usableW=rW-margin*2,usableD=rD-margin*2;
             for(const item of lay.floor1){
                 const px=ox+margin+item.ox*usableW,pz=oz+margin+item.oz*usableD;
-                const rot=item.rot??Math.floor(this.rand()*4)*(Math.PI/2);
+                const rot = resolveRot(item.rot, this.rand);
                 ps.push(this._place(item.a,new BABYLON.Vector3(px,H1,pz),new BABYLON.Vector3(0,rot,0),parent));
             }
             if(lay.hasFloor2)await this._buildFloor2(room,lay,parent);
@@ -578,7 +551,7 @@ export class ProceduralMap {
         const floors=FLOOR_BY_COLOR[room.color] ??FLOOR_BY_COLOR.grey;
         const ps=[];
 
-        const fCols=Math.floor(room.cols*0.5),fRows=Math.floor(room.rows*0.5);
+        const fCols=Math.floor(room.cols*0.4),fRows=Math.floor(room.rows*0.35);
         const corner=lay.rampCorner??"NW";
         let sCo,sRo;
         if     (corner==="NW"){sCo=0;              sRo=0;}
@@ -591,48 +564,58 @@ export class ProceduralMap {
         for(let tx=sCo;tx<sCo+fCols;tx++)
             for(let tz=sRo;tz<sRo+fRows;tz++)
                 ps.push(this._vis(pick(floors,this.rand),new BABYLON.Vector3(ox+tx*T+T/2,H2,oz+tz*T+T/2),BABYLON.Vector3.Zero(),parent));
+
         this._mkCol(`f2_${ox}_${oz}`,eOx+eW/2,H2-0.1,eOz+eD/2,eW,0.2,eD,parent);
+
+        const openSide = (corner==="NW") ? "S"
+            : (corner==="NE") ? "S"
+                : (corner==="SW") ? "N"
+                    :                   "N"; // SE
 
         for(let tx=sCo;tx<sCo+fCols;tx++){
             const wx=ox+tx*T+T/2;
-            if(sRo===0)              ps.push(this._vis(wSet.f2,new BABYLON.Vector3(wx,H2,oz),   new BABYLON.Vector3(0,Math.PI,0),parent));
-            if(sRo+fRows===room.rows)ps.push(this._vis(wSet.f2,new BABYLON.Vector3(wx,H2,oz+rD),BABYLON.Vector3.Zero(),          parent));
+            if(openSide!=="N") ps.push(this._vis(wSet.f2,new BABYLON.Vector3(wx,H2,eOz),    new BABYLON.Vector3(0,Math.PI,0),parent));
+            if(openSide!=="S") ps.push(this._vis(wSet.f2,new BABYLON.Vector3(wx,H2,eOz+eD), BABYLON.Vector3.Zero(),          parent));
         }
         for(let tz=sRo;tz<sRo+fRows;tz++){
             const wz=oz+tz*T+T/2;
-            if(sCo===0)              ps.push(this._vis(wSet.f2,new BABYLON.Vector3(ox,   H2,wz),new BABYLON.Vector3(0,-Math.PI/2,0),parent));
-            if(sCo+fCols===room.cols)ps.push(this._vis(wSet.f2,new BABYLON.Vector3(ox+rW,H2,wz),new BABYLON.Vector3(0,Math.PI/2,0), parent));
-        }
-        this._mkCol(`w2N_${ox}`,eOx+eW/2,H2+1.5,eOz,      eW,3,0.3,parent);
-        this._mkCol(`w2S_${ox}`,eOx+eW/2,H2+1.5,eOz+eD,   eW,3,0.3,parent);
-        this._mkCol(`w2W_${oz}`,eOx,      H2+1.5,eOz+eD/2,0.3,3,eD,parent);
-        this._mkCol(`w2E_${oz}`,eOx+eW,   H2+1.5,eOz+eD/2,0.3,3,eD,parent);
-
-        let rX,rZ,rRot;
-        if     (corner==="NW"){rX=eOx+T/2;    rZ=eOz+T/2;    rRot=0;}
-        else if(corner==="NE"){rX=eOx+eW-T/2; rZ=eOz+T/2;    rRot=Math.PI/2;}
-        else if(corner==="SW"){rX=eOx+T/2;    rZ=eOz+eD-T/2; rRot=-Math.PI/2;}
-        else                  {rX=eOx+eW-T/2; rZ=eOz+eD-T/2; rRot=Math.PI;}
-
-        ps.push(this._place(RAMP.base[room.color]??RAMP.base.grey,new BABYLON.Vector3(rX,   H1,rZ),new BABYLON.Vector3(0,rRot,0),parent));
-        ps.push(this._vis(  RAMP.L[room.color]  ??RAMP.L.grey,    new BABYLON.Vector3(rX-T/2,H1,rZ),new BABYLON.Vector3(0,rRot,0),parent));
-        ps.push(this._vis(  RAMP.R[room.color]  ??RAMP.R.grey,    new BABYLON.Vector3(rX+T/2,H1,rZ),new BABYLON.Vector3(0,rRot,0),parent));
-
-        for(let s=0;s<3;s++){
-            const sy=H1+(H2/3)*s+(H2/6);
-            const dz=(corner.includes("N")?1:-1)*s*(T/3);
-            this._mkCol(`rs_${s}_${ox}`,rX,sy,rZ+dz,T,H2/3,T/3,parent);
+            if(openSide!=="W") ps.push(this._vis(wSet.f2,new BABYLON.Vector3(eOx,   H2,wz),new BABYLON.Vector3(0,-Math.PI/2,0),parent));
+            if(openSide!=="E") ps.push(this._vis(wSet.f2,new BABYLON.Vector3(eOx+eW,H2,wz),new BABYLON.Vector3(0, Math.PI/2,0),parent));
         }
 
-        for(let tx=sCo;tx<sCo+fCols;tx++){
-            const wx=ox+tx*T+T/2;
-            ps.push(this._vis("Deck_Height_Metal.glb",new BABYLON.Vector3(wx,H1+0.5,eOz),   new BABYLON.Vector3(0,Math.PI,0),parent));
-            ps.push(this._vis("Deck_Height_Metal.glb",new BABYLON.Vector3(wx,H1+0.5,eOz+eD),BABYLON.Vector3.Zero(),          parent));
+        if(openSide!=="N") this._mkCol(`w2N_${ox}`,eOx+eW/2,H2+1.5,eOz,      eW,3,0.3,parent);
+        if(openSide!=="S") this._mkCol(`w2S_${ox}`,eOx+eW/2,H2+1.5,eOz+eD,   eW,3,0.3,parent);
+        if(openSide!=="W") this._mkCol(`w2W_${oz}`,eOx,      H2+1.5,eOz+eD/2,0.3,3,eD,parent);
+        if(openSide!=="E") this._mkCol(`w2E_${oz}`,eOx+eW,   H2+1.5,eOz+eD/2,0.3,3,eD,parent);
+
+        if(openSide==="N"||openSide==="S"){
+            const rZ  = openSide==="N" ? eOz - T : eOz+eD + T;
+            const rRot= openSide==="N" ? 0       : Math.PI;
+            const count = fCols;
+            for(let i=0;i<count;i++){
+                const rX = eOx + i*T + T/2;
+                const isFlipped = rRot !== 0;
+                const asset = i===0       ? (isFlipped ? RAMP.R[room.color]??RAMP.R.grey : RAMP.L[room.color]??RAMP.L.grey)
+                    : i===count-1 ? (isFlipped ? RAMP.L[room.color]??RAMP.L.grey : RAMP.R[room.color]??RAMP.R.grey)
+                        :               RAMP.base[room.color]??RAMP.base.grey;
+                ps.push(this._place(asset, new BABYLON.Vector3(rX,H1,rZ+T*0.5), new BABYLON.Vector3(0,rRot,0), parent));
+            }
+        } else {
+            const rX  = openSide==="W" ? eOx - T : eOx+eW + T;
+            const rRot= openSide==="W" ? -Math.PI/2 : Math.PI/2;
+            const count = fRows;
+            for(let i=0;i<count;i++){
+                const rZ = eOz + i*T + T/2;
+                const asset = i===0       ? RAMP.L[room.color]??RAMP.L.grey
+                    : i===count-1 ? RAMP.R[room.color]??RAMP.R.grey
+                        :               RAMP.base[room.color]??RAMP.base.grey;
+                ps.push(this._place(asset, new BABYLON.Vector3(rX,H1,rZ+T*0.5), new BABYLON.Vector3(0,rRot,0), parent));
+            }
         }
 
         for(const item of lay.floor2){
             const px=eOx+item.ox*eW,pz=eOz+item.oz*eD;
-            const rot=item.rot??Math.floor(this.rand()*4)*(Math.PI/2);
+            const rot = resolveRot(item.rot, this.rand);
             ps.push(this._place(item.a,new BABYLON.Vector3(px,H2,pz),new BABYLON.Vector3(0,rot,0),parent));
         }
 
@@ -640,7 +623,7 @@ export class ProceduralMap {
     }
 
     _calcEntrySpawn(room, cIn) {
-        const OFFSET = 3;
+        const OFFSET = 0.5;
         const ox = room.worldX * T, oz = room.worldZ * T;
         const cx = (room.worldX + room.cols / 2) * T;
         const cz = (room.worldZ + room.rows / 2) * T;
@@ -661,9 +644,8 @@ export class ProceduralMap {
         }
     }
 
-    // Spawn côté sortie (porte de sortie) — utilisé quand on revient en arrière
     _calcExitSpawn(room, cOut) {
-        const OFFSET = 3;
+        const OFFSET = 0.5;
         const ox = room.worldX * T, oz = room.worldZ * T;
         const cx = (room.worldX + room.cols / 2) * T;
         const cz = (room.worldZ + room.rows / 2) * T;
@@ -672,7 +654,6 @@ export class ProceduralMap {
             return new BABYLON.Vector3(cx, 2, cz);
         }
 
-        // La première tuile du couloir sortant est contre le mur de sortie
         const exitTile = cOut.tiles[0];
         const side = this._side(room, exitTile);
 

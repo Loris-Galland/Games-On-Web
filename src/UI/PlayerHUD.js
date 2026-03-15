@@ -51,6 +51,23 @@ export class PlayerHUD {
     this.waveText = document.createElement("div");
     this.waveText.id = "wave-hud";
     document.body.appendChild(this.waveText);
+
+    this.fpsContainer = document.createElement("div");
+    this.fpsContainer.id = "fpsContainer";
+    this.fpsContainer.style.cssText = `
+      position: absolute;
+      background-color: black;
+      border: 2px solid red;
+      text-align: center;
+      font-size: 16px;
+      color: white;
+      top: 15px;
+      right: 10px;
+      width: 60px;
+      height: 20px;
+      `;
+    this.fpsContainer.textContent = '0';
+    document.body.appendChild(this.fpsContainer);
   }
 
   // Mise à jour de la vie
@@ -109,5 +126,9 @@ export class PlayerHUD {
     setTimeout(() => {
       this.waveText.style.opacity = "0";
     }, 2000);
+  }
+
+  updateFps(engine){
+      this.fpsContainer.innerHTML = engine.getFps().toFixed() + " fps";
   }
 }

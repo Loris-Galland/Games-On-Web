@@ -2,5 +2,6 @@ import '../src/Styles/Game.css';
 import { GameScene } from './Scenes/GameScene';
 
 window.addEventListener('DOMContentLoaded', () => {
-    new GameScene('renderCanvas');
+    const game = new GameScene('renderCanvas');
+    game._init();
 });

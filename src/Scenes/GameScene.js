@@ -47,9 +47,9 @@ export class GameScene {
 
         await this._generateMap(scene, canvas);
 
-        /*scene.debugLayer.show({
+        scene.debugLayer.show({
             embedMode: true, // s'affiche dans la page
-        })*/
+        })
 
         return scene;
     }

@@ -709,7 +709,7 @@ export class ProceduralMap {
         if(openSide!=="E")this._mkCol(`w2E_${oz}`,eOx+eW,   H2+1.5,eOz+eD/2,0.3,3,eD,parent);
 
         if(openSide==="N"||openSide==="S"){
-            const rZ  =openSide==="N"?eOz-T:eOz+eD+T;
+            const rZ  =openSide==="N"?eOz-T:eOz+eD;
             const rRot=openSide==="N"?0:Math.PI;
             const count=fCols;
             for(let i=0;i<count;i++){

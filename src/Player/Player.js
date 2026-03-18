@@ -20,16 +20,15 @@ export class Player {
             this.scene,
         );
         this.camera.attachControl(this.canvas, true);
-        this.camera.checkCollisions = true; // Active la physique
+        this.camera.checkCollisions = true;
         this.camera.applyGravity = true;
         this.camera.ellipsoid = new BABYLON.Vector3(0.25, 1.5, 0.25);
-        this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 1.5, 0); // le bas de l'ellipsoïde touche pile le sol
-        this.camera.slopLimit = 90; // angle max des pentes franchissables
-        this.camera.stepOffset = 0.4; // hauteur max franchissable sans sauter (en unités)
+        this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 1.5, 0);
+        this.camera.slopLimit = 90;
+        this.camera.stepOffset = 0.4;
         this.camera.minZ = 0.1;
         this.camera.speed = this.speed;
         this.camera.angularSensibility = 5000;
-        // Rend tout sauf le layer arme (0x10000000)
         this.camera.layerMask = 0x0FFFFFFF;
 
         // Configuration des touches
@@ -61,10 +60,10 @@ export class Player {
             this._updateCameraTilt();
             this._updateWeaponBobbing();
             this._updateJump();
+            this._updateWeaponRecoilRecovery();
         });
     }
 
-    // Ecoute le clavier
     _initInputs() {
         this.scene.onKeyboardObservable.add((kbInfo) => {
             const key = kbInfo.event.key.toLowerCase();
@@ -78,11 +77,9 @@ export class Player {
         });
     }
 
-    // Logique du saut
     _jump() {
         if (this.jumpForce > 0) return;
 
-        // Lance un rayon vers le bas pour vérifier le sol
         const ray = new BABYLON.Ray(
             this.camera.position,
             new BABYLON.Vector3(0, -1, 0),
@@ -98,16 +95,14 @@ export class Player {
         }
     }
 
-    // Physique du saut
     _updateJump() {
         if (this.jumpForce > 0) {
             this.camera.cameraDirection.y += this.jumpForce;
-            this.jumpForce -= 0.02; // Gravité
+            this.jumpForce -= 0.02;
             if (this.jumpForce <= 0) this.jumpForce = 0;
         }
     }
 
-    // Création de l'arme
     _initWeapon() {
         const weaponMat = new BABYLON.StandardMaterial("weaponMat", this.scene);
         weaponMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.3);
@@ -122,12 +117,12 @@ export class Player {
         this.weaponOriginalPos = new BABYLON.Vector3(0.4, -0.4, 1);
         this.weapon.position = this.weaponOriginalPos.clone();
 
-        // Layer dédié pour l'arme : elle sera rendue par une caméra
-        // séparée APRÈS la scène, depth buffer vidé → toujours visible.
+        // Limite de recul : l'arme ne peut pas reculer en dessous de cette valeur Z
+        // (évite qu'elle passe derrière la caméra en spammant)
+        this.weaponMinZ = 0.6;
+
         this.weapon.layerMask = 0x10000000;
 
-        // Caméra arme : même orientation que la caméra joueur,
-        // rend uniquement le layer 0x10000000.
         this._weaponCamera = new BABYLON.FreeCamera(
             "weaponCam",
             BABYLON.Vector3.Zero(),
@@ -138,13 +133,8 @@ export class Player {
         this._weaponCamera.maxZ     = 5;
         this._weaponCamera.layerMask = 0x10000000;
 
-        // Deux caméras actives : scène principale d'abord, arme ensuite
         this.scene.activeCameras = [this.camera, this._weaponCamera];
 
-        // Avant le rendu de la weaponCam → vider le depth buffer
-        // pour que l'arme passe toujours devant tout.
-        // onBeforeCameraRenderObservable est l'observable correcte
-        // (onBeforeDrawPhaseObservable n'existe pas sur FreeCamera).
         this.scene.onBeforeCameraRenderObservable.add((cam) => {
             if (cam === this._weaponCamera) {
                 this.scene.getEngine().clear(null, false, true, false);
@@ -152,7 +142,29 @@ export class Player {
         });
     }
 
-    // Inclinaison de la caméra
+    // Applique le recul avec un cap pour ne pas dépasser weaponMinZ
+    applyWeaponRecoil(amount) {
+        if (!this.weapon) return;
+        const newZ = this.weapon.position.z - amount;
+        this.weapon.position.z = Math.max(newZ, this.weaponMinZ);
+    }
+
+    // Récupération progressive du recul vers la position originale
+    _updateWeaponRecoilRecovery() {
+        if (!this.weapon) return;
+        if (this.weapon.position.z < this.weaponOriginalPos.z) {
+            this.weapon.position.z = BABYLON.Scalar.Lerp(
+                this.weapon.position.z,
+                this.weaponOriginalPos.z,
+                0.15,
+            );
+            // Snap vers la position originale si très proche
+            if (Math.abs(this.weapon.position.z - this.weaponOriginalPos.z) < 0.001) {
+                this.weapon.position.z = this.weaponOriginalPos.z;
+            }
+        }
+    }
+
     _updateCameraTilt() {
         let targetTilt = 0;
         if (this.inputMap["q"] || this.inputMap["a"]) targetTilt = 0.05;
@@ -162,7 +174,6 @@ export class Player {
         this.camera.rotation.z = this.currentTilt;
     }
 
-    // Mouvement de l'arme en marchant
     _updateWeaponBobbing() {
         const isMoving =
             this.inputMap["z"] ||
@@ -179,9 +190,15 @@ export class Player {
             this.weapon.position.x =
                 this.weaponOriginalPos.x + Math.cos(this.bobTimer * 0.5) * 0.04;
         } else {
-            this.weapon.position = BABYLON.Vector3.Lerp(
-                this.weapon.position,
-                this.weaponOriginalPos,
+            // Lerp uniquement X et Y, Z est géré par _updateWeaponRecoilRecovery
+            this.weapon.position.x = BABYLON.Scalar.Lerp(
+                this.weapon.position.x,
+                this.weaponOriginalPos.x,
+                0.1,
+            );
+            this.weapon.position.y = BABYLON.Scalar.Lerp(
+                this.weapon.position.y,
+                this.weaponOriginalPos.y,
                 0.1,
             );
             this.bobTimer = 0;

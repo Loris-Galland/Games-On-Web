@@ -49,7 +49,7 @@ export class GameScene {
 
         scene.debugLayer.show({
             embedMode: true, // s'affiche dans la page
-        })
+        });
 
         return scene;
     }
@@ -163,9 +163,6 @@ export class GameScene {
             scene.meshes.forEach(m => {
                 if (m._worldMatrix) m.computeWorldMatrix(true);
             });
-
-            // Rebuild l'octree pour le frustum culling avec les nouveaux meshes
-            scene.createOrUpdateSelectionOctree(64);
 
             // Masquer l'écran de chargement
             this._finishLoading();

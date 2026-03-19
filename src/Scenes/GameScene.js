@@ -2,6 +2,7 @@ import * as BABYLON from "@babylonjs/core";
 import { Player } from "../Player/Player";
 import { ProceduralMap } from "./ProceduralMap";
 import { WaveManager } from "../Systems/WaveManager";
+import { NavigationManager } from "../Systems/NavigationManager";
 import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
 
@@ -23,6 +24,7 @@ export class GameScene {
         this.engine.runRenderLoop(() => {
             this.scene.render();
             if (this.player) this.player.hud.updateFps(this.engine);
+            if (this.navManager) this.navManager.update(this.engine.getDeltaTime() / 1000);
         });
         window.addEventListener("resize", () => this.engine.resize());
     }
@@ -203,7 +205,29 @@ export class GameScene {
                     (room.worldZ + room.rows / 2) * T,
                 );
 
-                this.waveManager.enterRoom(idx, entryPos, exitPos, entryRotY, exitRotY, roomCenter);
+                // Collecter les meshes walkable de la salle (sols + rampes, avec collisions)
+                // On prend uniquement les meshes visibles de la salle active (nœud de la salle)
+                const roomNode = this.map._builtRooms.get(idx);
+                const walkable = roomNode
+                    ? roomNode.getChildMeshes(false).filter(m =>
+                        m.isVisible &&
+                        m.getTotalVertices() > 0 &&
+                        !m.name.startsWith("w") &&   // pas les murs
+                        !m.name.startsWith("f2") &&  // pas les colliders balcon invisibles
+                        !m.name.startsWith("fRDC")   // pas le sol invisible (collider plat)
+                    )
+                    : [];
+
+                // Construire le navmesh de manière asynchrone puis notifier le WaveManager
+                if (this.navManager && walkable.length > 0) {
+                    this.navManager.buildForRoom(walkable).then(() => {
+                        // Optionnel : afficher le debug navmesh (commenter en prod)
+                        // this.navManager.showDebug(true);
+                        this.waveManager.enterRoom(idx, entryPos, exitPos, entryRotY, exitRotY, roomCenter, this.navManager);
+                    });
+                } else {
+                    this.waveManager.enterRoom(idx, entryPos, exitPos, entryRotY, exitRotY, roomCenter, null);
+                }
             }
 
             this._finishLoading();
@@ -220,6 +244,10 @@ export class GameScene {
 
         // Initialiser le WaveManager après avoir créé le Player
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);
+
+        // Initialiser le NavigationManager Recast (charge le WASM une seule fois)
+        this.navManager = new NavigationManager(scene);
+        await this.navManager.init();
 
         this._tempCamera.dispose();
         this._tempCamera = null;

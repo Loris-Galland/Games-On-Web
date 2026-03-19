@@ -34,13 +34,13 @@ export class WaveManager {
      * entryRot  : rotation Y de la porte d'entrée (rad)
      * exitRot   : rotation Y de la porte de sortie (rad)
      */
-    enterRoom(roomIdx, entryPos, exitPos, entryRot = 0, exitRot = 0, roomCenter = null) {
-        // Nettoyage des ennemis précédents
+    enterRoom(roomIdx, entryPos, exitPos, entryRot = 0, exitRot = 0, roomCenter = null, navManager = null) {
         this._clearEnemies();
         this._removeDoors();
 
         this._currentRoomIdx = roomIdx;
-        this._roomCenter     = roomCenter; // centre de la salle pour le spawn
+        this._roomCenter     = roomCenter;
+        this._navManager     = navManager;
 
         // Salle spawn (idx 0) → jamais de vagues
         if (roomIdx === 0) return;
@@ -151,8 +151,8 @@ export class WaveManager {
         this.hud.showWaveMessage(`VAGUE ${this.currentWave} / ${WAVES_PER_ROOM}`);
 
         const enemiesToSpawn = this.currentWave * 2; // 2, 4, 6, 8, 10
-        // Vitesse croissante : vague 1 → 0.29, vague 5 → 0.65
-        const enemySpeed = 0.2 + this.currentWave * 0.09;
+        // Vitesse croissante : vague 1 → 0.65, vague 5 → 1.05
+        const enemySpeed = 0.5 + this.currentWave * 0.1;
 
         // Spawn autour du centre de la salle (pas de la position joueur)
         const center = this._roomCenter ?? this.player.camera.position;
@@ -164,7 +164,7 @@ export class WaveManager {
             const z = center.z + Math.sin(angle) * radius;
 
             const spawnPos = new BABYLON.Vector3(x, 1.25, z);
-            const enemy    = new DummyEnemy(this.scene, spawnPos, this.player, enemySpeed);
+            const enemy    = new DummyEnemy(this.scene, spawnPos, this.player, enemySpeed, this._navManager);
             this.enemiesAlive.push(enemy);
         }
     }

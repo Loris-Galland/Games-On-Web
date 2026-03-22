@@ -49,7 +49,7 @@ export class GameScene {
 
         await this._generateMap(scene, canvas);
 
-        scene.debugLayer.show({ embedMode: true });
+        //scene.debugLayer.show({ embedMode: true });
 
         return scene;
     }
@@ -217,12 +217,11 @@ export class GameScene {
                         !m.name.startsWith("fRDC")   // pas le sol invisible (collider plat)
                     )
                     : [];
-
                 // Construire le navmesh de manière asynchrone puis notifier le WaveManager
                 if (this.navManager && walkable.length > 0) {
                     this.navManager.buildForRoom(walkable).then(() => {
                         // Optionnel : afficher le debug navmesh (commenter en prod)
-                        // this.navManager.showDebug(true);
+                        //this.navManager.showDebug(true);
                         this.waveManager.enterRoom(idx, entryPos, exitPos, entryRotY, exitRotY, roomCenter, this.navManager);
                     });
                 } else {
@@ -231,7 +230,6 @@ export class GameScene {
             }
 
             this._finishLoading();
-            console.log(`[GameScene] Joueur téléporté vers salle ${idx} (${room.type})`);
         };
 
         await this._showLoading("spawn", 0);

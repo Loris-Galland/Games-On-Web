@@ -16,13 +16,13 @@ export class DummyEnemy {
      * @param {NavigationManager|null} navManager   gestionnaire Recast
      */
     constructor(scene, position, player, speed = 0.65, navManager = null) {
-        this.scene      = scene;
-        this.player     = player;
-        this.speed      = speed;
+        this.scene       = scene;
+        this.player      = player;
+        this.speed       = speed;
         this._navManager = navManager;
-        this._agentIdx   = null;  // index crowd Recast
+        this._agentIdx   = null;
 
-        // Physique (utilisée en mode fallback ou pour la gravité)
+        // Physique (utilisée en mode fallback)
         this.gravity          = -18;
         this.verticalVelocity = 0;
         this.isGrounded       = false;
@@ -35,7 +35,7 @@ export class DummyEnemy {
         this._stuckDir      = null;
         this._stuckDirTimer = 0;
 
-        // Mise à jour périodique de la cible (évite de spammer agentGoto)
+        // Mise à jour périodique de la cible
         this._targetUpdateTimer = 0;
         this._targetInterval    = 0.5;
 
@@ -48,9 +48,7 @@ export class DummyEnemy {
         this.body.position  = new BABYLON.Vector3(position.x, position.y + 1.1, position.z);
         this.body.ellipsoid = new BABYLON.Vector3(0.55, 1.1, 0.55);
         this.body.refreshBoundingInfo();
-        this.body.showBoundingBox          = false;
-        this.body.showSubMeshesBoundingBox = false;
-        this.body.checkCollisions          = true;
+        this.body.checkCollisions = true;
 
         const bodyMat = new BABYLON.StandardMaterial("bodyMat", scene);
         bodyMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.25);
@@ -66,7 +64,6 @@ export class DummyEnemy {
         weakMat.disableLighting = true;
         this.weakPoint.material = weakMat;
 
-        // Enregistrement comme agent Recast une fois le navmesh prêt
         this._tryRegisterAgent();
 
         this.observer = this.scene.onBeforeRenderObservable.add(() => this._update());
@@ -103,7 +100,6 @@ export class DummyEnemy {
             (pos.x - targetWorld.x) ** 2 + (pos.z - targetWorld.z) ** 2,
         );
 
-        // Tenter l'enregistrement si pas encore fait
         if (this._agentIdx === null) this._tryRegisterAgent();
 
         if (this._agentIdx !== null && this._navManager?.isReady) {
@@ -114,9 +110,13 @@ export class DummyEnemy {
                 this._targetUpdateTimer = this._targetInterval;
             }
 
-            // La position du body est mise à jour par le crowd agent directement
-            // (Babylon lie le mesh au crowd via addAgent).
-            // On gère juste l'orientation.
+            // Le crowd Recast place le mesh au niveau du sol (Y navmesh).
+            // On corrige Y après sa mise à jour pour que le body soit au-dessus du sol.
+            const agentPos = this._navManager.getAgentPosition(this._agentIdx);
+            if (agentPos) {
+                this.body.position.y = agentPos.y + 1.1;
+            }
+
             const vel = this._navManager.getAgentVelocity(this._agentIdx);
             if (vel && vel.length() > 0.1 && distFlat > 1) {
                 const lookAt = new BABYLON.Vector3(pos.x + vel.x, pos.y, pos.z + vel.z);
@@ -139,7 +139,6 @@ export class DummyEnemy {
                 if (this.verticalVelocity < 0) this.verticalVelocity = Math.max(this.verticalVelocity, -3);
             }
 
-            // Anti-blocage
             if (this._lastPos) {
                 const moved = BABYLON.Vector3.Distance(pos, this._lastPos);
                 if (moved < 0.004 && distFlat > 3) { this._stuckTimer += dt; }

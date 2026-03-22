@@ -152,7 +152,7 @@ export class WaveManager {
 
         const enemiesToSpawn = this.currentWave * 2; // 2, 4, 6, 8, 10
         // Vitesse croissante : vague 1 → 0.65, vague 5 → 1.05
-        const enemySpeed = 0.5 + this.currentWave * 0.1;
+        const enemySpeed = 2 + this.currentWave * 0.1;
 
         // Spawn autour du centre de la salle (pas de la position joueur)
         const center = this._roomCenter ?? this.player.camera.position;

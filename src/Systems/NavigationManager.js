@@ -19,7 +19,7 @@ import * as BABYLON from "@babylonjs/core";
  */
 export class NavigationManager {
     constructor(scene) {
-        this.scene  = scene;
+        this.scene   = scene;
         this._plugin = null;
         this._crowd  = null;
         this._agents = new Map(); // agentIdx → { mesh, targetPos }
@@ -27,15 +27,25 @@ export class NavigationManager {
         this._debugMesh = null;
     }
 
-    // ── Initialisation (charge Recast WASM) ───────────────────────────────────
+    // ── Initialisation (charge Recast via CDN global) ─────────────────────────
+    // Nécessite dans index.html :
+    // <script src="https://cdn.babylonjs.com/recast.js"></script>
 
     async init() {
-        // recast-detour doit être installé : npm install recast-detour
         try {
-            const Recast = await import("recast-detour");
-            const recastInstance = await Recast.default();
+            const recastInstance = await new Promise((resolve, reject) => {
+                if (typeof Recast !== "undefined") {
+                    Recast().then(resolve).catch(reject);
+                } else {
+                    const interval = setInterval(() => {
+                        if (typeof Recast !== "undefined") {
+                            clearInterval(interval);
+                            Recast().then(resolve).catch(reject);
+                        }
+                    }, 100);
+                }
+            });
             this._plugin = new BABYLON.RecastJSPlugin(recastInstance);
-            console.log("[NavMesh] RecastJSPlugin initialisé");
         } catch (e) {
             console.error("[NavMesh] Impossible de charger recast-detour :", e);
             this._plugin = null;
@@ -55,12 +65,10 @@ export class NavigationManager {
     async buildForRoom(meshes, agentRadius = 0.6, agentHeight = 2.2) {
         if (!this._plugin) return;
 
-        // Nettoyage précédent
         this._destroyCrowd();
         if (this._debugMesh) { this._debugMesh.dispose(); this._debugMesh = null; }
         this._ready = false;
 
-        // Filtrer les meshes vides ou sans géométrie
         const valid = meshes.filter(m => m && !m.isDisposed() && m.getTotalVertices() > 0);
         if (valid.length === 0) {
             console.warn("[NavMesh] Aucun mesh walkable fourni");
@@ -68,43 +76,59 @@ export class NavigationManager {
         }
 
         const params = {
-            cs:                  0.3,   // résolution voxel XZ (plus petit = plus précis)
-            ch:                  0.2,   // résolution voxel Y
-            walkableSlopeAngle:  45,    // pente max franchissable (degrés)
-            walkableHeight:      agentHeight / 0.2,  // en voxels
-            walkableClimb:       2,     // marche max en voxels (~0.4u)
-            walkableRadius:      Math.ceil(agentRadius / 0.3),
-            maxEdgeLen:          12,
+            cs:                     0.3,
+            ch:                     0.2,
+            walkableSlopeAngle:     45,
+            walkableHeight:         agentHeight / 0.2,
+            walkableClimb:          4,      // était 2 — augmenté pour les rampes hautes
+            walkableRadius:         Math.ceil(agentRadius / 0.3),
+            maxEdgeLen:             12,
             maxSimplificationError: 1.3,
-            minRegionArea:       8,
-            mergeRegionArea:     20,
-            maxVertsPerPoly:     6,
-            detailSampleDist:    6,
-            detailSampleMaxError: 1,
+            minRegionArea:          8,
+            mergeRegionArea:        20,
+            maxVertsPerPoly:        6,
+            detailSampleDist:       6,
+            detailSampleMaxError:   1,
         };
 
-        return new Promise((resolve) => {
-            try {
-                this._plugin.createNavMesh(valid, params, (navmeshData) => {
-                    if (!navmeshData) {
-                        console.warn("[NavMesh] Données navmesh invalides");
-                        resolve();
-                        return;
-                    }
-                    this._plugin.buildFromNavmeshData(navmeshData);
+        try {
+            // Bake world transform : les meshes GLB ont leurs vertices en local space,
+            // on crée des meshes temporaires avec les vertices transformés en world space
+            const baked = valid.map(m => {
+                const worldMatrix = m.getWorldMatrix();
+                const positions   = m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+                if (!positions) return null;
 
-                    // Crowd : max 30 agents, rayon 0.6
-                    this._crowd = this._plugin.createCrowd(30, agentRadius, this.scene);
+                const transformed = new Float32Array(positions.length);
+                for (let i = 0; i < positions.length; i += 3) {
+                    const v = BABYLON.Vector3.TransformCoordinates(
+                        new BABYLON.Vector3(positions[i], positions[i + 1], positions[i + 2]),
+                        worldMatrix,
+                    );
+                    transformed[i]     = v.x;
+                    transformed[i + 1] = v.y;
+                    transformed[i + 2] = v.z;
+                }
 
-                    this._ready = true;
-                    console.log("[NavMesh] Navmesh + Crowd prêts");
-                    resolve();
-                });
-            } catch (e) {
-                console.error("[NavMesh] Erreur buildForRoom :", e);
-                resolve();
-            }
-        });
+                const temp = new BABYLON.Mesh("_nav_" + m.name, this.scene);
+                const vertexData = new BABYLON.VertexData();
+                vertexData.positions = transformed;
+                vertexData.indices   = m.getIndices();
+                vertexData.applyToMesh(temp);
+                return temp;
+            }).filter(Boolean);
+
+            // API synchrone (sans callback) — compatible CDN Recast
+            this._plugin.createNavMesh(baked, params);
+
+            // Nettoyer les meshes temporaires
+            baked.forEach(m => m.dispose());
+
+            this._crowd = this._plugin.createCrowd(30, agentRadius, this.scene);
+            this._ready = true;
+        } catch (e) {
+            console.error("[NavMesh] Erreur buildForRoom :", e);
+        }
     }
 
     // ── Debug visuel du navmesh (optionnel) ───────────────────────────────────
@@ -116,9 +140,9 @@ export class NavigationManager {
         this._debugMesh = this._plugin.createDebugNavMesh(this.scene);
         const mat = new BABYLON.StandardMaterial("navDebugMat", this.scene);
         mat.diffuseColor = new BABYLON.Color3(0.1, 0.4, 1);
-        mat.alpha = 0.25;
-        mat.wireframe = false;
-        this._debugMesh.material = mat;
+        mat.alpha        = 0.25;
+        mat.wireframe    = false;
+        this._debugMesh.material  = mat;
         this._debugMesh.isPickable = false;
     }
 
@@ -134,17 +158,18 @@ export class NavigationManager {
     addAgent(position, mesh, speed = 0.65) {
         if (!this.isReady) return null;
 
-        // Snapper la position sur le navmesh
-        const snapped = this._plugin.getClosestPoint(position);
+        // Forcer Y=0 pour le snap — le navmesh est au niveau du sol
+        const posOnGround = new BABYLON.Vector3(position.x, 0, position.z);
+        const snapped     = this._plugin.getClosestPoint(posOnGround);
 
         const agentParams = {
-            radius:             0.55,
-            height:             2.2,
-            maxAcceleration:    200,
-            maxSpeed:           speed,
-            collisionQueryRange: 2.0,
+            radius:                0.55,
+            height:                2.2,
+            maxAcceleration:       200,
+            maxSpeed:              speed,
+            collisionQueryRange:   2.0,
             pathOptimizationRange: 8.0,
-            separationWeight:   1.5,
+            separationWeight:      1.5,
         };
 
         try {
@@ -166,7 +191,8 @@ export class NavigationManager {
         if (!info) return;
         info.targetPos = targetPos;
         try {
-            const snapped = this._plugin.getClosestPoint(targetPos);
+            const targetAdjusted = new BABYLON.Vector3(targetPos.x, targetPos.y - 1.5, targetPos.z);
+            const snapped = this._plugin.getClosestPoint(targetAdjusted);
             this._crowd.agentGoto(agentIdx, snapped);
         } catch (e) { /* ignore */ }
     }

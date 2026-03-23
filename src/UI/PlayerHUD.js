@@ -131,4 +131,70 @@ export class PlayerHUD {
   updateFps(engine){
       this.fpsContainer.innerHTML = engine.getFps().toFixed() + " fps";
   }
+
+  // Affiche l'écran de sélection d'amélioration à la fin d'une salle
+  showUpgradeScreen(upgrades, onSelectCallback) {
+    this.upgradeOverlay = document.createElement("div");
+    this.upgradeOverlay.id = "upgrade-overlay";
+
+    // Titre
+    const title = document.createElement("div");
+    title.className = "upgrade-title";
+    title.innerText = ">> SYSTÈME DE MISE À JOUR DISPONIBLE <<";
+    this.upgradeOverlay.appendChild(title);
+
+    // Conteneur des cartes
+    const cardsContainer = document.createElement("div");
+    cardsContainer.className = "cards-container";
+
+    upgrades.forEach((upgrade) => {
+      const card = document.createElement("div");
+      card.className = "upgrade-card";
+
+      card.innerHTML = `
+        <div class="card-icon-wrapper">
+            <img src="${upgrade.iconPath || '/vite.svg'}" alt="icon" class="card-icon">
+        </div>
+        <div class="card-title">${upgrade.name}</div>
+        <div class="card-desc">${upgrade.description}</div>
+      `;
+
+      // Ce qui se passe quand le joueur clique sur une carte
+      card.addEventListener("click", () => {
+        this.upgradeOverlay.remove();
+        onSelectCallback(upgrade);
+      });
+
+      cardsContainer.appendChild(card);
+    });
+
+    this.upgradeOverlay.appendChild(cardsContainer);
+    document.body.appendChild(this.upgradeOverlay);
+
+    // Petite animation d'apparition fluide
+    requestAnimationFrame(() => {
+      this.upgradeOverlay.style.opacity = "1";
+    });
+  }
+
+  // Ajoute de nouveaux segments de vie au HUD
+  addHealthSegments(amount, newMaxHealth) {
+    this.maxHealth = newMaxHealth;
+    for (let i = 0; i < amount; i++) {
+      const segment = document.createElement("div");
+      segment.className = "hud-segment"; // Prend automatiquement le Cyan
+      this.segments.push(segment);
+      this.barContainer.appendChild(segment);
+    }
+  }
+
+  // Ajoute des segments de munitions
+  addAmmoSegments(amount) {
+    for (let i = 0; i < amount; i++) {
+      const segment = document.createElement("div");
+      segment.className = "hud-segment ammo-segment"; 
+      this.ammoSegments.push(segment);
+      this.ammoBarContainer.appendChild(segment);
+    }
+  }
 }

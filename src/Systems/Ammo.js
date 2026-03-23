@@ -38,4 +38,12 @@ export class Ammo {
       }
     }, this.rechargeRateMs);
   }
+
+  // Augmente la capacité du chargeur et le remplit
+  increaseMax(amount) {
+    this.maxAmmo += amount;
+    this.currentAmmo += amount;
+    
+    if (this.onAmmoChange) this.onAmmoChange(this.currentAmmo, this.maxAmmo);
+  }
 }

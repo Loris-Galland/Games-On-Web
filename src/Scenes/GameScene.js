@@ -5,6 +5,7 @@ import { WaveManager } from "../Systems/WaveManager";
 import { NavigationManager } from "../Systems/NavigationManager";
 import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
+import { UpgradeManager } from "../Systems/UpgradeManager";
 
 export class GameScene {
     constructor(canvasId) {
@@ -239,6 +240,23 @@ export class GameScene {
         this.player.camera.position = new BABYLON.Vector3(
             this.map.spawnPoint.x, 5, this.map.spawnPoint.z,
         );
+
+        // Teste le système d'amélioration dynamique avec la touche U
+    this.upgradeManager = new UpgradeManager(this.player);
+
+    window.addEventListener("keydown", (evt) => {
+      if (evt.key.toLowerCase() === 'u') {
+        document.exitPointerLock();
+
+        const randomCards = this.upgradeManager.getRandomUpgrades(3);
+
+        this.player.hud.showUpgradeScreen(randomCards, (choix) => {
+          console.log("Tu as choisi :", choix.name);
+          choix.apply(this.player);
+          scene.getEngine().enterPointerlock();
+        });
+      }
+    });
 
         // Initialiser le WaveManager après avoir créé le Player
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);

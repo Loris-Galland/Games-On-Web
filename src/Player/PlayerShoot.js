@@ -1,3 +1,4 @@
+import * as BABYLON from "@babylonjs/core";
 import { Projectile } from "../Weapons/Projectile.js";
 import { Ammo } from "../Systems/Ammo.js";
 
@@ -7,11 +8,12 @@ export class PlayerShoot {
         this.scene = player.scene;
         this.camera = player.camera;
 
-        // Configuration tir
         this.fireRate = 200;
         this.lastFireTime = 0;
+        
+        // Nouvelle variable pour l'amélioration
+        this.multishotEnabled = false;
 
-        // Système de munitions
         this.daggerAmmo = new Ammo(5, 1000, (current, max) => {
             this.player.hud.updateAmmo(current, max);
         });
@@ -21,6 +23,7 @@ export class PlayerShoot {
         this._initShootControl();
     }
 
+    // Initialise les contrôles de clic gauche pour tirer
     _initShootControl() {
         this.scene.onPointerDown = (evt) => {
             const engine = this.scene.getEngine();
@@ -40,6 +43,7 @@ export class PlayerShoot {
         };
     }
 
+    // Tire le projectile central et ajoute des tirs latéraux si l'amélioration est active
     fireBasicDagger() {
         if (this.daggerAmmo.consume()) {
             const forward = this.camera.getForwardRay();
@@ -47,9 +51,24 @@ export class PlayerShoot {
 
             const spawnPos = this.camera.globalPosition.add(direction.scale(2.0));
 
+            // Tir central classique
             new Projectile(this.scene, spawnPos, direction, false);
 
-            // Recul avec cap — délégué à Player pour respecter weaponMinZ
+            // Si l'amélioration TIR DIVISÉ a été choisie, on tire à gauche et à droite
+            if (this.multishotEnabled) {
+                const spreadAngle = 0.15; // Ajuste cette valeur pour écarter plus ou moins les balles
+
+                // Vecteur de la balle gauche
+                const matrixLeft = BABYLON.Matrix.RotationY(-spreadAngle);
+                const dirLeft = BABYLON.Vector3.TransformNormal(direction, matrixLeft);
+                new Projectile(this.scene, spawnPos, dirLeft, false);
+
+                // Vecteur de la balle droite
+                const matrixRight = BABYLON.Matrix.RotationY(spreadAngle);
+                const dirRight = BABYLON.Vector3.TransformNormal(direction, matrixRight);
+                new Projectile(this.scene, spawnPos, dirRight, false);
+            }
+
             if (this.player.weapon) {
                 this.player.applyWeaponRecoil(0.1);
             }

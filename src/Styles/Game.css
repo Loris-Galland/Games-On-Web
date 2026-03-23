@@ -89,6 +89,104 @@ html, body, #app, canvas {
     animation: glitch 0.2s infinite;
 }
 
+#upgrade-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 10, 15, 0.85);
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    pointer-events: auto; /* Permet de cliquer */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.upgrade-title {
+    color: #00ffff;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 32px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px #00ffff;
+    margin-bottom: 50px;
+    text-transform: uppercase;
+}
+
+.cards-container {
+    display: flex;
+    gap: 40px;
+}
+
+/* Style de la carte */
+.upgrade-card {
+    width: 250px;
+    height: 380px;
+    background: linear-gradient(135deg, #1a202c 0%, #0d1117 100%);
+    border: 2px solid #30363d;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    /* L'effet Cyberpunk : un coin inférieur droit coupé */
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
+}
+
+/* L'effet au survol de la souris */
+.upgrade-card:hover {
+    border-color: #00ffff;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+    transform: translateY(-10px);
+}
+
+.upgrade-card:hover .card-title {
+    color: #00ffff;
+    text-shadow: 0 0 8px #00ffff;
+}
+
+/* Conteneur de ton icône */
+.card-icon-wrapper {
+    width: 100px;
+    height: 100px;
+    background: #000;
+    border: 1px solid #445566;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 30px;
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+}
+
+.card-icon {
+    max-width: 60%;
+    max-height: 60%;
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+}
+
+.card-title {
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 15px;
+    transition: color 0.2s;
+}
+
+.card-desc {
+    color: #aaaaaa;
+    font-family: 'Arial', sans-serif;
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.5;
+}
+
 @keyframes glitch {
     0% { transform: translate(0) }
     20% { transform: translate(-2px, 2px) }

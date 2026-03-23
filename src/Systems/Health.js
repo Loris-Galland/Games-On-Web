@@ -34,4 +34,12 @@ export class Health {
   die() {
     if (this.onDeath) this.onDeath();
   }
+
+  // Augmente la vie maximale et soigne le joueur de ce montant
+  increaseMax(amount) {
+    this.maxHealth += amount;
+    this.currentHealth += amount;
+    
+    if (this.onDamage) this.onDamage(this.currentHealth, this.maxHealth);
+  }
 }

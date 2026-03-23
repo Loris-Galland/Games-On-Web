@@ -1,4 +1,4 @@
-// Dictionnaire des icônes par catégorie
+// Dictionnaire des icones par categorie
 const ICONS_BY_CATEGORY = {
     "HEALTH": "/assets/icons/health_icon.png",    
     "WEAPON": "/assets/icons/weapon_icon.png",
@@ -10,51 +10,59 @@ export class UpgradeManager {
         this.player = player;
         
         this.availableUpgrades = [
-            // --- SANTÉ ---
+            // Sante max
             {
                 id: "health_up",
                 category: "HEALTH",
                 name: "BLINDAGE RENFORCÉ",
-                description: "Restaure l'intégrité système et ajoute +2 barres max.",
+                description: "Ajoute +2 barres à votre intégrité système maximale.",
                 apply: (p) => {
-                    // 1. Crée les carrés visuels D'ABORD
                     p.hud.addHealthSegments(2, p.health.maxHealth + 2);
-                    // 2. Met à jour la logique (ça va allumer les carrés en Cyan)
                     p.health.increaseMax(2); 
                 }
             },
 
-            // --- ARMES (MUNITIONS MAX) ---
+            // Soin complet
+            {
+                id: "full_heal",
+                category: "HEALTH",
+                name: "RÉPARATION D'URGENCE",
+                description: "Restaure 100% de l'intégrité système (Soin complet).",
+                apply: (p) => {
+                    // La fonction heal bloque au max automatiquement
+                    p.health.heal(100); 
+                }
+            },
+
+            // Armes munitions max
             {
                 id: "ammo_up",
                 category: "WEAPON",
                 name: "CHARGEUR ÉTENDU",
                 description: "Augmente la capacité maximale du chargeur de +2.",
                 apply: (p) => {
-                    // CORRECTION ICI : on cible bien "daggerAmmo"
                     if(p.shootController && p.shootController.daggerAmmo) {
-                        // 1. Crée les carrés HTML invisibles
+                        // Ajout visuel puis logique
                         p.hud.addAmmoSegments(2);
-                        // 2. Met à jour la logique (ça va allumer les carrés en Violet néon)
                         p.shootController.daggerAmmo.increaseMax(2);
                     }
                 }
             },
 
-            // --- ARMES (VITESSE DE RECHARGEMENT) ---
+            // Armes vitesse de rechargement
             {
                 id: "reload_up",
                 category: "WEAPON",
                 name: "RECHARGEMENT ÉCLAIR",
                 description: "Réduit le temps de recharge des munitions de 30%.",
                 apply: (p) => {
-                    // CORRECTION ICI AUSSI
                     if(p.shootController && p.shootController.daggerAmmo) {
                         p.shootController.daggerAmmo.rechargeRateMs *= 0.7; 
                     }
                 }
             },
             
+            // Armes tir divise
             {
                 id: "weapon_multishot",
                 category: "WEAPON",
@@ -65,7 +73,7 @@ export class UpgradeManager {
                 }
             },
 
-            // --- MOBILITÉ ---
+            // Mobilite
             {
                 id: "dash_up",
                 category: "MOBILITY",
@@ -78,6 +86,7 @@ export class UpgradeManager {
             }
         ];
 
+        // Assigne automatiquement l'icone selon la categorie
         this.availableUpgrades.forEach(upgrade => {
             upgrade.iconPath = ICONS_BY_CATEGORY[upgrade.category];
         });

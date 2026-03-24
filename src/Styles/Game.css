@@ -187,6 +187,120 @@ html, body, #app, canvas {
     line-height: 1.5;
 }
 
+#main-menu-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, rgba(0,20,30,0.8) 0%, rgba(0,5,10,1) 100%);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    pointer-events: auto;
+}
+
+.menu-title {
+    color: #00ffff;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 64px;
+    letter-spacing: 8px;
+    text-shadow: 0 0 20px #00ffff;
+    margin-bottom: 60px;
+    text-transform: uppercase;
+}
+
+.menu-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 300px;
+}
+
+.menu-btn {
+    background: transparent;
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 15px 30px;
+    border: 2px solid #30363d;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    text-transform: uppercase;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
+}
+
+.menu-btn:hover {
+    border-color: #00ffff;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+    box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.2);
+    transform: translateX(10px);
+}
+
+.menu-btn.exit-btn:hover {
+    border-color: #ff00ff;
+    color: #ff00ff;
+    text-shadow: 0 0 10px #ff00ff;
+    box-shadow: inset 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+/* Panneau des paramètres */
+#settings-panel {
+    display: none; /* Caché par défaut */
+    flex-direction: column;
+    background: rgba(0, 10, 15, 0.9);
+    border: 2px solid #00ffff;
+    padding: 40px;
+    width: 400px;
+    color: white;
+    font-family: 'Courier New', Courier, monospace;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 25px;
+}
+
+.setting-group label {
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #aaaaaa;
+}
+
+.setting-group input[type="range"] {
+    width: 100%;
+    accent-color: #00ffff;
+    cursor: pointer;
+}
+
+/* Menu Pause */
+#pause-menu-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 10, 15, 0.6);
+    backdrop-filter: blur(8px);
+    display: none; /* Caché par défaut */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 150;
+    pointer-events: auto;
+}
+
+.pause-title {
+    color: #ffaa00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 48px;
+    letter-spacing: 6px;
+    text-shadow: 0 0 15px #ffaa00;
+    margin-bottom: 50px;
+    text-transform: uppercase;
+}
+
 @keyframes glitch {
     0% { transform: translate(0) }
     20% { transform: translate(-2px, 2px) }

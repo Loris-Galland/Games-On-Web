@@ -1,69 +1,81 @@
 import * as BABYLON from "@babylonjs/core";
 
 /**
- * DummyEnemy
- * ----------
- * Si un NavigationManager est fourni ET prêt, l'ennemi est piloté en tant
- * que crowd agent Recast (pathfinding + évitement automatique).
- * Sinon fallback sur un beeline direct + wall-avoidance raycasts.
+ * BaseEnemy
+ * ---------
+ * Classe abstraite commune à tous les types d'ennemis.
+ * Les sous-classes définissent leur config via _getConfig().
+ *
+ * Config attendue :
+ *   bodySize        { width, height, depth }
+ *   bodyColor       BABYLON.Color3
+ *   ellipsoid       BABYLON.Vector3
+ *   halfHeight      number   (offset Y du centre du body depuis le sol)
+ *   weakPointDiam   number
+ *   weakPointY      number   (position locale Y sur le body)
+ *   weakPointZ      number   (position locale Z sur le body)
+ *   weakPointColor  BABYLON.Color3
+ *   bodyName        string   (nom du mesh body — utilisé pour la séparation)
  */
-export class DummyEnemy {
-    /**
-     * @param {BABYLON.Scene}         scene
-     * @param {BABYLON.Vector3}       position      position de spawn (Y = sol)
-     * @param {object}                player
-     * @param {number}                speed         vitesse u/s
-     * @param {NavigationManager|null} navManager   gestionnaire Recast
-     */
-    constructor(scene, position, player, speed = 0.65, navManager = null) {
+export class BaseEnemy {
+    constructor(scene, position, player, speed, navManager = null) {
         this.scene       = scene;
         this.player      = player;
         this.speed       = speed;
         this._navManager = navManager;
         this._agentIdx   = null;
 
-        // Physique (utilisée en mode fallback)
+        // Physique (mode fallback)
         this.gravity          = -18;
         this.verticalVelocity = 0;
         this.isGrounded       = false;
         this._slopeNormal     = BABYLON.Vector3.Up();
         this._onSlope         = false;
 
-        // Fallback anti-blocage
+        // Anti-blocage
         this._stuckTimer    = 0;
         this._lastPos       = null;
         this._stuckDir      = null;
         this._stuckDirTimer = 0;
 
-        // Mise à jour périodique de la cible
+        // Mise à jour périodique de la cible Recast
         this._targetUpdateTimer = 0;
         this._targetInterval    = 0.5;
 
-        // ── Mesh ────────────────────────────────────────────────────────────
+        // ── Construction du mesh ─────────────────────────────────────────────
+        const cfg = this._getConfig();
+        this._cfg = cfg;
+
         this.body = BABYLON.MeshBuilder.CreateBox(
-            "enemyBody",
-            { width: 1.2, height: 2.2, depth: 1.2 },
+            cfg.bodyName,
+            { width: cfg.bodySize.width, height: cfg.bodySize.height, depth: cfg.bodySize.depth },
             scene,
         );
-        this.body.position  = new BABYLON.Vector3(position.x, position.y + 1.1, position.z);
-        this.body.ellipsoid = new BABYLON.Vector3(0.55, 1.1, 0.55);
+        this.body.position  = new BABYLON.Vector3(position.x, position.y + cfg.halfHeight, position.z);
+        this.body.ellipsoid = cfg.ellipsoid.clone();
         this.body.refreshBoundingInfo();
         this.body.checkCollisions = true;
 
-        const bodyMat = new BABYLON.StandardMaterial("bodyMat", scene);
-        bodyMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.25);
+        const bodyMat = new BABYLON.StandardMaterial(`bodyMat_${cfg.bodyName}`, scene);
+        bodyMat.diffuseColor = cfg.bodyColor;
         this.body.material   = bodyMat;
 
-        // Point faible
-        this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 0.5 }, scene);
+        // ── Point faible ─────────────────────────────────────────────────────
+        this.weakPoint = BABYLON.MeshBuilder.CreateSphere(
+            "weakPoint",
+            { diameter: cfg.weakPointDiam },
+            scene,
+        );
         this.weakPoint.parent     = this.body;
-        this.weakPoint.position.y = 0.8;
-        this.weakPoint.position.z = 0.6;
-        const weakMat = new BABYLON.StandardMaterial("weakMat", scene);
-        weakMat.emissiveColor   = new BABYLON.Color3(1, 0, 0);
+        this.weakPoint.position.y = cfg.weakPointY;
+        this.weakPoint.position.z = cfg.weakPointZ;
+
+        const weakMat = new BABYLON.StandardMaterial(`weakMat_${cfg.bodyName}`, scene);
+        weakMat.emissiveColor   = cfg.weakPointColor;
         weakMat.disableLighting = true;
         this.weakPoint.material = weakMat;
 
+        // ── Démarrage ────────────────────────────────────────────────────────
         this._tryRegisterAgent();
 
         this.observer = this.scene.onBeforeRenderObservable.add(() => this._update());
@@ -73,7 +85,15 @@ export class DummyEnemy {
         });
     }
 
-    // ── Enregistrement agent ──────────────────────────────────────────────────
+    /**
+     * À surcharger dans chaque sous-classe.
+     * @returns {object} config de l'ennemi
+     */
+    _getConfig() {
+        throw new Error("BaseEnemy._getConfig() doit être implémenté par la sous-classe.");
+    }
+
+    // ── Enregistrement agent Recast ───────────────────────────────────────────
 
     _tryRegisterAgent() {
         if (!this._navManager?.isReady) return;
@@ -110,11 +130,9 @@ export class DummyEnemy {
                 this._targetUpdateTimer = this._targetInterval;
             }
 
-            // Le crowd Recast place le mesh au niveau du sol (Y navmesh).
-            // On corrige Y après sa mise à jour pour que le body soit au-dessus du sol.
             const agentPos = this._navManager.getAgentPosition(this._agentIdx);
             if (agentPos) {
-                this.body.position.y = agentPos.y + 1.1;
+                this.body.position.y = agentPos.y + this._cfg.halfHeight;
             }
 
             const vel = this._navManager.getAgentVelocity(this._agentIdx);
@@ -142,7 +160,10 @@ export class DummyEnemy {
             if (this._lastPos) {
                 const moved = BABYLON.Vector3.Distance(pos, this._lastPos);
                 if (moved < 0.004 && distFlat > 3) { this._stuckTimer += dt; }
-                else { this._stuckTimer = Math.max(0, this._stuckTimer - dt * 2); if (this._stuckTimer <= 0) this._stuckDir = null; }
+                else {
+                    this._stuckTimer = Math.max(0, this._stuckTimer - dt * 2);
+                    if (this._stuckTimer <= 0) this._stuckDir = null;
+                }
 
                 if (this._stuckTimer > 1.0 && distFlat > 2) {
                     if (!this._stuckDir || this._stuckDirTimer <= 0) {
@@ -154,7 +175,9 @@ export class DummyEnemy {
                     moveDir = BABYLON.Vector3.Lerp(moveDir, this._stuckDir, 0.6).normalize();
                 }
                 if (this._stuckTimer > 2.5 && this.isGrounded) {
-                    this.verticalVelocity = 7; this._stuckTimer = 0; this._stuckDir = null;
+                    this.verticalVelocity = 7;
+                    this._stuckTimer = 0;
+                    this._stuckDir   = null;
                 }
             }
             this._lastPos = pos.clone();
@@ -204,7 +227,9 @@ export class DummyEnemy {
         const radius = 2.2;
         let push = BABYLON.Vector3.Zero();
         for (const mesh of this.scene.meshes) {
-            if (mesh === this.body || mesh.name !== "enemyBody") continue;
+            // Séparation avec tous les types d'ennemis
+            if (mesh === this.body) continue;
+            if (!["enemyBody", "enemyBodyHeavy", "enemyBodyScout"].includes(mesh.name)) continue;
             const diff = pos.subtract(mesh.position);
             const d    = diff.length();
             if (d > 0.01 && d < radius) push.addInPlace(diff.normalize().scale((radius - d) / radius));
@@ -217,19 +242,21 @@ export class DummyEnemy {
     }
 
     _updateGroundInfo(pos) {
+        const halfH = this._cfg.halfHeight;
         const tryRay = (len) => this.scene.pickWithRay(
             new BABYLON.Ray(pos, new BABYLON.Vector3(0, -1, 0), len),
             m => m.checkCollisions && m !== this.body && m.name !== "weakPoint",
         );
-        let hit = tryRay(1.35);
-        if (!hit.hit) hit = tryRay(1.7);
+        let hit = tryRay(halfH + 0.25);
+        if (!hit.hit) hit = tryRay(halfH + 0.6);
         if (hit.hit) {
             this._slopeNormal = hit.getNormal(true, true) ?? BABYLON.Vector3.Up();
             const dot         = BABYLON.Vector3.Dot(this._slopeNormal, BABYLON.Vector3.Up());
             this._onSlope     = dot < 0.97 && dot > 0.2;
             this.isGrounded   = this.verticalVelocity <= 0.5;
         } else {
-            this.isGrounded = false; this._onSlope = false;
+            this.isGrounded   = false;
+            this._onSlope     = false;
             this._slopeNormal = BABYLON.Vector3.Up();
         }
     }
@@ -238,5 +265,8 @@ export class DummyEnemy {
         const c = Math.cos(a), s = Math.sin(a);
         return new BABYLON.Vector3(v.x * c - v.z * s, 0, v.x * s + v.z * c).normalize();
     }
-    _projectOnPlane(v, n) { return v.subtract(n.scale(BABYLON.Vector3.Dot(v, n))); }
+
+    _projectOnPlane(v, n) {
+        return v.subtract(n.scale(BABYLON.Vector3.Dot(v, n)));
+    }
 }

@@ -5,7 +5,7 @@ export default defineConfig({
         {
             name: 'debug-plugin',
             buildStart() {
-                console.log('✅ vite.config.js bien chargé !');
+                console.log('vite.config.js chargé');
             }
         }
     ],

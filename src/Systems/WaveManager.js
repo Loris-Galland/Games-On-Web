@@ -1,7 +1,26 @@
 import * as BABYLON from "@babylonjs/core";
-import { DummyEnemy } from "../Enemies/DummyEnemy";
+import { StandardEnemy } from "../Enemies/StandardEnemy";
+import { HeavyEnemy }    from "../Enemies/HeavyEnemy";
+import { ScoutEnemy }    from "../Enemies/ScoutEnemy";
 
 const WAVES_PER_ROOM = 5;
+
+/**
+ * Composition des vagues par numéro de vague (1..5).
+ *
+ * Chaque entrée est un tableau de { type, count, speedMult }.
+ *   type      : "standard" | "heavy" | "scout"
+ *   count     : nombre d'ennemis de ce type
+ *   speedMult : multiplicateur appliqué à la vitesse de base du type
+ *               (permet une légère montée en difficulté à chaque vague)
+ */
+const WAVE_COMPOSITIONS = {
+    1: [ { type: "standard", count: 3, speedMult: 1.0 } ],
+    2: [ { type: "standard", count: 2, speedMult: 1.0 }, { type: "scout", count: 2, speedMult: 1.0 } ],
+    3: [ { type: "standard", count: 3, speedMult: 1.1 }, { type: "heavy",  count: 1, speedMult: 1.0 } ],
+    4: [ { type: "standard", count: 2, speedMult: 1.1 }, { type: "scout",  count: 3, speedMult: 1.1 }, { type: "heavy", count: 1, speedMult: 1.0 } ],
+    5: [ { type: "heavy",    count: 2, speedMult: 1.1 }, { type: "scout",  count: 4, speedMult: 1.2 }, { type: "standard", count: 2, speedMult: 1.2 } ],
+};
 
 export class WaveManager {
     constructor(scene, player, hud) {
@@ -9,31 +28,21 @@ export class WaveManager {
         this.player = player;
         this.hud    = hud;
 
-        // Vague en cours dans la salle active (1..WAVES_PER_ROOM)
         this.currentWave    = 0;
         this.enemiesAlive   = [];
         this.isWaveActive   = false;
 
-        // Salle courante et salles déjà terminées
         this._currentRoomIdx  = -1;
-        this._clearedRooms    = new Set(); // salles dont toutes les vagues sont terminées
-        this._visitedRooms    = new Set(); // salles déjà visitées (au moins une fois)
+        this._clearedRooms    = new Set();
+        this._visitedRooms    = new Set();
 
-        // Portes actives (meshes)
         this._doors = [];
 
         this.scene.onBeforeRenderObservable.add(() => this._update());
     }
 
-    // ── API publique appelée par GameScene à chaque changement de salle ──
+    // ── API publique ─────────────────────────────────────────────────────────
 
-    /**
-     * roomIdx   : index de la nouvelle salle
-     * entryPos  : BABYLON.Vector3 — centre de la porte d'entrée (côté couloir entrant)
-     * exitPos   : BABYLON.Vector3 — centre de la porte de sortie (côté couloir sortant)
-     * entryRot  : rotation Y de la porte d'entrée (rad)
-     * exitRot   : rotation Y de la porte de sortie (rad)
-     */
     enterRoom(roomIdx, entryPos, exitPos, entryRot = 0, exitRot = 0, roomCenter = null, navManager = null) {
         this._clearEnemies();
         this._removeDoors();
@@ -42,21 +51,18 @@ export class WaveManager {
         this._roomCenter     = roomCenter;
         this._navManager     = navManager;
 
-        // Salle spawn (idx 0) → jamais de vagues
         if (roomIdx === 0) return;
 
         const isNew = !this._visitedRooms.has(roomIdx);
         this._visitedRooms.add(roomIdx);
 
-        if (!isNew || this._clearedRooms.has(roomIdx)) {
-            return;
-        }
+        if (!isNew || this._clearedRooms.has(roomIdx)) return;
 
         this._spawnDoors(entryPos, exitPos, entryRot, exitRot);
         this._startRoomWaves();
     }
 
-    // ── Spawn / suppression des portes ──────────────────────────────────
+    // ── Spawn / suppression des portes ───────────────────────────────────────
 
     _spawnDoors(entryPos, exitPos, entryRot, exitRot) {
         if (!entryPos && !exitPos) return;
@@ -69,18 +75,15 @@ export class WaveManager {
         const makeBarrier = (name, pos, rotY) => {
             if (!pos) return null;
             const door = BABYLON.MeshBuilder.CreateBox(name, {
-                width: 4,
-                height: 3.5,
-                depth: 0.25,
+                width: 4, height: 3.5, depth: 0.25,
             }, this.scene);
-            door.position = pos.clone();
+            door.position   = pos.clone();
             door.position.y = 1.75;
             door.rotation.y = rotY;
             door.material   = mat;
             door.checkCollisions = true;
             door.isPickable      = false;
 
-            // Effet lumineux pulsant
             door._pulseT = 0;
             const obs = this.scene.onBeforeRenderObservable.add(() => {
                 door._pulseT += 0.05;
@@ -88,13 +91,11 @@ export class WaveManager {
                 mat.emissiveColor = new BABYLON.Color3(alpha, 0.05, 0.05);
             });
             door._obs = obs;
-
             return door;
         };
 
         const entry = makeBarrier("door_entry", entryPos, entryRot);
         const exit  = makeBarrier("door_exit",  exitPos,  exitRot);
-
         if (entry) this._doors.push(entry);
         if (exit)  this._doors.push(exit);
     }
@@ -102,12 +103,11 @@ export class WaveManager {
     _openDoors() {
         this._doors.forEach(door => {
             if (door._obs) this.scene.onBeforeRenderObservable.remove(door._obs);
-            // Animation d'ouverture : monte le mesh vers le haut
             let elapsed = 0;
             const startY = door.position.y;
             const obs = this.scene.onBeforeRenderObservable.add(() => {
                 elapsed += this.scene.getEngine().getDeltaTime();
-                const t = Math.min(elapsed / 800, 1); // 800 ms
+                const t = Math.min(elapsed / 800, 1);
                 door.position.y = startY + t * 5;
                 if (t >= 1) {
                     door.checkCollisions = false;
@@ -127,7 +127,7 @@ export class WaveManager {
         this._doors = [];
     }
 
-    // ── Gestion des vagues ───────────────────────────────────────────────
+    // ── Gestion des vagues ────────────────────────────────────────────────────
 
     _startRoomWaves() {
         this.currentWave  = 0;
@@ -137,7 +137,6 @@ export class WaveManager {
 
     _launchNextWave() {
         if (this.currentWave >= WAVES_PER_ROOM) {
-            // Toutes les vagues terminées pour cette salle
             this._clearedRooms.add(this._currentRoomIdx);
             this.hud.showWaveMessage("SECTEUR SÉCURISÉ — PORTES OUVERTES");
             this._openDoors();
@@ -150,23 +149,42 @@ export class WaveManager {
         this.hud.updateWave(this.currentWave);
         this.hud.showWaveMessage(`VAGUE ${this.currentWave} / ${WAVES_PER_ROOM}`);
 
-        const enemiesToSpawn = this.currentWave * 2; // 2, 4, 6, 8, 10
-        // Vitesse croissante : vague 1 → 0.65, vague 5 → 1.05
-        const enemySpeed = 2 + this.currentWave * 0.1;
+        const composition = WAVE_COMPOSITIONS[this.currentWave] ?? WAVE_COMPOSITIONS[1];
+        const center      = this._roomCenter ?? this.player.camera.position;
+        let totalSpawned  = 0;
 
-        // Spawn autour du centre de la salle (pas de la position joueur)
-        const center = this._roomCenter ?? this.player.camera.position;
+        for (const group of composition) {
+            for (let i = 0; i < group.count; i++) {
+                const angle  = ((totalSpawned + i) / this._totalEnemiesInComposition(composition)) * Math.PI * 2 + Math.random() * 0.4;
+                const radius = 8 + Math.random() * 14;
+                const spawnPos = new BABYLON.Vector3(
+                    center.x + Math.cos(angle) * radius,
+                    1.25,
+                    center.z + Math.sin(angle) * radius,
+                );
 
-        for (let i = 0; i < enemiesToSpawn; i++) {
-            const angle  = (i / enemiesToSpawn) * Math.PI * 2 + Math.random() * 0.5;
-            const radius = 8 + Math.random() * 14;
-            const x = center.x + Math.cos(angle) * radius;
-            const z = center.z + Math.sin(angle) * radius;
-
-            const spawnPos = new BABYLON.Vector3(x, 1.25, z);
-            const enemy    = new DummyEnemy(this.scene, spawnPos, this.player, enemySpeed, this._navManager);
-            this.enemiesAlive.push(enemy);
+                const enemy = this._createEnemy(group.type, spawnPos, group.speedMult);
+                if (enemy) this.enemiesAlive.push(enemy);
+            }
+            totalSpawned += group.count;
         }
+    }
+
+    /** Crée l'ennemi du bon type avec le bon multiplicateur de vitesse. */
+    _createEnemy(type, spawnPos, speedMult) {
+        switch (type) {
+            case "heavy":
+                return new HeavyEnemy(this.scene, spawnPos, this.player, 0.35 * speedMult, this._navManager);
+            case "scout":
+                return new ScoutEnemy(this.scene, spawnPos, this.player, 1.4  * speedMult, this._navManager);
+            case "standard":
+            default:
+                return new StandardEnemy(this.scene, spawnPos, this.player, 0.65 * speedMult, this._navManager);
+        }
+    }
+
+    _totalEnemiesInComposition(composition) {
+        return composition.reduce((acc, g) => acc + g.count, 0);
     }
 
     _clearEnemies() {
@@ -177,7 +195,7 @@ export class WaveManager {
         this.isWaveActive = false;
     }
 
-    // ── Boucle principale ────────────────────────────────────────────────
+    // ── Boucle principale ─────────────────────────────────────────────────────
 
     _update() {
         if (!this.isWaveActive) return;
@@ -193,7 +211,7 @@ export class WaveManager {
                 this.hud.showWaveMessage(`VAGUE ${this.currentWave} TERMINÉE`);
                 setTimeout(() => this._launchNextWave(), 3000);
             } else {
-                this._launchNextWave(); // déclenche la fin de salle
+                this._launchNextWave();
             }
         }
     }

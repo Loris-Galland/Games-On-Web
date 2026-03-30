@@ -216,6 +216,7 @@ export class ProceduralMap {
             fb.position = new BABYLON.Vector3(wx + T / 2, -0.05, wz + T / 2);
             fb.material = darkMat; fb.checkCollisions = false; fb.isPickable = false; fb.parent = node;
             this._mkCol(`cF_${i}_${roomIdx}_${isReturn}`, wx + T / 2, -0.1, wz + T / 2, T, 0.2, T, node);
+            //this._mkCol(`cC_${i}_${roomIdx}_${isReturn}`, wx + T / 2, 3.1, wz + T / 2, T, 0.2, T, node);
 
             if (gX) {
                 if (!tileSet.has(`${tile.x},${tile.z - 1}`)) { ps.push(this._vis("Wall_Grey.glb", new BABYLON.Vector3(wx + T / 2, 0, wz),     new BABYLON.Vector3(0, Math.PI, 0), node)); this._mkCol(`cWN_${i}_${roomIdx}_${isReturn}`, wx + T / 2, 1.5, wz,     T, 3, 0.3, node); }
@@ -304,6 +305,7 @@ export class ProceduralMap {
             for (let tz = 0; tz < room.rows; tz++)
                 ps.push(this._vis(pick(floors, this.rand), new BABYLON.Vector3(ox + tx * T + T / 2, H1, oz + tz * T + T / 2), BABYLON.Vector3.Zero(), parent));
         this._mkCol(`fRDC_${ox}_${oz}`, ox + rW / 2, -0.1, oz + rD / 2, rW, 0.2, rD, parent);
+        //this._mkCol(`ceil_${ox}_${oz}`, ox + rW / 2, 3.1, oz + rD / 2, rW, 0.2, rD, parent);
 
         // Murs N/S
         for (let tx = 0; tx < room.cols; tx++) {
@@ -333,6 +335,33 @@ export class ProceduralMap {
                 ps.push(this._vis(wSet.light, new BABYLON.Vector3(ox + rW, H1, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
             }
         }
+
+        /*const CEIL_Y = 2.95;
+        const glowMat = new BABYLON.StandardMaterial(`ceilGlow_${ox}_${oz}`, this.scene);
+        const roomColors = {
+            blue:   new BABYLON.Color3(0.0,  0.15, 0.4),
+            green:  new BABYLON.Color3(0.05, 0.35, 0.1),
+            grey:   new BABYLON.Color3(0.1,  0.12, 0.18),
+            orange: new BABYLON.Color3(0.4,  0.15, 0.0),
+            red:    new BABYLON.Color3(0.35, 0.02, 0.02),
+        };
+        glowMat.emissiveColor   = roomColors[room.color] ?? roomColors.grey;
+        glowMat.disableLighting = true;
+        glowMat.backFaceCulling = false;
+        glowMat.alpha           = 0.55;
+
+        const ceilPlane = BABYLON.MeshBuilder.CreatePlane(
+            `ceilGlowPlane_${ox}_${oz}`,
+            { width: rW, height: rD },
+            this.scene,
+        );
+        ceilPlane.rotation.x  = Math.PI / 2;   // orienté vers le bas
+        ceilPlane.position    = new BABYLON.Vector3(ox + rW / 2, CEIL_Y, oz + rD / 2);
+        ceilPlane.material    = glowMat;
+        ceilPlane.isPickable  = false;
+        ceilPlane.checkCollisions = false;
+        ceilPlane.parent      = parent;
+        ceilPlane.alwaysSelectAsActiveMesh = true;*/
 
         if (!room.isSpawn) {
             const lay   = pick(LAYOUTS[room.type] ?? LAYOUTS.default, this.rand);

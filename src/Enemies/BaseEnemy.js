@@ -1,4 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
+import { EnemyParticles } from "./EnemyParticles";
 
 /**
  * BaseEnemy
@@ -10,12 +11,13 @@ import * as BABYLON from "@babylonjs/core";
  *   bodySize        { width, height, depth }
  *   bodyColor       BABYLON.Color3
  *   ellipsoid       BABYLON.Vector3
- *   halfHeight      number   (offset Y du centre du body depuis le sol)
+ *   halfHeight      number
  *   weakPointDiam   number
- *   weakPointY      number   (position locale Y sur le body)
- *   weakPointZ      number   (position locale Z sur le body)
+ *   weakPointY      number
+ *   weakPointZ      number
  *   weakPointColor  BABYLON.Color3
- *   bodyName        string   (nom du mesh body — utilisé pour la séparation)
+ *   bodyName        string
+ *   enemyType       "standard" | "heavy" | "scout"
  */
 export class BaseEnemy {
     constructor(scene, position, player, speed, navManager = null) {
@@ -25,24 +27,20 @@ export class BaseEnemy {
         this._navManager = navManager;
         this._agentIdx   = null;
 
-        // Physique (mode fallback)
         this.gravity          = -18;
         this.verticalVelocity = 0;
         this.isGrounded       = false;
         this._slopeNormal     = BABYLON.Vector3.Up();
         this._onSlope         = false;
 
-        // Anti-blocage
         this._stuckTimer    = 0;
         this._lastPos       = null;
         this._stuckDir      = null;
         this._stuckDirTimer = 0;
 
-        // Mise à jour périodique de la cible Recast
         this._targetUpdateTimer = 0;
         this._targetInterval    = 0.5;
 
-        // ── Construction du mesh ─────────────────────────────────────────────
         const cfg = this._getConfig();
         this._cfg = cfg;
 
@@ -56,11 +54,10 @@ export class BaseEnemy {
         this.body.refreshBoundingInfo();
         this.body.checkCollisions = true;
 
-        const bodyMat = new BABYLON.StandardMaterial(`bodyMat_${cfg.bodyName}`, scene);
+        const bodyMat = new BABYLON.StandardMaterial(`bodyMat_${Math.random().toString(36).slice(2)}`, scene);
         bodyMat.diffuseColor = cfg.bodyColor;
         this.body.material   = bodyMat;
 
-        // ── Point faible ─────────────────────────────────────────────────────
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere(
             "weakPoint",
             { diameter: cfg.weakPointDiam },
@@ -70,30 +67,30 @@ export class BaseEnemy {
         this.weakPoint.position.y = cfg.weakPointY;
         this.weakPoint.position.z = cfg.weakPointZ;
 
-        const weakMat = new BABYLON.StandardMaterial(`weakMat_${cfg.bodyName}`, scene);
+        const weakMat = new BABYLON.StandardMaterial(`weakMat_${Math.random().toString(36).slice(2)}`, scene);
         weakMat.emissiveColor   = cfg.weakPointColor;
         weakMat.disableLighting = true;
         this.weakPoint.material = weakMat;
 
-        // ── Démarrage ────────────────────────────────────────────────────────
         this._tryRegisterAgent();
 
         this.observer = this.scene.onBeforeRenderObservable.add(() => this._update());
+
+        // ── Burst de particules à la mort ────────────────────────────────────
         this.body.onDisposeObservable.add(() => {
             this._removeAgent();
             this.scene.onBeforeRenderObservable.remove(this.observer);
+            EnemyParticles.death(
+                this.scene,
+                this.body.position.clone(),
+                EnemyParticles.colorForType(this._cfg.enemyType),
+            );
         });
     }
 
-    /**
-     * À surcharger dans chaque sous-classe.
-     * @returns {object} config de l'ennemi
-     */
     _getConfig() {
-        throw new Error("BaseEnemy._getConfig() doit être implémenté par la sous-classe.");
+        throw new Error("BaseEnemy._getConfig() must be implemented by subclass.");
     }
-
-    // ── Enregistrement agent Recast ───────────────────────────────────────────
 
     _tryRegisterAgent() {
         if (!this._navManager?.isReady) return;
@@ -106,8 +103,6 @@ export class BaseEnemy {
             this._agentIdx = null;
         }
     }
-
-    // ── Boucle principale ─────────────────────────────────────────────────────
 
     _update() {
         if (!this.player?.camera) return;
@@ -123,7 +118,6 @@ export class BaseEnemy {
         if (this._agentIdx === null) this._tryRegisterAgent();
 
         if (this._agentIdx !== null && this._navManager?.isReady) {
-            // ── Mode Recast crowd ───────────────────────────────────────────
             this._targetUpdateTimer -= dt;
             if (this._targetUpdateTimer <= 0) {
                 this._navManager.setAgentTarget(this._agentIdx, targetWorld);
@@ -131,9 +125,7 @@ export class BaseEnemy {
             }
 
             const agentPos = this._navManager.getAgentPosition(this._agentIdx);
-            if (agentPos) {
-                this.body.position.y = agentPos.y + this._cfg.halfHeight;
-            }
+            if (agentPos) this.body.position.y = agentPos.y + this._cfg.halfHeight;
 
             const vel = this._navManager.getAgentVelocity(this._agentIdx);
             if (vel && vel.length() > 0.1 && distFlat > 1) {
@@ -142,7 +134,6 @@ export class BaseEnemy {
             }
 
         } else {
-            // ── Mode fallback : beeline + wall avoidance ────────────────────
             const toPlayer = new BABYLON.Vector3(targetWorld.x - pos.x, 0, targetWorld.z - pos.z);
             let desiredDir = toPlayer.length() > 0.01 ? toPlayer.normalize() : BABYLON.Vector3.Zero();
 
@@ -196,8 +187,6 @@ export class BaseEnemy {
         }
     }
 
-    // ── Fallback helpers ──────────────────────────────────────────────────────
-
     _steerAroundWalls(pos, desiredDir) {
         const origin = pos.add(new BABYLON.Vector3(0, 0.6, 0));
         const rayLen = 2.8;
@@ -227,7 +216,6 @@ export class BaseEnemy {
         const radius = 2.2;
         let push = BABYLON.Vector3.Zero();
         for (const mesh of this.scene.meshes) {
-            // Séparation avec tous les types d'ennemis
             if (mesh === this.body) continue;
             if (!["enemyBody", "enemyBodyHeavy", "enemyBodyScout"].includes(mesh.name)) continue;
             const diff = pos.subtract(mesh.position);

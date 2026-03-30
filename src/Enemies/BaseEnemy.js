@@ -5,19 +5,12 @@ import { EnemyParticles } from "./EnemyParticles";
  * BaseEnemy
  * ---------
  * Classe abstraite commune à tous les types d'ennemis.
- * Les sous-classes définissent leur config via _getConfig().
  *
- * Config attendue :
- *   bodySize        { width, height, depth }
- *   bodyColor       BABYLON.Color3
- *   ellipsoid       BABYLON.Vector3
- *   halfHeight      number
- *   weakPointDiam   number
- *   weakPointY      number
- *   weakPointZ      number
- *   weakPointColor  BABYLON.Color3
- *   bodyName        string
- *   enemyType       "standard" | "heavy" | "scout"
+ * Nouveautés :
+ *  - Contact joueur → dégâts (1 HP) avec cooldown de 1s
+ *  - Recul de l'ennemi à l'opposé du joueur, avec test de mur :
+ *    si le chemin direct est bloqué, on essaie les perpendiculaires,
+ *    sinon on reste sur place (l'ennemi est coincé entre le joueur et un mur).
  */
 export class BaseEnemy {
     constructor(scene, position, player, speed, navManager = null) {
@@ -40,6 +33,15 @@ export class BaseEnemy {
 
         this._targetUpdateTimer = 0;
         this._targetInterval    = 0.5;
+
+        // ── Contact damage ────────────────────────────────────────────────────
+        // Cooldown en secondes entre deux dégâts du même ennemi
+        this._damageCooldown    = 1.0;
+        this._damageTimer       = 0;        // temps restant avant prochain dégât possible
+
+        // ── Recul ─────────────────────────────────────────────────────────────
+        this._knockbackVel      = BABYLON.Vector3.Zero();
+        this._knockbackDuration = 0;        // secondes restantes de recul
 
         const cfg = this._getConfig();
         this._cfg = cfg;
@@ -76,7 +78,6 @@ export class BaseEnemy {
 
         this.observer = this.scene.onBeforeRenderObservable.add(() => this._update());
 
-        // ── Burst de particules à la mort ────────────────────────────────────
         this.body.onDisposeObservable.add(() => {
             this._removeAgent();
             this.scene.onBeforeRenderObservable.remove(this.observer);
@@ -104,6 +105,8 @@ export class BaseEnemy {
         }
     }
 
+    // ── Boucle principale ─────────────────────────────────────────────────────
+
     _update() {
         if (!this.player?.camera) return;
         if (this.body.isDisposed())  return;
@@ -115,6 +118,34 @@ export class BaseEnemy {
             (pos.x - targetWorld.x) ** 2 + (pos.z - targetWorld.z) ** 2,
         );
 
+        // ── Timers ────────────────────────────────────────────────────────────
+        if (this._damageTimer > 0)       this._damageTimer       -= dt;
+        if (this._knockbackDuration > 0) this._knockbackDuration -= dt;
+
+        // ── Contact damage ────────────────────────────────────────────────────
+        const contactRadius = this._cfg.bodySize.width * 0.65 + 0.6; // adapté à la taille
+        if (distFlat < contactRadius && this._damageTimer <= 0) {
+            this._damageTimer = this._damageCooldown;
+            if (this.player.health) this.player.health.takeDamage(1);
+            this._applyKnockback(pos, targetWorld);
+        }
+
+        // ── Phase de recul ────────────────────────────────────────────────────
+        if (this._knockbackDuration > 0) {
+            this.body.moveWithCollisions(new BABYLON.Vector3(
+                this._knockbackVel.x * dt,
+                this.verticalVelocity * dt,
+                this._knockbackVel.z * dt,
+            ));
+            // Remet à jour Y si en mode Recast pour ne pas planer
+            if (this._agentIdx !== null && this._navManager?.isReady) {
+                const agentPos = this._navManager.getAgentPosition(this._agentIdx);
+                if (agentPos) this.body.position.y = agentPos.y + this._cfg.halfHeight;
+            }
+            return; // on ne fait pas le déplacement normal pendant le recul
+        }
+
+        // ── Déplacement normal ────────────────────────────────────────────────
         if (this._agentIdx === null) this._tryRegisterAgent();
 
         if (this._agentIdx !== null && this._navManager?.isReady) {
@@ -186,6 +217,67 @@ export class BaseEnemy {
             if (distFlat > 1) this.body.lookAt(new BABYLON.Vector3(targetWorld.x, pos.y, targetWorld.z));
         }
     }
+
+    // ── Recul sécurisé ────────────────────────────────────────────────────────
+
+    /**
+     * Calcule la direction de recul la plus libre possible.
+     * Priorité : direction opposée au joueur → perpendiculaires → rester sur place.
+     * On fait un raycast court pour détecter un mur immédiat avant de valider.
+     */
+    _applyKnockback(pos, playerPos) {
+        const KNOCKBACK_SPEED    = this.speed * 3.5;  // recul 3.5× la vitesse normale
+        const KNOCKBACK_DURATION = 0.35;              // secondes
+        const RAY_LEN            = 1.2;               // distance de test de mur
+
+        // Direction de base : s'éloigner du joueur
+        const awayDir = new BABYLON.Vector3(
+            pos.x - playerPos.x,
+            0,
+            pos.z - playerPos.z,
+        );
+
+        const candidates = [];
+        if (awayDir.length() > 0.01) {
+            const base = awayDir.normalize();
+            candidates.push(base);
+            // Perpendiculaires ±90°
+            candidates.push(new BABYLON.Vector3(-base.z,  0,  base.x));
+            candidates.push(new BABYLON.Vector3( base.z,  0, -base.x));
+            // Diagonales ±45°
+            candidates.push(this._rotateY(base,  Math.PI / 4));
+            candidates.push(this._rotateY(base, -Math.PI / 4));
+        }
+
+        let chosen = BABYLON.Vector3.Zero(); // par défaut : sur place (ennemi coincé)
+
+        const origin = pos.clone();
+        origin.y += 0.5;
+
+        for (const dir of candidates) {
+            const ray = new BABYLON.Ray(origin, dir, RAY_LEN);
+            const hit = this.scene.pickWithRay(
+                ray,
+                m => m.checkCollisions && m !== this.body && m.name !== "weakPoint",
+            );
+            if (!hit.hit) {
+                // Chemin libre — on l'utilise
+                chosen = dir.scale(KNOCKBACK_SPEED);
+                break;
+            }
+            // Chemin partiellement libre : on utilise si ennemi très proche du mur (distance > 0.4)
+            if (hit.distance > RAY_LEN * 0.4) {
+                chosen = dir.scale(KNOCKBACK_SPEED * (hit.distance / RAY_LEN));
+                break;
+            }
+            // Sinon on continue d'essayer
+        }
+
+        this._knockbackVel      = chosen;
+        this._knockbackDuration = KNOCKBACK_DURATION;
+    }
+
+    // ── Fallback helpers ──────────────────────────────────────────────────────
 
     _steerAroundWalls(pos, desiredDir) {
         const origin = pos.add(new BABYLON.Vector3(0, 0.6, 0));

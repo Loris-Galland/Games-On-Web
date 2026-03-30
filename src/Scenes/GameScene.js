@@ -62,7 +62,7 @@ export class GameScene {
 
         await this._generateMap(scene, canvas);
 
-        //scene.debugLayer.show({ embedMode: true });
+        scene.debugLayer.show({ embedMode: true });
 
         return scene;
     }

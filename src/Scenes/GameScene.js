@@ -62,8 +62,6 @@ export class GameScene {
 
         await this._generateMap(scene, canvas);
 
-        scene.debugLayer.show({ embedMode: true });
-
         return scene;
     }
 
@@ -240,8 +238,15 @@ export class GameScene {
 
         this.player = new Player(scene, canvas);
         this.player.camera.position = new BABYLON.Vector3(
-            this.map.spawnPoint.x, 1, this.map.spawnPoint.z,
+            this.map.spawnPoint.x, 5, this.map.spawnPoint.z,
         );
+
+        // ── Stats pour le Game Over ───────────────────────────────────────
+        // Injecte un callback dans Player pour récupérer les stats au moment de la mort
+        this.player.getStatsCallback = () => ({
+            wavesCleared: this.waveManager ? this.waveManager.currentWave : 0,
+            roomsCleared: this.waveManager ? this.waveManager._clearedRooms.size : 0,
+        });
 
         // ── Pipeline post-process sur la caméra joueur ────────────────────
         // (la pipeline est déjà créée dans LightingManager.init(),

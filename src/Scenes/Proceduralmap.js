@@ -64,6 +64,8 @@ export class ProceduralMap {
         this._lastTransition = 0;
         this._cooldownMs     = 1500;
         this._lastTriggerKey = null;
+
+        this._paused = false
     }
 
     // ── API publique ──────────────────────────────────────────────────────────
@@ -127,7 +129,7 @@ export class ProceduralMap {
     // ── Activation d'une salle ────────────────────────────────────────────────
 
     async _activateRoom(idx, comingFromIdx = null) {
-        if (this._loading || idx === this._activeIdx) return;
+        if (this._loading || idx === this._activeIdx || this._paused) return;
         this._loading = true;
 
         const room = this.rooms[idx];
@@ -159,7 +161,7 @@ export class ProceduralMap {
 
         if (this._onRoomReady) {
             await new Promise(resolve => setTimeout(resolve, 50));
-            this._onRoomReady(room, idx, spawnPos, { spawnEntry, spawnExit, comingBack });
+            await this._onRoomReady(room, idx, spawnPos, { spawnEntry, spawnExit, comingBack });
         }
 
         this._lastTriggerKey = null;

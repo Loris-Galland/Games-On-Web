@@ -184,10 +184,10 @@ export class WaveManager {
             case "heavy":
                 return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
             case "scout":
-                return new ScoutEnemy(this.scene, spawnPos, this.player, 5 * speedMult, this._navManager);
+                return new ScoutEnemy(this.scene, spawnPos, this.player, 6 * speedMult, this._navManager);
             case "standard":
             default:
-                return new StandardEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
+                return new StandardEnemy(this.scene, spawnPos, this.player, 4 * speedMult, this._navManager);
         }
     }
 

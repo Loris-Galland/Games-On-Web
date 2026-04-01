@@ -4,7 +4,44 @@ Ce document décrit les principaux éléments architecturaux de l'application.
 
 ---
 
-## Vue d'ensemble
+## Architecture du projet
+```
+src/
+├── main.js
+├── Styles/
+│   └── Game.css
+├── Scenes/
+│   ├── GameScene.js
+│   ├── ProceduralMap.js
+│   └── ProceduralMapData.js
+├── Player/
+│   ├── Player.js
+│   └── PlayerShoot.js
+├── Enemies/
+│   ├── BaseEnemy.js
+│   ├── StandardEnemy.js
+│   ├── HeavyEnemy.js
+│   ├── ScoutEnemy.js
+│   └── EnemyParticles.js
+├── Systems/
+│   ├── Health.js
+│   ├── Ammo.js
+│   ├── WaveManager.js
+│   ├── NavigationManager.js
+│   ├── LightingManager.js
+│   └── UpgradeManager.js
+├── Weapons/
+│   └── Projectile.js
+└── UI/
+    ├── MainMenu.js
+    ├── PauseMenu.js
+    ├── PlayerHUD.js
+    └── GameOverScreen.js
+```
+
+---
+
+## Hiérarchie des classes
 
 PROJECT // ROGUE est une Single Page Application (SPA) sans framework UI. Le rendu 3D est entièrement géré par **Babylon.js** ; la logique métier est découpée en classes ES6 indépendantes, bundlées par **Vite**.
 

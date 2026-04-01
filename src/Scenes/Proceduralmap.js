@@ -216,6 +216,7 @@ export class ProceduralMap {
             fb.position = new BABYLON.Vector3(wx + T / 2, -0.05, wz + T / 2);
             fb.material = darkMat; fb.checkCollisions = false; fb.isPickable = false; fb.parent = node;
             this._mkCol(`cF_${i}_${roomIdx}_${isReturn}`, wx + T / 2, -0.1, wz + T / 2, T, 0.2, T, node);
+            //this._mkCol(`cC_${i}_${roomIdx}_${isReturn}`, wx + T / 2, 3.1, wz + T / 2, T, 0.2, T, node);
 
             if (gX) {
                 if (!tileSet.has(`${tile.x},${tile.z - 1}`)) { ps.push(this._vis("Wall_Grey.glb", new BABYLON.Vector3(wx + T / 2, 0, wz),     new BABYLON.Vector3(0, Math.PI, 0), node)); this._mkCol(`cWN_${i}_${roomIdx}_${isReturn}`, wx + T / 2, 1.5, wz,     T, 3, 0.3, node); }
@@ -308,26 +309,42 @@ export class ProceduralMap {
         // Murs N/S
         for (let tx = 0; tx < room.cols; tx++) {
             const wx = ox + tx * T + T / 2, tX = room.worldX + tx;
-            const dN = openings.has("N") && ((cIn  && this._at(cIn.tiles,  tX, room.worldZ - 1))          || (cOut && this._at(cOut.tiles, tX, room.worldZ - 1)));
-            const dS = openings.has("S") && ((cIn  && this._at(cIn.tiles,  tX, room.worldZ + room.rows))   || (cOut && this._at(cOut.tiles, tX, room.worldZ + room.rows)));
-            ps.push(this._vis(dN ? wSet.door : wSet.base, new BABYLON.Vector3(wx, H1, oz),      new BABYLON.Vector3(0, Math.PI, 0), parent));
-            ps.push(this._vis(dS ? wSet.door : wSet.base, new BABYLON.Vector3(wx, H1, oz + rD), BABYLON.Vector3.Zero(),             parent));
-            if (!dN) this._mkCol(`wN_${tx}_${ox}`, wx, H1 + 1.5, oz,      T, 3, 0.3, parent);
-            if (!dS) this._mkCol(`wS_${tx}_${ox}`, wx, H1 + 1.5, oz + rD, T, 3, 0.3, parent);
+            const dN = openings.has("N") && ((cIn  && this._at(cIn.tiles,  tX, room.worldZ - 1))        || (cOut && this._at(cOut.tiles, tX, room.worldZ - 1)));
+            const dS = openings.has("S") && ((cIn  && this._at(cIn.tiles,  tX, room.worldZ + room.rows)) || (cOut && this._at(cOut.tiles, tX, room.worldZ + room.rows)));
+            ps.push(this._vis(dN ? wSet.door : wSet.base, new BABYLON.Vector3(wx, H1,     oz      ), new BABYLON.Vector3(0, Math.PI, 0), parent));
+            ps.push(this._vis(dS ? wSet.door : wSet.base, new BABYLON.Vector3(wx, H1,     oz + rD ), BABYLON.Vector3.Zero(),             parent));
+            if (!dN) this._mkCol(`wN_${tx}_${ox}`,  wx, H1 + 1.5, oz,      T, 3, 0.3, parent);
+            if (!dS) this._mkCol(`wS_${tx}_${ox}`,  wx, H1 + 1.5, oz + rD, T, 3, 0.3, parent);
+            if (!dN) {
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 4, oz      ), new BABYLON.Vector3(0, Math.PI, 0), parent));
+                this._mkCol(`wNH_${tx}_${ox}`, wx, H1 + 4.5, oz,      T, 3, 0.3, parent);
+            }
+            if (!dS) {
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 4, oz + rD ), BABYLON.Vector3.Zero(),             parent));
+                this._mkCol(`wSH_${tx}_${ox}`, wx, H1 + 4.5, oz + rD, T, 3, 0.3, parent);
+            }
             if (tx % 3 === 1) {
-                ps.push(this._vis(wSet.light, new BABYLON.Vector3(wx, H1, oz),      new BABYLON.Vector3(0, Math.PI, 0), parent));
-                ps.push(this._vis(wSet.light, new BABYLON.Vector3(wx, H1, oz + rD), BABYLON.Vector3.Zero(),             parent));
+                ps.push(this._vis(wSet.light, new BABYLON.Vector3(wx, H1, oz      ), new BABYLON.Vector3(0, Math.PI, 0), parent));
+                ps.push(this._vis(wSet.light, new BABYLON.Vector3(wx, H1, oz + rD ), BABYLON.Vector3.Zero(),             parent));
             }
         }
         // Murs E/W
         for (let tz = 0; tz < room.rows; tz++) {
             const wz = oz + tz * T + T / 2, tZ = room.worldZ + tz;
-            const dW = openings.has("W") && ((cIn  && this._at(cIn.tiles,  room.worldX - 1,          tZ)) || (cOut && this._at(cOut.tiles, room.worldX - 1,          tZ)));
-            const dE = openings.has("E") && ((cIn  && this._at(cIn.tiles,  room.worldX + room.cols,   tZ)) || (cOut && this._at(cOut.tiles, room.worldX + room.cols,   tZ)));
+            const dW = openings.has("W") && ((cIn  && this._at(cIn.tiles,  room.worldX - 1,        tZ)) || (cOut && this._at(cOut.tiles, room.worldX - 1,        tZ)));
+            const dE = openings.has("E") && ((cIn  && this._at(cIn.tiles,  room.worldX + room.cols, tZ)) || (cOut && this._at(cOut.tiles, room.worldX + room.cols, tZ)));
             ps.push(this._vis(dW ? wSet.door : wSet.base, new BABYLON.Vector3(ox,      H1, wz), new BABYLON.Vector3(0, -Math.PI / 2, 0), parent));
             ps.push(this._vis(dE ? wSet.door : wSet.base, new BABYLON.Vector3(ox + rW, H1, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
-            if (!dW) this._mkCol(`wW_${tz}_${oz}`, ox,      H1 + 1.5, wz, 0.3, 3, T, parent);
-            if (!dE) this._mkCol(`wE_${tz}_${oz}`, ox + rW, H1 + 1.5, wz, 0.3, 3, T, parent);
+            if (!dW) this._mkCol(`wW_${tz}_${oz}`,  ox,      H1 + 1.5, wz, 0.3, 3, T, parent);
+            if (!dE) this._mkCol(`wE_${tz}_${oz}`,  ox + rW, H1 + 1.5, wz, 0.3, 3, T, parent);
+            if (!dW) {
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox,      H1 + 4, wz), new BABYLON.Vector3(0, -Math.PI / 2, 0), parent));
+                this._mkCol(`wWH_${tz}_${oz}`, ox,      H1 + 4.5, wz, 0.3, 3, T, parent);
+            }
+            if (!dE) {
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox + rW, H1 + 4, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
+                this._mkCol(`wEH_${tz}_${oz}`, ox + rW, H1 + 4.5, wz, 0.3, 3, T, parent);
+            }
             if (tz % 3 === 1) {
                 ps.push(this._vis(wSet.light, new BABYLON.Vector3(ox,      H1, wz), new BABYLON.Vector3(0, -Math.PI / 2, 0), parent));
                 ps.push(this._vis(wSet.light, new BABYLON.Vector3(ox + rW, H1, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
@@ -359,6 +376,28 @@ export class ProceduralMap {
             if (lay.hasFloor2) await this._buildFloor2(room, lay, parent);
         }
 
+        const ROOF_Y = 8;
+        const roofColors = {
+            blue:   new BABYLON.Color3(0.10, 0.13, 0.22),
+            green:  new BABYLON.Color3(0.09, 0.17, 0.11),
+            grey:   new BABYLON.Color3(0.13, 0.13, 0.16),
+            orange: new BABYLON.Color3(0.22, 0.12, 0.06),
+            red:    new BABYLON.Color3(0.20, 0.07, 0.07),
+        };
+        const roofMat = new BABYLON.StandardMaterial(`roofMat_${ox}_${oz}`, this.scene);
+        roofMat.diffuseColor    = roofColors[room.color] ?? roofColors.grey;
+        roofMat.emissiveColor   = (roofColors[room.color] ?? roofColors.grey).scale(0.3);
+        roofMat.specularColor   = new BABYLON.Color3(0, 0, 0);
+        roofMat.backFaceCulling = false;  // visible depuis en-dessous
+
+        const roof = BABYLON.MeshBuilder.CreateBox(`roof_${ox}_${oz}`,
+            { width: rW, height: 0.2, depth: rD }, this.scene);
+        roof.position        = new BABYLON.Vector3(ox + rW / 2, ROOF_Y, oz + rD / 2);
+        roof.material        = roofMat;
+        roof.checkCollisions = false;
+        roof.isPickable      = false;
+        roof.parent          = parent;
+        roof.alwaysSelectAsActiveMesh = true;
         await Promise.all(ps);
     }
 

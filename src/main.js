@@ -28,7 +28,7 @@ window.addEventListener('DOMContentLoaded', () => {
         );
 
         // Détection de la touche Échap via le Pointer Lock du navigateur
-        document.addEventListener('pointerlockchange', () => {
+        /*document.addEventListener('pointerlockchange', () => {
             if (!isGameRunning) return; 
 
             if (document.pointerLockElement) {
@@ -38,7 +38,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 isPaused = true;
                 pauseMenu.show();
             }
-        });
+        });*/
 
         // La boucle de rendu modifiée pour gérer la pause
         game.engine.runRenderLoop(() => {

@@ -1,24 +1,20 @@
 import * as BABYLON from "@babylonjs/core";
+import { EnemyParticles } from "../Enemies/EnemyParticles";
 
 export class Projectile {
     constructor(scene, startPosition, direction, isEnemy = false) {
-        this.scene = scene;
-        this.speed = 40;
+        this.scene   = scene;
+        this.speed   = 40;
         this.isEnemy = isEnemy;
 
-        // Creation de la forme du projectile
         this.mesh = BABYLON.MeshBuilder.CreateCylinder(
             "projectile",
             { height: 0.6, diameter: 0.05 },
             scene,
         );
 
-        // Positionnement devant le tireur
-        // startPosition est déjà la globalPosition de la caméra,
-        // on décale juste assez pour sortir du near clip plane
         this.mesh.position = startPosition.clone().add(direction.scale(0.5));
 
-        // Orientation vers la direction du tir
         this.direction = direction.normalize();
         this.mesh.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionRH(
             this.direction,
@@ -26,34 +22,24 @@ export class Projectile {
         );
         this.mesh.rotate(BABYLON.Axis.X, Math.PI / 2, BABYLON.Space.LOCAL);
 
-        // Application de la couleur lumineuse
         const mat = new BABYLON.StandardMaterial("projMat", scene);
         mat.emissiveColor = isEnemy
             ? new BABYLON.Color3(1, 0, 0)
             : new BABYLON.Color3(0, 1, 1);
         mat.disableLighting = true;
-        this.mesh.material = mat;
+        this.mesh.material  = mat;
 
-        // Bypass frustum culling : les projectiles sont créés après
-        // tout appel à createOrUpdateSelectionOctree et seraient
-        // autrement exclus du rendu si hors des bounds de l'octree.
         this.mesh.alwaysSelectAsActiveMesh = true;
 
-        // Duree de vie avant destruction
-        this.lifeTime = 2000;
+        this.lifeTime  = 2000;
         this.spawnTime = Date.now();
 
-        // Ajout a la boucle de rendu
-        this.observer = this.scene.onBeforeRenderObservable.add(() =>
-            this.update(),
-        );
+        this.observer = this.scene.onBeforeRenderObservable.add(() => this.update());
     }
 
-    // Mise a jour a chaque frame
     update() {
         const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
 
-        // Lancement d'un rayon pour detecter les collisions
         const ray = new BABYLON.Ray(
             this.mesh.position,
             this.direction,
@@ -64,37 +50,45 @@ export class Projectile {
             (mesh) => mesh.isPickable && mesh !== this.mesh,
         );
 
-        // Gestion de l'impact
         if (hit.hit) {
             this.onHit(hit);
             return;
         }
 
-        // Avancement du projectile
         this.mesh.position.addInPlace(this.direction.scale(this.speed * deltaTime));
 
-        // Destruction si le temps de vie est depasse
         if (Date.now() - this.spawnTime > this.lifeTime) {
             this.destroy();
         }
     }
 
-    // Logique lors d'un impact
     onHit(hitResult) {
         const meshTouché = hitResult.pickedMesh;
 
-        // Verification de la zone touchee
         if (meshTouché.name === "weakPoint") {
-            console.log("Point faible touché ! ONE SHOT !");
+            // Pas de particules d'impact sur les weakpoints — l'explosion de mort suffit
             if (meshTouché.parent) meshTouché.parent.dispose();
-        } else if (meshTouché.name === "enemyBody") {
-            console.log("Armure touchée (pas de dégâts)");
+
+        } else if (
+            meshTouché.name === "enemyBody"      ||
+            meshTouché.name === "enemyBodyHeavy" ||
+            meshTouché.name === "enemyBodyScout"
+        ) {
+            // Impact sur armure : petit splash cyan
+            const impactPos = hitResult.pickedPoint ?? this.mesh.position.clone();
+            const normal    = hitResult.getNormal(true) ?? BABYLON.Vector3.Up();
+            EnemyParticles.projectileImpact(this.scene, impactPos, normal);
+
+        } else {
+            // Impact sur le décor (mur, sol, prop...)
+            const impactPos = hitResult.pickedPoint ?? this.mesh.position.clone();
+            const normal    = hitResult.getNormal(true) ?? BABYLON.Vector3.Up();
+            EnemyParticles.projectileImpact(this.scene, impactPos, normal);
         }
 
         this.destroy();
     }
 
-    // Nettoyage de la memoire
     destroy() {
         this.scene.onBeforeRenderObservable.remove(this.observer);
         this.mesh.dispose();

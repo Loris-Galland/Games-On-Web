@@ -309,3 +309,216 @@ html, body, #app, canvas {
     80% { transform: translate(2px, -2px) }
     100% { transform: translate(0) }
 }
+
+#game-over-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier New', Courier, monospace;
+    opacity: 0;
+    transition: opacity 0.6s ease-in;
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+#game-over-overlay.go-visible {
+    opacity: 1;
+}
+
+/* Ligne de scan CRT */
+.go-scanline {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 255, 100, 0.018) 2px,
+            rgba(0, 255, 100, 0.018) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+    animation: go-scan 8s linear infinite;
+}
+
+@keyframes go-scan {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 100vh; }
+}
+
+/* Contenu centré */
+.go-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    max-width: 700px;
+    width: 100%;
+    padding: 40px;
+}
+
+/* Titre glitch */
+.go-glitch {
+    font-size: 72px;
+    font-weight: bold;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+    color: #ff0033;
+    text-shadow:
+            0 0 20px #ff0033,
+            0 0 40px #ff003388;
+    position: relative;
+    animation: go-glitch-anim 2.5s infinite;
+}
+
+.go-glitch::before,
+.go-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.go-glitch::before {
+    color: #00ffff;
+    clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+    animation: go-glitch-top 2.5s infinite;
+    text-shadow: -3px 0 #00ffff;
+}
+
+.go-glitch::after {
+    color: #ff00ff;
+    clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+    animation: go-glitch-bot 2.5s infinite;
+    text-shadow: 3px 0 #ff00ff;
+}
+
+@keyframes go-glitch-anim {
+    0%, 90%, 100% { transform: translate(0); }
+    91%            { transform: translate(-3px, 1px); }
+    93%            { transform: translate(3px, -1px); }
+    95%            { transform: translate(-2px, 2px); }
+    97%            { transform: translate(2px, -2px); }
+}
+
+@keyframes go-glitch-top {
+    0%, 88%, 100% { transform: translate(0); opacity: 0; }
+    89%            { transform: translate(-4px, 0); opacity: 1; }
+    91%            { transform: translate(4px, 0); opacity: 1; }
+    93%            { opacity: 0; }
+}
+
+@keyframes go-glitch-bot {
+    0%, 88%, 100% { transform: translate(0); opacity: 0; }
+    90%            { transform: translate(4px, 0); opacity: 1; }
+    92%            { transform: translate(-4px, 0); opacity: 1; }
+    94%            { opacity: 0; }
+}
+
+/* Sous-titre */
+.go-subtitle {
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: #ff003388;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px #ff003366;
+    animation: go-flicker 3s infinite;
+}
+
+@keyframes go-flicker {
+    0%, 19%, 21%, 23%, 75%, 77%, 100% { opacity: 1; }
+    20%, 22%, 76%                       { opacity: 0.4; }
+}
+
+/* Stats */
+.go-stats {
+    display: flex;
+    gap: 60px;
+    margin: 10px 0;
+    border: 1px solid #ff003344;
+    padding: 20px 40px;
+    background: rgba(255, 0, 50, 0.04);
+}
+
+.go-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.go-stat-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #ff003388;
+    text-transform: uppercase;
+}
+
+.go-stat-value {
+    font-size: 42px;
+    letter-spacing: 4px;
+    color: #ff4466;
+    text-shadow: 0 0 12px #ff0033;
+}
+
+/* Boutons */
+.go-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 380px;
+}
+
+.go-btn {
+    background: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 24px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+}
+
+.go-btn-primary {
+    color: #ff0033;
+    border-color: #ff0033;
+}
+
+.go-btn-primary:hover {
+    color: #000;
+    background: #ff0033;
+    box-shadow: 0 0 20px #ff003388;
+    transform: translateX(6px);
+}
+
+.go-btn-secondary {
+    color: #556677;
+    border-color: #334455;
+}
+
+.go-btn-secondary:hover {
+    color: #00ffff;
+    border-color: #00ffff;
+    box-shadow: 0 0 14px #00ffff44;
+    transform: translateX(6px);
+}
+
+.go-footer {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #223344;
+    text-transform: uppercase;
+    margin-top: 10px;
+}

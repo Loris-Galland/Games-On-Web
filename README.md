@@ -100,3 +100,9 @@ src/
 | `vite` | Bundler / serveur de développement |
 
 Les assets 3D (fichiers `.glb`) doivent être placés dans `public/assets/models/` et les icônes dans `public/assets/icons/`.
+
+---
+
+## Crédits assets
+Les assets 3D utilisés dans ce projet : https://moltenmaps.itch.io/molten-maps-scifi-pack
+Créé par : Moltenbolt, https://moltenmaps.itch.io/

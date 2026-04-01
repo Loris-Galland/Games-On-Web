@@ -1,4 +1,4 @@
-# PROJECT // ROGUE
+# GAMES ON WEB : PROJECT // ROGUE
 
 > FPS roguelike 3D dans un vaisseau spatial abandonné — survivez aux vagues d'ennemis, explorez des salles générées procéduralement et améliorez votre équipement.
 
@@ -62,7 +62,6 @@ Puis ouvrir **http://localhost:5173** dans votre navigateur.
 | Se déplacer | Z / W / S / Q / A / D |
 | Regarder | Souris |
 | Tirer | Clic gauche |
-| Sauter | Espace |
 | Pause / Reprendre | Entrée |
 
 ### Déroulement d'une partie

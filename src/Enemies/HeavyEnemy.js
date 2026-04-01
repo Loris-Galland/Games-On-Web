@@ -18,6 +18,9 @@ export class HeavyEnemy extends BaseEnemy {
             weakPointY:     1.2,
             weakPointZ:     1.1,
             weakPointColor: new BABYLON.Color3(1, 0.45, 0),
+            // Heavy reste plus loin — grand corps, il bloque sinon
+            encircleRadius: 3.2,
+            angularDrift:   0.18,
         };
     }
 }

@@ -167,7 +167,7 @@ export class GameScene {
             if (!this.player) return;
 
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
-                (room.worldX + room.cols / 2) * 4, 5, (room.worldZ + room.rows / 2) * 4,
+                (room.worldX + room.cols / 2) * 4, 2, (room.worldZ + room.rows / 2) * 4,
             );
 
             scene.meshes.forEach(m => {

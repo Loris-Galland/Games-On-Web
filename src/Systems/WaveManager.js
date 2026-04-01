@@ -1,26 +1,19 @@
 import * as BABYLON from "@babylonjs/core";
-import { StandardEnemy }  from "../Enemies/StandardEnemy";
-import { HeavyEnemy }     from "../Enemies/HeavyEnemy";
-import { ScoutEnemy }     from "../Enemies/ScoutEnemy";
-import { EnemyParticles } from "../Enemies/EnemyParticles";
+import { StandardEnemy }              from "../Enemies/StandardEnemy";
+import { HeavyEnemy }                 from "../Enemies/HeavyEnemy";
+import { ScoutEnemy }                 from "../Enemies/ScoutEnemy";
+import { EnemyParticles }             from "../Enemies/EnemyParticles";
+import { resetSlotCounter }           from "../Enemies/BaseEnemy";
 
-const WAVES_PER_ROOM = 5;
-
-// Délai entre l'apparition du warning de spawn et l'ennemi réel (ms)
+const WAVES_PER_ROOM      = 5;
 const SPAWN_WARNING_DELAY = 1800;
 
-/**
- * Composition des vagues (1..5).
- * type      : "standard" | "heavy" | "scout"
- * count     : nombre d'ennemis
- * speedMult : multiplicateur sur la vitesse de base du type
- */
 const WAVE_COMPOSITIONS = {
-    1: [ { type: "standard", count: 3, speedMult: 1.0 } ],
-    2: [ { type: "standard", count: 2, speedMult: 1.0 }, { type: "scout",    count: 2, speedMult: 1.0 } ],
-    3: [ { type: "standard", count: 3, speedMult: 1.1 }, { type: "heavy",    count: 1, speedMult: 1.0 } ],
-    4: [ { type: "standard", count: 2, speedMult: 1.1 }, { type: "scout",    count: 3, speedMult: 1.1 }, { type: "heavy", count: 1, speedMult: 1.0 } ],
-    5: [ { type: "heavy",    count: 2, speedMult: 1.1 }, { type: "scout",    count: 4, speedMult: 1.2 }, { type: "standard", count: 2, speedMult: 1.2 } ],
+    1: [ { type: "standard", count: 10, speedMult: 1.0 } ],
+    2: [ { type: "standard", count: 10, speedMult: 1.0 }, { type: "scout",    count: 5, speedMult: 1.0 } ],
+    3: [ { type: "standard", count: 10, speedMult: 1.1 }, { type: "heavy",    count: 5, speedMult: 1.0 } ],
+    4: [ { type: "standard", count: 15, speedMult: 1.1 }, { type: "scout",    count: 5, speedMult: 1.1 }, { type: "heavy", count: 5, speedMult: 1.0 } ],
+    5: [ { type: "heavy",    count: 20, speedMult: 1.1 }, { type: "scout",    count: 10, speedMult: 1.2 }, { type: "standard", count: 5, speedMult: 1.2 } ],
 };
 
 export class WaveManager {
@@ -144,6 +137,9 @@ export class WaveManager {
         this.currentWave++;
         this.isWaveActive = true;
 
+        // Réinitialise le compteur de slots : chaque vague recommence à "front"
+        resetSlotCounter();
+
         this.hud.updateWave(this.currentWave);
         this.hud.showWaveMessage(`VAGUE ${this.currentWave} / ${WAVES_PER_ROOM}`);
 
@@ -154,9 +150,8 @@ export class WaveManager {
         let globalIdx = 0;
         for (const group of composition) {
             for (let i = 0; i < group.count; i++) {
-                // Position de spawn calculée à l'avance
-                const angle  = (globalIdx / total) * Math.PI * 2 + Math.random() * 0.4;
-                const radius = 8 + Math.random() * 14;
+                const angle    = (globalIdx / total) * Math.PI * 2 + Math.random() * 0.4;
+                const radius   = 8 + Math.random() * 14;
                 const spawnPos = new BABYLON.Vector3(
                     center.x + Math.cos(angle) * radius,
                     1.25,
@@ -166,7 +161,6 @@ export class WaveManager {
                 const type      = group.type;
                 const speedMult = group.speedMult;
 
-                // 1) Particules de warning IMMÉDIATEMENT
                 EnemyParticles.spawnWarning(
                     this.scene,
                     spawnPos,
@@ -174,9 +168,7 @@ export class WaveManager {
                     SPAWN_WARNING_DELAY,
                 );
 
-                // 2) Ennemi spawné après le délai
                 setTimeout(() => {
-                    // Vérifie que la salle est toujours active (le joueur n'est pas parti)
                     if (!this.isWaveActive) return;
                     const enemy = this._createEnemy(type, spawnPos, speedMult);
                     if (enemy) this.enemiesAlive.push(enemy);
@@ -190,12 +182,12 @@ export class WaveManager {
     _createEnemy(type, spawnPos, speedMult) {
         switch (type) {
             case "heavy":
-                return new HeavyEnemy(this.scene, spawnPos, this.player, 1 * speedMult, this._navManager);
+                return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
             case "scout":
-                return new ScoutEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
+                return new ScoutEnemy(this.scene, spawnPos, this.player, 5 * speedMult, this._navManager);
             case "standard":
             default:
-                return new StandardEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
+                return new StandardEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
         }
     }
 
@@ -212,9 +204,6 @@ export class WaveManager {
     _update() {
         if (!this.isWaveActive) return;
 
-        // Ne compter les ennemis morts qu'une fois que tous les spawns différés
-        // sont passés — on attend que enemiesAlive soit stable (> 0) avant de
-        // commencer à surveiller le 0.
         const allSpawned = this.enemiesAlive.length > 0;
         if (!allSpawned) return;
 

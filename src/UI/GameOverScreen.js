@@ -49,9 +49,6 @@ export class GameOverScreen {
                 </div>
 
                 <div class="go-buttons">
-                    <button class="go-btn go-btn-primary" id="go-restart">
-                        ↻ REINITIALIZE SYSTEM
-                    </button>
                     <button class="go-btn go-btn-secondary" id="go-menu">
                         ← RETURN TO TERMINAL
                     </button>
@@ -68,11 +65,6 @@ export class GameOverScreen {
             requestAnimationFrame(() => {
                 this._overlay.classList.add("go-visible");
             });
-        });
-
-        // Bouton restart
-        document.getElementById("go-restart").addEventListener("click", () => {
-            window.location.reload();
         });
 
         // Bouton menu (reload aussi — à adapter si tu as un vrai système de menu)

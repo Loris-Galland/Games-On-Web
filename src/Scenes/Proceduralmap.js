@@ -316,11 +316,11 @@ export class ProceduralMap {
             if (!dN) this._mkCol(`wN_${tx}_${ox}`,  wx, H1 + 1.5, oz,      T, 3, 0.3, parent);
             if (!dS) this._mkCol(`wS_${tx}_${ox}`,  wx, H1 + 1.5, oz + rD, T, 3, 0.3, parent);
             if (!dN) {
-                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 3, oz      ), new BABYLON.Vector3(0, Math.PI, 0), parent));
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 4, oz      ), new BABYLON.Vector3(0, Math.PI, 0), parent));
                 this._mkCol(`wNH_${tx}_${ox}`, wx, H1 + 4.5, oz,      T, 3, 0.3, parent);
             }
             if (!dS) {
-                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 3, oz + rD ), BABYLON.Vector3.Zero(),             parent));
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(wx, H1 + 4, oz + rD ), BABYLON.Vector3.Zero(),             parent));
                 this._mkCol(`wSH_${tx}_${ox}`, wx, H1 + 4.5, oz + rD, T, 3, 0.3, parent);
             }
             if (tx % 3 === 1) {
@@ -338,11 +338,11 @@ export class ProceduralMap {
             if (!dW) this._mkCol(`wW_${tz}_${oz}`,  ox,      H1 + 1.5, wz, 0.3, 3, T, parent);
             if (!dE) this._mkCol(`wE_${tz}_${oz}`,  ox + rW, H1 + 1.5, wz, 0.3, 3, T, parent);
             if (!dW) {
-                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox,      H1 + 3, wz), new BABYLON.Vector3(0, -Math.PI / 2, 0), parent));
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox,      H1 + 4, wz), new BABYLON.Vector3(0, -Math.PI / 2, 0), parent));
                 this._mkCol(`wWH_${tz}_${oz}`, ox,      H1 + 4.5, wz, 0.3, 3, T, parent);
             }
             if (!dE) {
-                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox + rW, H1 + 3, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
+                ps.push(this._vis(wSet.base, new BABYLON.Vector3(ox + rW, H1 + 4, wz), new BABYLON.Vector3(0,  Math.PI / 2, 0), parent));
                 this._mkCol(`wEH_${tz}_${oz}`, ox + rW, H1 + 4.5, wz, 0.3, 3, T, parent);
             }
             if (tz % 3 === 1) {

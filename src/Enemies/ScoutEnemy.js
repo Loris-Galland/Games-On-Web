@@ -18,6 +18,9 @@ export class ScoutEnemy extends BaseEnemy {
             weakPointY:     0.55,
             weakPointZ:     0.4,
             weakPointColor: new BABYLON.Color3(0, 0.95, 1),
+            // Scout rapide, orbite serrée — harcèle de près
+            encircleRadius: 1.5,
+            angularDrift:   0.70,
         };
     }
 }

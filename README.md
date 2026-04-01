@@ -103,6 +103,15 @@ Les assets 3D (fichiers `.glb`) doivent être placés dans `public/assets/models
 
 ---
 
+## Fonctionnalités à venir
+
+- **Design Sonore** : Intégration complète des effets sonores (armes, ennemis, interface) et d'une ambiance musicale.
+- **Enrichissement du Gameplay** : Ajout de nouveaux environnements, de salles d'amélioration spécifiques et d'un affrontement final contre un Boss.
+- **Amélioration Visuelle** : Intégration de modèles 3D complets pour le stuff du joueur.
+- **Paramètres Avancés** : Ajout d'options (réattribution des touches, réglages graphiques et sonores).
+
+---
+
 ## Crédits assets
 Les assets 3D utilisés dans ce projet : https://moltenmaps.itch.io/molten-maps-scifi-pack
 Créé par : Moltenbolt, https://moltenmaps.itch.io/

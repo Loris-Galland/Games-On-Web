@@ -19,11 +19,18 @@ export class GameScene {
         });
         this.engine.setHardwareScalingLevel(2);
         this._loadingScreen = null;
+        this.upgradeManager = new UpgradeManager(this.player);
+
+        this.isInUpgrade = false;
+        this.isPaused = false;
+
+        this.visitedRooms = new Set();
     }
 
     async _init() {
         this.scene = await this._createScene(this.canvas);
         this.engine.runRenderLoop(() => {
+            if (this.isPaused) return;
             this.scene.render();
             if (this.player)         this.player.hud.updateFps(this.engine);
             if (this.navManager)     this.navManager.update(this.engine.getDeltaTime() / 1000);
@@ -163,8 +170,16 @@ export class GameScene {
         this.lightingManager = new LightingManager(scene, this.engine);
         this.lightingManager.init();
 
-        this.map._onRoomReady = (room, idx, spawnPos, spawnInfo) => {
+        this.map._onRoomReady = async (room, idx, spawnPos, spawnInfo) => {
             if (!this.player) return;
+            this._finishLoading();
+
+            const isNew = !this.visitedRooms.has(idx);
+            this.visitedRooms.add(idx);
+
+            if(idx !==0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+                await this._waitForUpgradeChoice(scene);
+            }
 
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
                 (room.worldX + room.cols / 2) * 4, 2, (room.worldZ + room.rows / 2) * 4,
@@ -238,7 +253,7 @@ export class GameScene {
 
         this.player = new Player(scene, canvas);
         this.player.camera.position = new BABYLON.Vector3(
-            this.map.spawnPoint.x, 5, this.map.spawnPoint.z,
+            this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );
 
         // ── Stats pour le Game Over ───────────────────────────────────────
@@ -254,19 +269,6 @@ export class GameScene {
         if (this.lightingManager._pipeline) {
             this.lightingManager._pipeline.addCamera(this.player.camera);
         }
-
-        // ── Upgrade manager ───────────────────────────────────────────────
-        this.upgradeManager = new UpgradeManager(this.player);
-        window.addEventListener("keydown", (evt) => {
-            if (evt.key.toLowerCase() === "u") {
-                document.exitPointerLock();
-                const randomCards = this.upgradeManager.getRandomUpgrades(3);
-                this.player.hud.showUpgradeScreen(randomCards, (choix) => {
-                    choix.apply(this.player);
-                    scene.getEngine().enterPointerlock();
-                });
-            }
-        });
 
         // ── WaveManager avec hook mode combat ─────────────────────────────
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);
@@ -311,5 +313,25 @@ export class GameScene {
 
         // Lumières de la salle de spawn (room 0)
         this.lightingManager.setRoom(this.map.rooms[0]);
+    }
+
+    _waitForUpgradeChoice(scene) {
+        this.isInUpgrade = true;
+        this.map._paused = true;
+        document.exitPointerLock();
+
+        const randomCards = this.upgradeManager.getRandomUpgrades(3);
+
+        return new Promise(resolve => {
+            this.player.hud.showUpgradeScreen(randomCards, (choix) => {
+                choix.apply(this.player);
+                scene.getEngine().enterPointerlock();
+
+                this.map._paused = false;
+                this.isInUpgrade = false;
+
+                resolve();
+            });
+        });
     }
 }

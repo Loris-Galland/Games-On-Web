@@ -25,6 +25,7 @@ export class PauseMenu {
         resumeBtn.className = "menu-btn";
         resumeBtn.innerText = "REPRENDRE";
         resumeBtn.onclick = () => {
+            this.hide();
             if (this.onResume) this.onResume();
         };
 

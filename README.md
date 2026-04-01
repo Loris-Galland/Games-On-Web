@@ -106,9 +106,11 @@ Les assets 3D (fichiers `.glb`) doivent être placés dans `public/assets/models
 ## Fonctionnalités à venir
 
 - **Design Sonore** : Intégration complète des effets sonores (armes, ennemis, interface) et d'une ambiance musicale.
-- **Enrichissement du Gameplay** : Ajout de nouveaux environnements, de salles d'amélioration spécifiques et d'un affrontement final contre un Boss.
+- **Enrichissement du Gameplay** : Ajout de salles fonctionnelles (Boutiques d'armes, Salles de Défi, Stations d'amélioration spécifiques) et d'un affrontement final contre un Boss, et un système de scoring détaillé.
+- **Jouabilité** : Prise en charge complète des manettes (gamepad) pour offrir plus de confort et de possibilités aux joueurs.
+- **Narration** : Introduction d'une histoire fil rouge et intégration de cinématiques simples pour renforcer l'immersion dans l'univers.
 - **Amélioration Visuelle** : Intégration de modèles 3D complets pour le stuff du joueur.
-- **Paramètres Avancés** : Ajout d'options (réattribution des touches, réglages graphiques et sonores).
+- **Paramètres Avancés** : Ajout d'options de personnalisation (réattribution des touches, réglages graphiques et sonores).
 
 ---
 

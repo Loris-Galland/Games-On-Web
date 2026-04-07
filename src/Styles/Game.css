@@ -522,3 +522,395 @@ html, body, #app, canvas {
     text-transform: uppercase;
     margin-top: 10px;
 }
+/* ══════════════════════════════════════════════════════════════════════════════
+   PANNEAU GRAPHISMES — POST-PROCESSING PIPELINE CONTROLS
+   Style AAA : Cyberpunk terminal, sections accordéon, sliders custom
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Conteneur principal du panneau graphismes */
+.gfx-panel {
+    display: flex;
+    flex-direction: column;
+    width: 640px;
+    max-width: 95vw;
+    max-height: 82vh;
+    background: linear-gradient(160deg, rgba(0,8,18,0.98) 0%, rgba(0,14,28,0.98) 100%);
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    box-shadow:
+        0 0 0 1px rgba(0, 255, 204, 0.08),
+        0 0 60px rgba(0, 180, 255, 0.08),
+        inset 0 1px 0 rgba(0,255,204,0.12);
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    position: relative;
+}
+
+/* Ligne de scan subtile sur le panneau */
+.gfx-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,255,204,0.012) 3px,
+        rgba(0,255,204,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Header */
+.gfx-header {
+    padding: 22px 28px 16px;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.15);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.gfx-title {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: #00ffcc;
+    text-shadow: 0 0 20px rgba(0,255,204,0.6), 0 0 40px rgba(0,255,204,0.2);
+    text-transform: uppercase;
+    line-height: 1;
+}
+
+.gfx-subtitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: rgba(0, 200, 160, 0.45);
+    text-transform: uppercase;
+    margin-top: 6px;
+}
+
+/* Presets */
+.gfx-presets {
+    padding: 14px 28px;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.08);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.gfx-preset-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: rgba(0, 200, 160, 0.4);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.gfx-preset-row {
+    display: flex;
+    gap: 8px;
+}
+
+.gfx-preset-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(0, 255, 204, 0.2);
+    color: rgba(0, 200, 160, 0.55);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 8px 4px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+    position: relative;
+}
+
+.gfx-preset-btn:hover {
+    border-color: rgba(0, 255, 204, 0.6);
+    color: #00ffcc;
+    background: rgba(0, 255, 204, 0.06);
+    text-shadow: 0 0 8px rgba(0,255,204,0.5);
+}
+
+.gfx-preset-btn.active {
+    border-color: #00ffcc;
+    color: #000;
+    background: #00ffcc;
+    text-shadow: none;
+    box-shadow: 0 0 16px rgba(0,255,204,0.4);
+}
+
+/* Zone scrollable des contrôles */
+.gfx-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 0;
+    position: relative;
+    z-index: 1;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,255,204,0.3) transparent;
+}
+
+.gfx-scroll::-webkit-scrollbar { width: 4px; }
+.gfx-scroll::-webkit-scrollbar-track { background: transparent; }
+.gfx-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0,255,204,0.3);
+    border-radius: 2px;
+}
+
+/* Section */
+.gfx-section {
+    border-bottom: 1px solid rgba(0, 255, 204, 0.07);
+}
+
+.gfx-section-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 28px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(0, 200, 160, 0.5);
+    background: rgba(0,255,204,0.018);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.07);
+    backdrop-filter: blur(4px);
+}
+
+.gfx-section-icon {
+    font-size: 14px;
+    color: rgba(0, 255, 204, 0.4);
+    width: 16px;
+    text-align: center;
+}
+
+.gfx-section-body {
+    padding: 4px 0 8px;
+}
+
+/* Row individuelle */
+.gfx-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 28px;
+    min-height: 36px;
+    transition: background 0.15s;
+}
+
+.gfx-row:hover {
+    background: rgba(0, 255, 204, 0.028);
+}
+
+.gfx-row-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: rgba(200, 230, 230, 0.75);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    width: 180px;
+}
+
+/* Toggle switch */
+.gfx-toggle {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.gfx-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.gfx-toggle-track {
+    display: block;
+    width: 44px;
+    height: 22px;
+    background: rgba(0, 20, 30, 0.8);
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    border-radius: 11px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.gfx-toggle input:checked + .gfx-toggle-track {
+    background: rgba(0, 255, 204, 0.15);
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px rgba(0,255,204,0.25);
+}
+
+.gfx-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    background: rgba(0, 180, 150, 0.5);
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.gfx-toggle input:checked + .gfx-toggle-track .gfx-toggle-thumb {
+    left: 25px;
+    background: #00ffcc;
+    box-shadow: 0 0 8px rgba(0,255,204,0.7);
+}
+
+/* Slider */
+.gfx-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    max-width: 280px;
+}
+
+.gfx-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 3px;
+    background: rgba(0, 255, 204, 0.15);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.gfx-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #00ffcc;
+    box-shadow: 0 0 8px rgba(0,255,204,0.6), 0 0 0 2px rgba(0,255,204,0.2);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+}
+
+.gfx-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 14px rgba(0,255,204,0.9), 0 0 0 4px rgba(0,255,204,0.15);
+}
+
+.gfx-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #00ffcc;
+    border: none;
+    box-shadow: 0 0 8px rgba(0,255,204,0.6);
+    cursor: pointer;
+}
+
+.gfx-slider::-moz-range-track {
+    background: rgba(0, 255, 204, 0.15);
+    height: 3px;
+    border-radius: 2px;
+}
+
+.gfx-slider-val {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #00ffcc;
+    text-shadow: 0 0 6px rgba(0,255,204,0.5);
+    min-width: 52px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Select */
+.gfx-select {
+    background: rgba(0, 10, 20, 0.9);
+    border: 1px solid rgba(0, 255, 204, 0.3);
+    color: #00ffcc;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 5px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    min-width: 130px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+}
+
+.gfx-select:hover, .gfx-select:focus {
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px rgba(0,255,204,0.2);
+}
+
+.gfx-select option {
+    background: #000e1a;
+    color: #00ffcc;
+}
+
+/* Footer boutons */
+.gfx-footer {
+    display: flex;
+    gap: 12px;
+    padding: 14px 28px;
+    border-top: 1px solid rgba(0, 255, 204, 0.12);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.gfx-back-btn,
+.gfx-reset-btn {
+    background: transparent;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+
+.gfx-back-btn {
+    color: #00ffcc;
+    border-color: rgba(0, 255, 204, 0.4);
+    flex: 2;
+}
+
+.gfx-back-btn:hover {
+    background: rgba(0, 255, 204, 0.1);
+    border-color: #00ffcc;
+    box-shadow: 0 0 14px rgba(0,255,204,0.2);
+    transform: translateX(-4px);
+}
+
+.gfx-reset-btn {
+    color: rgba(180, 100, 80, 0.8);
+    border-color: rgba(180, 80, 60, 0.35);
+    flex: 1;
+}
+
+.gfx-reset-btn:hover {
+    color: #ff6644;
+    border-color: #ff6644;
+    background: rgba(255, 80, 40, 0.08);
+    box-shadow: 0 0 14px rgba(255,80,40,0.2);
+}
+
+/* Adaptation du menu overlay pour accueillir le panneau gfx (scroll complet) */
+#main-menu-overlay .gfx-panel,
+#pause-menu-overlay .gfx-panel {
+    /* Le panneau prend tout l'espace centré */
+    margin: 0 auto;
+}

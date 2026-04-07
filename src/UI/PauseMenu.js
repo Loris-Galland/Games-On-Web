@@ -1,123 +1,132 @@
+import { GraphicsMenu } from "./GraphicsMenu.js";
+
 export class PauseMenu {
-    constructor(onResumeCallback, onQuitCallback, playerRef = null) {
+    constructor(onResumeCallback, onQuitCallback, playerRef = null, lightingManagerRef = null) {
         this.onResume = onResumeCallback;
-        this.onQuit = onQuitCallback;
-        this.player = playerRef;
+        this.onQuit   = onQuitCallback;
+        this.player   = playerRef;
+        this.lm       = lightingManagerRef;
+        this._gfxMenu = null;
         this._createMenu();
+    }
+
+    setLightingManager(lm) {
+        this.lm = lm;
+        this._gfxMenu = new GraphicsMenu(lm);
     }
 
     _createMenu() {
         this.overlay = document.createElement("div");
         this.overlay.id = "pause-menu-overlay";
 
-        // Titre
         const title = document.createElement("div");
         title.className = "pause-title";
         title.innerText = "SYSTÈME EN PAUSE";
         this.overlay.appendChild(title);
 
-        // Conteneur des boutons
+        // Boutons principaux
         this.buttonsContainer = document.createElement("div");
         this.buttonsContainer.className = "menu-buttons-container";
 
-        // Bouton REPRENDRE
         const resumeBtn = document.createElement("button");
-        resumeBtn.className = "menu-btn";
-        resumeBtn.innerText = "REPRENDRE";
-        resumeBtn.onclick = () => {
-            this.hide();
-            if (this.onResume) this.onResume();
-        };
+        resumeBtn.className = "menu-btn"; resumeBtn.innerText = "REPRENDRE";
+        resumeBtn.onclick = () => { this.hide(); if (this.onResume) this.onResume(); };
 
-        // Bouton PARAMÈTRES
         const settingsBtn = document.createElement("button");
-        settingsBtn.className = "menu-btn";
-        settingsBtn.innerText = "PARAMÈTRES";
-        settingsBtn.onclick = () => this._toggleSettings(true);
+        settingsBtn.className = "menu-btn"; settingsBtn.innerText = "PARAMÈTRES";
+        settingsBtn.onclick = () => this._showSettings();
 
-        // Bouton RETOUR AU MENU
+        const gfxBtn = document.createElement("button");
+        gfxBtn.className = "menu-btn"; gfxBtn.innerText = "GRAPHISMES";
+        gfxBtn.onclick = () => this._showGraphics();
+
         const quitBtn = document.createElement("button");
-        quitBtn.className = "menu-btn exit-btn";
-        quitBtn.innerText = "RETOUR À L'ACCUEIL";
-        quitBtn.onclick = () => {
-            if (this.onQuit) this.onQuit();
-        };
+        quitBtn.className = "menu-btn exit-btn"; quitBtn.innerText = "RETOUR À L'ACCUEIL";
+        quitBtn.onclick = () => { if (this.onQuit) this.onQuit(); };
 
         this.buttonsContainer.appendChild(resumeBtn);
         this.buttonsContainer.appendChild(settingsBtn);
+        this.buttonsContainer.appendChild(gfxBtn);
         this.buttonsContainer.appendChild(quitBtn);
         this.overlay.appendChild(this.buttonsContainer);
 
-        // Création du même panneau de paramètres que le menu principal
+        // Panneau paramètres existant
         this._createSettingsPanel();
+
+        // Slot graphismes
+        this._gfxPanelSlot = document.createElement("div");
+        this._gfxPanelSlot.style.display = "none";
+        this.overlay.appendChild(this._gfxPanelSlot);
 
         document.body.appendChild(this.overlay);
     }
 
     _createSettingsPanel() {
         this.settingsPanel = document.createElement("div");
-        this.settingsPanel.id = "settings-panel";
-        
-        // On force le style pour l'isoler des règles générales du CSS
+        this.settingsPanel.id = "settings-panel-pause";
         this.settingsPanel.style.display = "none";
         this.settingsPanel.style.flexDirection = "column";
+        this.settingsPanel.style.cssText += `
+            background: rgba(0,10,15,0.9);
+            border: 2px solid #00ffff;
+            padding: 40px;
+            width: 400px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 0 30px rgba(0,255,255,0.2);
+        `;
 
         const title = document.createElement("h2");
-        title.innerText = "PARAMÈTRES";
-        title.style.color = "#00ffff";
-        title.style.marginTop = "0";
+        title.innerText = "PARAMÈTRES"; title.style.color = "#00ffff"; title.style.marginTop = "0";
         this.settingsPanel.appendChild(title);
 
-        const sensGroup = document.createElement("div");
-        sensGroup.className = "setting-group";
-        
+        const sensGroup = document.createElement("div"); sensGroup.className = "setting-group";
         const currentSens = this.player ? this.player.camera.angularSensibility : 5000;
-        const sensLabel = document.createElement("label");
-        sensLabel.innerText = `SENSIBILITÉ SOURIS : ${currentSens}`;
-        
+        const sensLabel = document.createElement("label"); sensLabel.innerText = `SENSIBILITÉ SOURIS : ${currentSens}`;
         const sensInput = document.createElement("input");
-        sensInput.type = "range";
-        sensInput.min = "1000"; 
-        sensInput.max = "10000"; 
-        sensInput.value = currentSens;
-        
+        sensInput.type = "range"; sensInput.min = "1000"; sensInput.max = "10000"; sensInput.value = currentSens;
         sensInput.oninput = (e) => {
             sensLabel.innerText = `SENSIBILITÉ SOURIS : ${e.target.value}`;
-            if (this.player) {
-                this.player.camera.angularSensibility = parseInt(e.target.value);
-            }
+            if (this.player) this.player.camera.angularSensibility = parseInt(e.target.value);
         };
-
-        sensGroup.appendChild(sensLabel);
-        sensGroup.appendChild(sensInput);
+        sensGroup.appendChild(sensLabel); sensGroup.appendChild(sensInput);
         this.settingsPanel.appendChild(sensGroup);
 
         const backBtn = document.createElement("button");
-        backBtn.className = "menu-btn";
-        backBtn.style.marginTop = "20px";
-        backBtn.innerText = "RETOUR";
-        backBtn.onclick = () => this._toggleSettings(false);
+        backBtn.className = "menu-btn"; backBtn.style.marginTop = "20px"; backBtn.innerText = "RETOUR";
+        backBtn.onclick = () => this._showMain();
         this.settingsPanel.appendChild(backBtn);
 
         this.overlay.appendChild(this.settingsPanel);
     }
 
-    _toggleSettings(show) {
-        if (show) {
-            this.buttonsContainer.style.display = "none";
-            this.settingsPanel.style.display = "flex";
-        } else {
-            this.buttonsContainer.style.display = "flex";
-            this.settingsPanel.style.display = "none";
-        }
+    _showMain() {
+        this.buttonsContainer.style.display = "flex";
+        this.settingsPanel.style.display    = "none";
+        this._gfxPanelSlot.style.display    = "none";
     }
 
-    show() {
-        this.overlay.style.display = "flex";
+    _showSettings() {
+        this.buttonsContainer.style.display = "none";
+        this.settingsPanel.style.display    = "flex";
+        this._gfxPanelSlot.style.display    = "none";
     }
+
+    _showGraphics() {
+        if (!this.lm) { console.warn("[PauseMenu] LightingManager non disponible."); return; }
+        this.buttonsContainer.style.display = "none";
+        this.settingsPanel.style.display    = "none";
+        this._gfxPanelSlot.innerHTML = "";
+        if (!this._gfxMenu) this._gfxMenu = new GraphicsMenu(this.lm);
+        const panel = this._gfxMenu.buildPanel(() => this._showMain());
+        this._gfxPanelSlot.appendChild(panel);
+        this._gfxPanelSlot.style.display = "block";
+    }
+
+    show() { this.overlay.style.display = "flex"; }
 
     hide() {
         this.overlay.style.display = "none";
-        this._toggleSettings(false); 
+        this._showMain();
     }
 }

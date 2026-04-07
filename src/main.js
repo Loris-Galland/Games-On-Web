@@ -1,38 +1,45 @@
 import '../src/Styles/Game.css';
 import { GameScene } from './Scenes/GameScene.js';
-import { MainMenu } from './UI/MainMenu.js';
-import { PauseMenu } from './UI/PauseMenu.js'; 
+import { MainMenu }  from './UI/MainMenu.js';
+import { PauseMenu } from './UI/PauseMenu.js';
 
 window.addEventListener('DOMContentLoaded', () => {
     const game = new GameScene('renderCanvas');
-    
-    game._init().then(() => {
-        // Le menu principal
-        const mainMenu = new MainMenu(() => {
-            game.engine.enterPointerlock();
-        }, game.player);
 
-        // Le menu pause
-        const pauseMenu = new PauseMenu(
-            () => {
-                game.isPaused = false;
-                game.engine.enterPointerlock();
-            },
-            () => {
-                location.reload(); 
-            }, 
-            game.player
+    game._init().then(() => {
+        // Instanciation des menus — le LightingManager sera injecté après
+        const mainMenu = new MainMenu(
+            () => { game.engine.enterPointerlock(); },
+            game.player,
+            game.lightingManager,   // peut être null si init pas finie, voir setLightingManager ci-dessous
         );
 
-        // Détection de la touche Échap via le Pointer Lock du navigateur
+        const pauseMenu = new PauseMenu(
+            () => { game.isPaused = false; game.engine.enterPointerlock(); },
+            () => { location.reload(); },
+            game.player,
+            game.lightingManager,
+        );
+
+        // Si le LightingManager est initialisé après (cas async), on l'injecte rétrospectivement
+        if (!game.lightingManager) {
+            const inject = setInterval(() => {
+                if (game.lightingManager) {
+                    mainMenu.setLightingManager(game.lightingManager);
+                    pauseMenu.setLightingManager(game.lightingManager);
+                    clearInterval(inject);
+                }
+            }, 200);
+        }
+
+        // Touche Entrée → Pause / Reprise
         document.addEventListener('keydown', (evt) => {
-            if(evt.key === 'Enter') {
+            if (evt.key === 'Enter') {
                 game.isPaused = !game.isPaused;
-                console.log("pause : ", game.isPaused);
                 if (game.isPaused) {
                     document.exitPointerLock();
                     pauseMenu.show();
-                }else{
+                } else {
                     pauseMenu.hide();
                     game.engine.enterPointerlock();
                 }

@@ -5,7 +5,7 @@ import { ScoutEnemy }                 from "../Enemies/ScoutEnemy";
 import { EnemyParticles }             from "../Enemies/EnemyParticles";
 import { resetSlotCounter }           from "../Enemies/BaseEnemy";
 
-const WAVES_PER_ROOM      = 5;
+const WAVES_PER_ROOM      = 0;
 const SPAWN_WARNING_DELAY = 1800;
 
 const WAVE_COMPOSITIONS = {

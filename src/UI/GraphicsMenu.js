@@ -1,25 +1,32 @@
 /**
  * GraphicsMenu
  * ------------
+ * Panneau "GRAPHISMES" AAA réutilisable — MainMenu + PauseMenu.
  *
- * Usage :
- *   const gm = new GraphicsMenu(lightingManagerRef);
- *   const panel = gm.buildPanel(onBackCallback);
- *   someContainer.appendChild(panel);
+ * Comportement :
+ *   - À l'ouverture, snapshot des params courants.
+ *   - Sliders/toggles modifient la pipeline EN LIVE (prévisualisation).
+ *   - "APPLIQUER" valide et ferme.
+ *   - "ANNULER"   restaure le snapshot et ferme.
+ *   - "RESET"     repasse sur le preset "high" (reste ouvert).
  */
 export class GraphicsMenu {
     constructor(lightingManager) {
         this.lm = lightingManager;
+        this._snapshot = null;
     }
 
     buildPanel(onBack) {
+        // Snapshot au moment de l'ouverture
+        this._snapshot = this.lm ? { ...this.lm.getGraphicsParams() } : null;
+
         const panel = document.createElement("div");
         panel.className = "gfx-panel";
 
         panel.innerHTML = `
             <div class="gfx-header">
                 <div class="gfx-title">GRAPHISMES</div>
-                <div class="gfx-subtitle">POST-PROCESSING PIPELINE</div>
+                <div class="gfx-subtitle">POST-PROCESSING PIPELINE — PRÉVISUALISATION EN DIRECT</div>
             </div>
             <div class="gfx-presets">
                 <div class="gfx-preset-label">QUALITÉ PRÉDÉFINIE</div>
@@ -27,22 +34,41 @@ export class GraphicsMenu {
             </div>
             <div class="gfx-scroll" id="gfxScroll"></div>
             <div class="gfx-footer">
-                <button class="gfx-back-btn" id="gfxBack">← RETOUR</button>
-                <button class="gfx-reset-btn" id="gfxReset">RESET</button>
+                <button class="gfx-apply-btn" id="gfxApply">✓ APPLIQUER</button>
+                <button class="gfx-back-btn"  id="gfxBack">✕ ANNULER</button>
+                <button class="gfx-reset-btn" id="gfxReset">⟳ RESET</button>
             </div>
         `;
 
         this._buildPresetRow(panel.querySelector("#gfxPresetRow"));
         this._buildControls(panel.querySelector("#gfxScroll"));
 
-        panel.querySelector("#gfxBack").onclick  = onBack;
+        // APPLIQUER — valide et ferme
+        panel.querySelector("#gfxApply").onclick = () => {
+            this._snapshot = null;
+            onBack();
+        };
+
+        // ANNULER — restaure le snapshot et ferme
+        panel.querySelector("#gfxBack").onclick = () => {
+            this._rollback();
+            onBack();
+        };
+
+        // RESET — remet preset "high" et reste ouvert
         panel.querySelector("#gfxReset").onclick = () => {
-            const preset = this.lm?.getCurrentPreset?.() ?? "high";
-            this.lm?.applyGraphicsPreset?.(preset === "custom" ? "high" : preset);
+            this.lm?.applyGraphicsPreset?.("low");
             this._refresh(panel);
         };
 
         return panel;
+    }
+
+    _rollback() {
+        if (!this._snapshot || !this.lm) return;
+        const saved = this._snapshot;
+        Object.keys(saved).forEach(key => this.lm.setGraphicsParam(key, saved[key]));
+        this._snapshot = null;
     }
 
     _buildPresetRow(container) {
@@ -63,7 +89,6 @@ export class GraphicsMenu {
                 this.lm?.applyGraphicsPreset?.(id);
                 container.querySelectorAll(".gfx-preset-btn").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
-                // Refresh tous les controls
                 const scroll = container.closest(".gfx-panel")?.querySelector("#gfxScroll");
                 if (scroll) this._buildControls(scroll);
             };
@@ -81,17 +106,17 @@ export class GraphicsMenu {
                 icon: "◈",
                 rows: [
                     { key: "bloomEnabled",   label: "Activé",    type: "toggle" },
-                    { key: "bloomThreshold", label: "Seuil",     type: "range", min: 0, max: 1,   step: 0.01, fmt: v => v.toFixed(2) },
-                    { key: "bloomWeight",    label: "Intensité",  type: "range", min: 0, max: 1,   step: 0.01, fmt: v => v.toFixed(2) },
-                    { key: "bloomKernel",    label: "Kernel",    type: "range", min: 4, max: 128, step: 4,    fmt: v => Math.round(v) + "px" },
-                    { key: "bloomScale",     label: "Scale",     type: "range", min: 0.1, max: 1, step: 0.05, fmt: v => v.toFixed(2) },
+                    { key: "bloomThreshold", label: "Seuil",     type: "range", min: 0,   max: 1,   step: 0.01, fmt: v => v.toFixed(2) },
+                    { key: "bloomWeight",    label: "Intensité", type: "range", min: 0,   max: 1,   step: 0.01, fmt: v => v.toFixed(2) },
+                    { key: "bloomKernel",    label: "Kernel",    type: "range", min: 4,   max: 128, step: 4,    fmt: v => Math.round(v) + "px" },
+                    { key: "bloomScale",     label: "Scale",     type: "range", min: 0.1, max: 1,   step: 0.05, fmt: v => v.toFixed(2) },
                 ],
             },
             {
                 title: "VIGNETTE",
                 icon: "◉",
                 rows: [
-                    { key: "vignetteEnabled", label: "Activé",  type: "toggle" },
+                    { key: "vignetteEnabled", label: "Activée", type: "toggle" },
                     { key: "vignetteWeight",  label: "Force",   type: "range", min: 0, max: 8, step: 0.1, fmt: v => v.toFixed(1) },
                 ],
             },
@@ -99,10 +124,10 @@ export class GraphicsMenu {
                 title: "IMAGE",
                 icon: "▣",
                 rows: [
-                    { key: "contrast",  label: "Contraste",  type: "range", min: 0.5, max: 2.5, step: 0.01, fmt: v => v.toFixed(2) },
-                    { key: "exposure",  label: "Exposition", type: "range", min: 0.5, max: 3.0, step: 0.01, fmt: v => v.toFixed(2) },
-                    { key: "toneMappingEnabled", label: "Tone Mapping",    type: "toggle" },
-                    { key: "toneMappingType",    label: "Mode TM",         type: "select",
+                    { key: "contrast",           label: "Contraste",    type: "range", min: 0.5, max: 2.5, step: 0.01, fmt: v => v.toFixed(2) },
+                    { key: "exposure",           label: "Exposition",   type: "range", min: 0.5, max: 3.0, step: 0.01, fmt: v => v.toFixed(2) },
+                    { key: "toneMappingEnabled", label: "Tone Mapping", type: "toggle" },
+                    { key: "toneMappingType",    label: "Mode TM",      type: "select",
                       options: [
                           { v: 0, l: "Standard" }, { v: 1, l: "ACES" }, { v: 2, l: "Photographic" },
                       ],
@@ -120,26 +145,26 @@ export class GraphicsMenu {
                 title: "ABERRATION CHROMATIQUE",
                 icon: "◐",
                 rows: [
-                    { key: "chromaticAberrationEnabled", label: "Activée", type: "toggle" },
-                    { key: "chromaticAberrationAmount",  label: "Intensité",  type: "range", min: 0, max: 60, step: 0.5, fmt: v => v.toFixed(1) },
+                    { key: "chromaticAberrationEnabled", label: "Activée",   type: "toggle" },
+                    { key: "chromaticAberrationAmount",  label: "Intensité", type: "range", min: 0, max: 60, step: 0.5, fmt: v => v.toFixed(1) },
                 ],
             },
             {
                 title: "PROFONDEUR DE CHAMP",
                 icon: "◎",
                 rows: [
-                    { key: "depthOfFieldEnabled",      label: "Activée",         type: "toggle" },
-                    { key: "depthOfFieldFocalLength",  label: "Focale (mm)",      type: "range", min: 10,   max: 500,   step: 5,   fmt: v => Math.round(v) + "mm" },
-                    { key: "depthOfFieldFStop",        label: "Ouverture (f/)",   type: "range", min: 0.5,  max: 16,    step: 0.1, fmt: v => "f/" + v.toFixed(1) },
-                    { key: "depthOfFieldFocusDistance",label: "Distance focus",   type: "range", min: 100,  max: 10000, step: 100, fmt: v => Math.round(v) + "mm" },
+                    { key: "depthOfFieldEnabled",       label: "Activée",        type: "toggle" },
+                    { key: "depthOfFieldFocalLength",   label: "Focale (mm)",     type: "range", min: 10,  max: 500,   step: 5,   fmt: v => Math.round(v) + "mm" },
+                    { key: "depthOfFieldFStop",         label: "Ouverture (f/)",  type: "range", min: 0.5, max: 16,    step: 0.1, fmt: v => "f/" + v.toFixed(1) },
+                    { key: "depthOfFieldFocusDistance", label: "Distance focus",  type: "range", min: 100, max: 10000, step: 100, fmt: v => Math.round(v) + "mm" },
                 ],
             },
             {
                 title: "GRAIN CINÉMATIQUE",
                 icon: "◌",
                 rows: [
-                    { key: "grainEnabled",   label: "Activé",   type: "toggle" },
-                    { key: "grainAnimated",  label: "Animé",    type: "toggle" },
+                    { key: "grainEnabled",   label: "Activé",    type: "toggle" },
+                    { key: "grainAnimated",  label: "Animé",     type: "toggle" },
                     { key: "grainIntensity", label: "Intensité", type: "range", min: 0, max: 60, step: 0.5, fmt: v => v.toFixed(1) },
                 ],
             },
@@ -181,12 +206,9 @@ export class GraphicsMenu {
                     `;
                     rowEl.querySelector("input").onchange = (e) => {
                         this.lm?.setGraphicsParam?.(row.key, e.target.checked);
-                        container.closest(".gfx-panel")?.querySelector("#gfxPresetRow")
-                            ?.querySelectorAll(".gfx-preset-btn").forEach(b => b.classList.remove("active"));
+                        this._markCustom(container.closest(".gfx-panel"));
                     };
-                }
-
-                else if (row.type === "range") {
+                } else if (row.type === "range") {
                     const fmt = row.fmt ?? (v => v);
                     rowEl.innerHTML = `
                         <span class="gfx-row-label">${row.label}</span>
@@ -196,18 +218,15 @@ export class GraphicsMenu {
                             <span class="gfx-slider-val">${fmt(val)}</span>
                         </div>
                     `;
-                    const input  = rowEl.querySelector("input");
+                    const input   = rowEl.querySelector("input");
                     const display = rowEl.querySelector(".gfx-slider-val");
                     input.oninput = (e) => {
                         const v = parseFloat(e.target.value);
                         display.textContent = fmt(v);
                         this.lm?.setGraphicsParam?.(row.key, v);
-                        container.closest(".gfx-panel")?.querySelector("#gfxPresetRow")
-                            ?.querySelectorAll(".gfx-preset-btn").forEach(b => b.classList.remove("active"));
+                        this._markCustom(container.closest(".gfx-panel"));
                     };
-                }
-
-                else if (row.type === "select") {
+                } else if (row.type === "select") {
                     const opts = row.options.map(o =>
                         `<option value="${o.v}" ${val === o.v ? "selected" : ""}>${o.l}</option>`
                     ).join("");
@@ -217,6 +236,7 @@ export class GraphicsMenu {
                     `;
                     rowEl.querySelector("select").onchange = (e) => {
                         this.lm?.setGraphicsParam?.(row.key, parseInt(e.target.value));
+                        this._markCustom(container.closest(".gfx-panel"));
                     };
                 }
 
@@ -226,6 +246,10 @@ export class GraphicsMenu {
             sec.appendChild(body);
             container.appendChild(sec);
         });
+    }
+
+    _markCustom(panel) {
+        panel?.querySelectorAll(".gfx-preset-btn").forEach(b => b.classList.remove("active"));
     }
 
     _refresh(panel) {

@@ -933,3 +933,411 @@ html, body, #app, canvas {
     /* Le panneau prend tout l'espace centré */
     margin: 0 auto;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PANNEAU KEYBINDINGS — REMAPPING DE TOUCHES
+   Style terminal cyberpunk cohérent avec le reste du jeu
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.kb-panel {
+    display: flex;
+    flex-direction: column;
+    width: 640px;
+    max-width: 95vw;
+    max-height: 82vh;
+    background: linear-gradient(160deg, rgba(0,8,18,0.98) 0%, rgba(0,14,28,0.98) 100%);
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    box-shadow:
+        0 0 0 1px rgba(0, 255, 204, 0.08),
+        0 0 60px rgba(0, 180, 255, 0.08),
+        inset 0 1px 0 rgba(0,255,204,0.12);
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    position: relative;
+}
+
+/* Scanlines */
+.kb-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,255,204,0.012) 3px,
+        rgba(0,255,204,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.kb-header {
+    padding: 22px 28px 16px;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.15);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.kb-title {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: #00ffcc;
+    text-shadow: 0 0 20px rgba(0,255,204,0.6), 0 0 40px rgba(0,255,204,0.2);
+    text-transform: uppercase;
+}
+
+.kb-subtitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: rgba(0, 200, 160, 0.45);
+    text-transform: uppercase;
+    margin-top: 6px;
+}
+
+/* ── Bandeau "en écoute" ───────────────────────────────────────────────────── */
+.kb-notice {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 28px;
+    background: rgba(0, 255, 204, 0.07);
+    border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+    animation: kb-notice-pulse 1s ease-in-out infinite;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+@keyframes kb-notice-pulse {
+    0%, 100% { background: rgba(0, 255, 204, 0.06); }
+    50%       { background: rgba(0, 255, 204, 0.14); }
+}
+
+.kb-notice-icon {
+    font-size: 18px;
+    color: #00ffcc;
+    animation: kb-blink 0.7s step-end infinite;
+}
+
+@keyframes kb-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
+
+#kbNoticeText {
+    flex: 1;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #00ffcc;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(0,255,204,0.5);
+}
+
+.kb-cancel-listen {
+    background: transparent;
+    border: 1px solid rgba(255, 80, 60, 0.5);
+    color: rgba(255, 100, 80, 0.8);
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+}
+
+.kb-cancel-listen:hover {
+    border-color: #ff5040;
+    color: #ff5040;
+    background: rgba(255, 80, 60, 0.08);
+}
+
+/* ── Zone scrollable ─────────────────────────────────────────────────────────── */
+.kb-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 0;
+    position: relative;
+    z-index: 1;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,255,204,0.3) transparent;
+}
+
+.kb-scroll::-webkit-scrollbar { width: 4px; }
+.kb-scroll::-webkit-scrollbar-track { background: transparent; }
+.kb-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0,255,204,0.3);
+    border-radius: 2px;
+}
+
+/* ── Sections / Catégories ────────────────────────────────────────────────── */
+.kb-section {
+    border-bottom: 1px solid rgba(0, 255, 204, 0.07);
+    margin-bottom: 4px;
+}
+
+.kb-section-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 28px;
+    font-size: 9px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(0, 200, 160, 0.45);
+    background: rgba(0,255,204,0.018);
+    border-bottom: 1px solid rgba(0, 255, 204, 0.07);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+
+.kb-section-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(0, 255, 204, 0.5);
+    box-shadow: 0 0 6px rgba(0,255,204,0.4);
+    flex-shrink: 0;
+}
+
+/* ── Ligne d'action ─────────────────────────────────────────────────────────── */
+.kb-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 28px;
+    min-height: 48px;
+    transition: background 0.15s;
+    position: relative;
+}
+
+.kb-row::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 28px;
+    right: 28px;
+    height: 1px;
+    background: rgba(0, 255, 204, 0.05);
+}
+
+.kb-row:hover {
+    background: rgba(0, 255, 204, 0.025);
+}
+
+/* Flash de confirmation après assignation */
+.kb-row-flash {
+    animation: kb-flash 0.5s ease-out;
+}
+
+@keyframes kb-flash {
+    0%   { background: rgba(0, 255, 204, 0.18); }
+    100% { background: transparent; }
+}
+
+/* Côté label */
+.kb-row-label-side {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    width: 240px;
+}
+
+.kb-row-icon {
+    font-size: 14px;
+    color: rgba(0, 200, 160, 0.5);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.kb-row-label {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: rgba(210, 235, 235, 0.8);
+    text-transform: uppercase;
+}
+
+/* Côté touches */
+.kb-row-keys-side {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* ── Slot de touche ─────────────────────────────────────────────────────────── */
+.kb-key-slot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 88px;
+    height: 32px;
+    padding: 0 10px;
+    background: rgba(0, 8, 18, 0.8);
+    border: 1px solid rgba(0, 255, 204, 0.22);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.kb-key-slot:hover {
+    border-color: rgba(0, 255, 204, 0.6);
+    background: rgba(0, 255, 204, 0.06);
+    box-shadow: 0 0 10px rgba(0,255,204,0.12), inset 0 0 8px rgba(0,255,204,0.04);
+}
+
+/* Slot vide (+ AJOUTER) */
+.kb-key-empty {
+    border-style: dashed;
+    border-color: rgba(0, 255, 204, 0.12);
+    min-width: 88px;
+}
+
+.kb-key-empty:hover {
+    border-color: rgba(0, 255, 204, 0.35);
+    border-style: solid;
+}
+
+.kb-key-empty .kb-key-label {
+    color: rgba(0, 180, 140, 0.35);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+}
+
+/* Conflit */
+.kb-conflict {
+    border-color: rgba(255, 80, 50, 0.5) !important;
+    background: rgba(255, 50, 30, 0.06) !important;
+}
+
+.kb-conflict .kb-key-label {
+    color: #ff5533 !important;
+    text-shadow: 0 0 8px rgba(255,80,40,0.5) !important;
+}
+
+/* Mode écoute */
+.kb-listening {
+    border-color: #00ffcc !important;
+    background: rgba(0, 255, 204, 0.10) !important;
+    box-shadow: 0 0 0 2px rgba(0,255,204,0.2), 0 0 20px rgba(0,255,204,0.15) !important;
+    animation: kb-slot-pulse 0.6s ease-in-out infinite !important;
+}
+
+@keyframes kb-slot-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(0,255,204,0.2), 0 0 12px rgba(0,255,204,0.12); }
+    50%       { box-shadow: 0 0 0 2px rgba(0,255,204,0.5), 0 0 24px rgba(0,255,204,0.25); }
+}
+
+.kb-key-label {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #00ffcc;
+    text-shadow: 0 0 8px rgba(0,255,204,0.4);
+    text-transform: uppercase;
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Bouton clear (×) */
+.kb-key-clear {
+    background: none;
+    border: none;
+    color: rgba(0, 180, 140, 0.4);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 0 1px 0;
+    line-height: 1;
+    transition: color 0.12s, transform 0.12s;
+    flex-shrink: 0;
+}
+
+.kb-key-clear:hover {
+    color: #ff5533;
+    transform: scale(1.3);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+.kb-footer {
+    display: flex;
+    gap: 12px;
+    padding: 14px 28px;
+    border-top: 1px solid rgba(0, 255, 204, 0.12);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.kb-apply-btn,
+.kb-back-btn,
+.kb-reset-btn {
+    background: transparent;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+
+.kb-apply-btn {
+    color: #00ffcc;
+    border-color: #00ffcc;
+    background: rgba(0, 255, 204, 0.08);
+    box-shadow: 0 0 12px rgba(0,255,204,0.15);
+    flex: 3;
+}
+
+.kb-apply-btn:hover {
+    color: #000;
+    background: #00ffcc;
+    box-shadow: 0 0 24px rgba(0,255,204,0.45);
+    transform: translateY(-2px);
+}
+
+.kb-back-btn {
+    color: rgba(150, 170, 180, 0.7);
+    border-color: rgba(100, 130, 150, 0.3);
+    flex: 2;
+}
+
+.kb-back-btn:hover {
+    color: #aaccdd;
+    border-color: #aaccdd;
+    background: rgba(150, 200, 220, 0.06);
+    transform: translateX(-3px);
+}
+
+.kb-reset-btn {
+    color: rgba(180, 100, 80, 0.7);
+    border-color: rgba(180, 80, 60, 0.3);
+    flex: 1;
+}
+
+.kb-reset-btn:hover {
+    color: #ff6644;
+    border-color: #ff6644;
+    background: rgba(255, 80, 40, 0.07);
+    box-shadow: 0 0 12px rgba(255,80,40,0.18);
+}

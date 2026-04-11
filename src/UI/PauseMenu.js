@@ -1,4 +1,5 @@
-import { GraphicsMenu } from "./GraphicsMenu.js";
+import { GraphicsMenu }    from "./GraphicsMenu.js";
+import { KeybindingsMenu } from "./KeybindingsMenu.js";
 
 export class PauseMenu {
     constructor(onResumeCallback, onQuitCallback, playerRef = null, lightingManagerRef = null) {
@@ -7,12 +8,14 @@ export class PauseMenu {
         this.player   = playerRef;
         this.lm       = lightingManagerRef;
         this._gfxMenu = null;
+        this._kbMenu  = null;
         this._createMenu();
     }
 
     setLightingManager(lm) {
         this.lm = lm;
         this._gfxMenu = new GraphicsMenu(lm);
+        this._kbMenu  = new KeybindingsMenu(this.player);
     }
 
     _createMenu() {
@@ -24,7 +27,6 @@ export class PauseMenu {
         title.innerText = "SYSTÈME EN PAUSE";
         this.overlay.appendChild(title);
 
-        // Boutons principaux
         this.buttonsContainer = document.createElement("div");
         this.buttonsContainer.className = "menu-buttons-container";
 
@@ -40,6 +42,11 @@ export class PauseMenu {
         gfxBtn.className = "menu-btn"; gfxBtn.innerText = "GRAPHISMES";
         gfxBtn.onclick = () => this._showGraphics();
 
+        // ── NOUVEAU : bouton TOUCHES ──────────────────────────────
+        const kbBtn = document.createElement("button");
+        kbBtn.className = "menu-btn"; kbBtn.innerText = "TOUCHES";
+        kbBtn.onclick = () => this._showKeybindings();
+
         const quitBtn = document.createElement("button");
         quitBtn.className = "menu-btn exit-btn"; quitBtn.innerText = "RETOUR À L'ACCUEIL";
         quitBtn.onclick = () => { if (this.onQuit) this.onQuit(); };
@@ -47,16 +54,19 @@ export class PauseMenu {
         this.buttonsContainer.appendChild(resumeBtn);
         this.buttonsContainer.appendChild(settingsBtn);
         this.buttonsContainer.appendChild(gfxBtn);
+        this.buttonsContainer.appendChild(kbBtn);    // ← NOUVEAU
         this.buttonsContainer.appendChild(quitBtn);
         this.overlay.appendChild(this.buttonsContainer);
 
-        // Panneau paramètres existant
         this._createSettingsPanel();
 
-        // Slot graphismes
-        this._gfxPanelSlot = document.createElement("div");
-        this._gfxPanelSlot.style.display = "none";
-        this.overlay.appendChild(this._gfxPanelSlot);
+        // Slot générique unique pour tous les sous-panneaux
+        this._panelSlot = document.createElement("div");
+        this._panelSlot.style.display = "none";
+        this.overlay.appendChild(this._panelSlot);
+
+        // Alias rétrocompatibilité
+        this._gfxPanelSlot = this._panelSlot;
 
         document.body.appendChild(this.overlay);
     }
@@ -103,24 +113,35 @@ export class PauseMenu {
     _showMain() {
         this.buttonsContainer.style.display = "flex";
         this.settingsPanel.style.display    = "none";
-        this._gfxPanelSlot.style.display    = "none";
+        this._panelSlot.style.display       = "none";
     }
 
     _showSettings() {
         this.buttonsContainer.style.display = "none";
         this.settingsPanel.style.display    = "flex";
-        this._gfxPanelSlot.style.display    = "none";
+        this._panelSlot.style.display       = "none";
     }
 
     _showGraphics() {
         if (!this.lm) { console.warn("[PauseMenu] LightingManager non disponible."); return; }
         this.buttonsContainer.style.display = "none";
         this.settingsPanel.style.display    = "none";
-        this._gfxPanelSlot.innerHTML = "";
+        this._panelSlot.innerHTML = "";
         if (!this._gfxMenu) this._gfxMenu = new GraphicsMenu(this.lm);
         const panel = this._gfxMenu.buildPanel(() => this._showMain());
-        this._gfxPanelSlot.appendChild(panel);
-        this._gfxPanelSlot.style.display = "block";
+        this._panelSlot.appendChild(panel);
+        this._panelSlot.style.display = "block";
+    }
+
+    // ── NOUVEAU ────────────────────────────────────────────────────────────────
+    _showKeybindings() {
+        this.buttonsContainer.style.display = "none";
+        this.settingsPanel.style.display    = "none";
+        this._panelSlot.innerHTML = "";
+        if (!this._kbMenu) this._kbMenu = new KeybindingsMenu(this.player);
+        const panel = this._kbMenu.buildPanel(() => this._showMain());
+        this._panelSlot.appendChild(panel);
+        this._panelSlot.style.display = "block";
     }
 
     show() { this.overlay.style.display = "flex"; }

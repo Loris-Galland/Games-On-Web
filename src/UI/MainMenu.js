@@ -1,4 +1,5 @@
-import { GraphicsMenu } from "./GraphicsMenu.js";
+import { GraphicsMenu }    from "./GraphicsMenu.js";
+import { KeybindingsMenu } from "./KeybindingsMenu.js";
 
 export class MainMenu {
     constructor(onPlayCallback, playerRef = null, lightingManagerRef = null) {
@@ -6,26 +7,25 @@ export class MainMenu {
         this.player   = playerRef;
         this.lm       = lightingManagerRef;
         this._gfxMenu = null;
+        this._kbMenu  = null;
         this._createMenu();
     }
 
-    /** Appelé après l'init si le LightingManager n'est pas encore dispo au constructeur. */
     setLightingManager(lm) {
         this.lm = lm;
         this._gfxMenu = new GraphicsMenu(lm);
+        this._kbMenu  = new KeybindingsMenu(this.player);
     }
 
     _createMenu() {
         this.overlay = document.createElement("div");
         this.overlay.id = "main-menu-overlay";
 
-        // Titre
         const title = document.createElement("div");
         title.className = "menu-title";
         title.innerText = "PROJECT // ROGUE";
         this.overlay.appendChild(title);
 
-        // Conteneur boutons principaux
         this.buttonsContainer = document.createElement("div");
         this.buttonsContainer.className = "menu-buttons-container";
 
@@ -47,6 +47,12 @@ export class MainMenu {
         gfxBtn.innerText = "GRAPHISMES";
         gfxBtn.onclick = () => this._showGraphics();
 
+        // ── NOUVEAU : bouton TOUCHES ──────────────────────────────
+        const kbBtn = document.createElement("button");
+        kbBtn.className = "menu-btn";
+        kbBtn.innerText = "TOUCHES";
+        kbBtn.onclick = () => this._showKeybindings();
+
         const exitBtn = document.createElement("button");
         exitBtn.className = "menu-btn exit-btn";
         exitBtn.innerText = "QUITTER SYSTÈME";
@@ -57,16 +63,19 @@ export class MainMenu {
         this.buttonsContainer.appendChild(playBtn);
         this.buttonsContainer.appendChild(settingsBtn);
         this.buttonsContainer.appendChild(gfxBtn);
+        this.buttonsContainer.appendChild(kbBtn);    // ← NOUVEAU
         this.buttonsContainer.appendChild(exitBtn);
         this.overlay.appendChild(this.buttonsContainer);
 
-        // Panneau paramètres
         this._createSettingsPanel();
 
-        // Panneau graphismes (construit à la demande)
-        this._gfxPanelSlot = document.createElement("div");
-        this._gfxPanelSlot.style.display = "none";
-        this.overlay.appendChild(this._gfxPanelSlot);
+        // Slot générique pour tous les sous-panneaux
+        this._panelSlot = document.createElement("div");
+        this._panelSlot.style.display = "none";
+        this.overlay.appendChild(this._panelSlot);
+
+        // Alias pour rétrocompatibilité interne
+        this._gfxPanelSlot = this._panelSlot;
 
         document.body.appendChild(this.overlay);
     }
@@ -113,28 +122,34 @@ export class MainMenu {
     _showMain() {
         this.buttonsContainer.style.display = "flex";
         this.settingsPanel.style.display    = "none";
-        this._gfxPanelSlot.style.display    = "none";
+        this._panelSlot.style.display       = "none";
     }
 
     _showSettings() {
         this.buttonsContainer.style.display = "none";
         this.settingsPanel.style.display    = "flex";
-        this._gfxPanelSlot.style.display    = "none";
+        this._panelSlot.style.display       = "none";
     }
 
     _showGraphics() {
-        if (!this.lm) {
-            console.warn("[MainMenu] LightingManager non encore disponible.");
-            return;
-        }
+        if (!this.lm) { console.warn("[MainMenu] LightingManager non encore disponible."); return; }
         this.buttonsContainer.style.display = "none";
         this.settingsPanel.style.display    = "none";
-
-        // Reconstruit le panneau à chaque ouverture pour refléter l'état courant
-        this._gfxPanelSlot.innerHTML = "";
+        this._panelSlot.innerHTML = "";
         if (!this._gfxMenu) this._gfxMenu = new GraphicsMenu(this.lm);
         const panel = this._gfxMenu.buildPanel(() => this._showMain());
-        this._gfxPanelSlot.appendChild(panel);
-        this._gfxPanelSlot.style.display = "block";
+        this._panelSlot.appendChild(panel);
+        this._panelSlot.style.display = "block";
+    }
+
+    // ── NOUVEAU ────────────────────────────────────────────────────────────────
+    _showKeybindings() {
+        this.buttonsContainer.style.display = "none";
+        this.settingsPanel.style.display    = "none";
+        this._panelSlot.innerHTML = "";
+        if (!this._kbMenu) this._kbMenu = new KeybindingsMenu(this.player);
+        const panel = this._kbMenu.buildPanel(() => this._showMain());
+        this._panelSlot.appendChild(panel);
+        this._panelSlot.style.display = "block";
     }
 }

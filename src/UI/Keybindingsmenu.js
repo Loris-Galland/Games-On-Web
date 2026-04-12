@@ -2,57 +2,59 @@
  * KeybindingsMenu
  * ---------------
  * Panneau de remapping de touches style AAA.
- * S'intègre dans MainMenu et PauseMenu comme le GraphicsMenu.
  *
- * Usage :
- *   const kb = new KeybindingsMenu(player);
- *   const panel = kb.buildPanel(() => goBack());
- *   container.appendChild(panel);
+ * La touche PAUSE est gérée en dehors du Player (dans main.js).
+ * Pour être notifié quand elle change, passe un callback :
  *
- * Le panneau gère :
- *   - Affichage de toutes les actions avec leur touche actuelle
- *   - Clic pour entrer en mode "écoute" (waiting for key)
- *   - Détection de conflits (même touche = deux actions)
- *   - RESET global vers les défauts
- *   - APPLIQUER / ANNULER avec snapshot
- *   - Application live au Player (camera.keysUp/Down/Left/Right + jump + shoot)
+ *   const kb = new KeybindingsMenu(player, (newKey) => {
+ *       myPauseKey = newKey; // mettre à jour ton listener clavier ici
+ *   });
+ *
+ * Dans ton main.js, remplace la comparaison de touche statique par :
+ *   let pauseKey = "enter"; // touche par défaut
+ *   document.addEventListener("keydown", e => {
+ *       if (e.key.toLowerCase() === pauseKey || e.key === "Enter" && pauseKey === "enter") {
+ *           togglePause();
+ *       }
+ *   });
  */
 export class KeybindingsMenu {
 
-    // ── Définition des actions et leur état par défaut ────────────────────────
     static DEFAULT_BINDINGS = [
-        { id: "moveForward",  label: "AVANCER",            category: "DÉPLACEMENT", keys: ["w", "z"],     icon: "▲" },
-        { id: "moveBack",     label: "RECULER",            category: "DÉPLACEMENT", keys: ["s"],           icon: "▼" },
-        { id: "moveLeft",     label: "STRAFE GAUCHE",      category: "DÉPLACEMENT", keys: ["a", "q"],     icon: "◄" },
-        { id: "moveRight",    label: "STRAFE DROIT",       category: "DÉPLACEMENT", keys: ["d"],           icon: "►" },
-        { id: "jump",         label: "SAUTER",             category: "DÉPLACEMENT", keys: ["space"],       icon: "↑" },
-        { id: "shoot",        label: "TIRER",              category: "COMBAT",      keys: ["mouse0"],      icon: "◎" },
-        { id: "pause",        label: "PAUSE / MENU",       category: "SYSTÈME",     keys: ["enter"],      icon: "⏸" },
+        { id: "moveForward",  label: "AVANCER",         category: "DÉPLACEMENT", keys: ["w", "z"],   icon: "▲" },
+        { id: "moveBack",     label: "RECULER",         category: "DÉPLACEMENT", keys: ["s"],         icon: "▼" },
+        { id: "moveLeft",     label: "STRAFE GAUCHE",   category: "DÉPLACEMENT", keys: ["a", "q"],   icon: "◄" },
+        { id: "moveRight",    label: "STRAFE DROIT",    category: "DÉPLACEMENT", keys: ["d"],         icon: "►" },
+        { id: "jump",         label: "SAUTER",          category: "DÉPLACEMENT", keys: ["space"],     icon: "↑" },
+        { id: "shoot",        label: "TIRER",           category: "COMBAT",      keys: ["mouse0"],    icon: "◎" },
+        // Gérée globalement dans main.js — le callback onPauseKeyChange notifie le changement
+        { id: "pause",        label: "PAUSE / MENU",    category: "SYSTÈME",     keys: ["enter"],     icon: "⏸" },
     ];
 
-    // Touches interdites (réservées système)
-    static FORBIDDEN_KEYS = new Set(["f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12","printscreen","scrolllock","pause"]);
+    static FORBIDDEN_KEYS = new Set([
+        "f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12",
+        "printscreen","scrolllock","pause","contextmenu",
+    ]);
 
-    constructor(player = null) {
-        this.player    = player;
-        this._bindings = null;   // état courant
-        this._snapshot = null;   // snapshot pour annuler
-        this._listening = null;  // { id, slotIdx, el } — action en attente de touche
-        this._keyHandler  = null;
-        this._mouseHandler = null;
+    constructor(player = null, onPauseKeyChange = null) {
+        this.player            = player;
+        this._onPauseKeyChange = onPauseKeyChange;
+        this._bindings         = null;
+        this._snapshot         = null;
+        this._listening        = null;
+        this._keyHandler       = null;
+        this._mouseHandler     = null;
     }
 
-    // ── API Publique ──────────────────────────────────────────────────────────
-
-    /** Retourne une copie profonde des bindings courants. */
     getBindings() {
         if (!this._bindings) {
-            this._bindings = KeybindingsMenu.DEFAULT_BINDINGS.map(a => ({
-                ...a,
-                keys: [...a.keys],
-            }));
+            this._bindings = KeybindingsMenu.DEFAULT_BINDINGS.map(a => ({ ...a, keys: [...a.keys] }));
         }
         return this._bindings;
+    }
+
+    getPauseKey() {
+        return this.getBindings().find(b => b.id === "pause")?.keys[0] ?? "enter";
     }
 
     buildPanel(onBack) {
@@ -60,18 +62,7 @@ export class KeybindingsMenu {
 
         const panel = document.createElement("div");
         panel.className = "kb-panel";
-        panel.innerHTML = this._buildPanelHTML();
-
-        this._renderRows(panel);
-        this._attachFooter(panel, onBack);
-
-        return panel;
-    }
-
-    // ── Construction HTML du squelette ────────────────────────────────────────
-
-    _buildPanelHTML() {
-        return `
+        panel.innerHTML = `
             <div class="kb-header">
                 <div class="kb-title">TOUCHES</div>
                 <div class="kb-subtitle">REMAPPING CLAVIER — CLIQUEZ UNE ENTRÉE POUR REBINDER</div>
@@ -88,20 +79,20 @@ export class KeybindingsMenu {
                 <button class="kb-reset-btn" id="kbReset">⟳ DÉFAUTS</button>
             </div>
         `;
-    }
 
-    // ── Rendu des lignes par catégorie ────────────────────────────────────────
+        this._renderRows(panel);
+        this._attachFooter(panel, onBack);
+        return panel;
+    }
 
     _renderRows(panel) {
         const scroll = panel.querySelector("#kbScroll");
         if (!scroll) return;
         scroll.innerHTML = "";
 
-        const bindings = this.getBindings();
+        const bindings   = this.getBindings();
         const categories = [...new Set(bindings.map(b => b.category))];
-
-        // Détecter les conflits
-        const conflicts = this._detectConflicts(bindings);
+        const conflicts  = this._detectConflicts(bindings);
 
         categories.forEach(cat => {
             const section = document.createElement("div");
@@ -113,8 +104,7 @@ export class KeybindingsMenu {
             section.appendChild(hdr);
 
             bindings.filter(b => b.category === cat).forEach(action => {
-                const row = this._buildRow(action, conflicts, panel);
-                section.appendChild(row);
+                section.appendChild(this._buildRow(action, conflicts, panel));
             });
 
             scroll.appendChild(section);
@@ -126,47 +116,39 @@ export class KeybindingsMenu {
         row.className = "kb-row";
         row.dataset.id = action.id;
 
+        const isPause = action.id === "pause";
+
         const labelSide = document.createElement("div");
         labelSide.className = "kb-row-label-side";
         labelSide.innerHTML = `
             <span class="kb-row-icon">${action.icon}</span>
             <span class="kb-row-label">${action.label}</span>
+            ${isPause ? `<span class="kb-badge" title="Touche gérée globalement via callback">GLOBAL</span>` : ""}
         `;
 
         const keysSide = document.createElement("div");
         keysSide.className = "kb-row-keys-side";
 
-        // Jusqu'à 2 slots de touche par action
-        const maxSlots = 2;
-        for (let slotIdx = 0; slotIdx < maxSlots; slotIdx++) {
-            const key = action.keys[slotIdx] ?? null;
+        for (let slotIdx = 0; slotIdx < 2; slotIdx++) {
+            const key  = action.keys[slotIdx] ?? null;
             const slot = document.createElement("div");
             slot.className = "kb-key-slot" + (key ? "" : " kb-key-empty");
-            slot.dataset.action = action.id;
-            slot.dataset.slot   = slotIdx;
-
-            const isConflict = key && conflicts.has(`${action.id}:${key}`);
-            if (isConflict) slot.classList.add("kb-conflict");
+            if (key && conflicts.has(`${action.id}:${key}`)) slot.classList.add("kb-conflict");
 
             slot.innerHTML = `
                 <span class="kb-key-label">${key ? this._formatKey(key) : "+ AJOUTER"}</span>
-                ${key ? `<button class="kb-key-clear" data-action="${action.id}" data-slot="${slotIdx}" title="Supprimer">×</button>` : ""}
+                ${key ? `<button class="kb-key-clear" data-action="${action.id}" data-slot="${slotIdx}">×</button>` : ""}
             `;
 
-            // Clic sur le slot → mode écoute
             slot.addEventListener("click", (e) => {
                 if (e.target.classList.contains("kb-key-clear")) return;
                 this._startListening(action.id, slotIdx, slot, panel);
             });
 
-            // Bouton clear
-            const clearBtn = slot.querySelector(".kb-key-clear");
-            if (clearBtn) {
-                clearBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    this._clearKey(action.id, slotIdx, panel);
-                });
-            }
+            slot.querySelector(".kb-key-clear")?.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._clearKey(action.id, slotIdx, panel);
+            });
 
             keysSide.appendChild(slot);
         }
@@ -176,228 +158,144 @@ export class KeybindingsMenu {
         return row;
     }
 
-    // ── Écoute de touche ──────────────────────────────────────────────────────
-
     _startListening(actionId, slotIdx, slotEl, panel) {
-        // Annuler toute écoute précédente
         this._stopListening(false);
-
         this._listening = { actionId, slotIdx, slotEl };
         slotEl.classList.add("kb-listening");
 
+        const action    = this.getBindings().find(b => b.id === actionId);
         const noticeEl  = panel.querySelector("#kbNotice");
         const noticeText = panel.querySelector("#kbNoticeText");
-        const action    = this.getBindings().find(b => b.id === actionId);
-        if (noticeEl && noticeText) {
+        if (noticeEl) {
             noticeText.textContent = `APPUYEZ SUR UNE TOUCHE POUR « ${action.label} »...`;
             noticeEl.style.display = "flex";
         }
+        panel.querySelector("#kbCancelListen").onclick = () => this._stopListening(true, panel);
 
-        // Annuler avec le bouton
-        const cancelBtn = panel.querySelector("#kbCancelListen");
-        if (cancelBtn) {
-            cancelBtn.onclick = () => this._stopListening(true, panel);
-        }
-
-        // Keyboard handler
         this._keyHandler = (e) => {
             e.preventDefault();
             e.stopPropagation();
             const key = this._normalizeKey(e.key, e.code);
-            if (key === "escape") { this._stopListening(true, panel); return; }
+            // Échap annule sauf si on bind justement la touche pause
+            if (key === "escape" && actionId !== "pause") { this._stopListening(true, panel); return; }
             if (KeybindingsMenu.FORBIDDEN_KEYS.has(key)) return;
             this._assignKey(actionId, slotIdx, key, panel);
         };
-
-        // Mouse handler
         this._mouseHandler = (e) => {
-            if (e.button >= 0) {
-                const key = `mouse${e.button}`;
-                this._assignKey(actionId, slotIdx, key, panel);
-            }
+            if (e.button >= 0) this._assignKey(actionId, slotIdx, `mouse${e.button}`, panel);
         };
 
-        // Délai court pour éviter de capturer le clic d'ouverture
         setTimeout(() => {
-            window.addEventListener("keydown",  this._keyHandler,   { capture: true });
+            window.addEventListener("keydown",   this._keyHandler,   { capture: true });
             window.addEventListener("mousedown", this._mouseHandler, { capture: true });
         }, 150);
     }
 
     _stopListening(restoreUI = true, panel = null) {
-        if (this._keyHandler)  { window.removeEventListener("keydown",  this._keyHandler,   { capture: true }); this._keyHandler  = null; }
-        if (this._mouseHandler){ window.removeEventListener("mousedown", this._mouseHandler, { capture: true }); this._mouseHandler = null; }
-
+        if (this._keyHandler)   { window.removeEventListener("keydown",   this._keyHandler,   { capture: true }); this._keyHandler  = null; }
+        if (this._mouseHandler) { window.removeEventListener("mousedown", this._mouseHandler, { capture: true }); this._mouseHandler = null; }
         if (this._listening?.slotEl) this._listening.slotEl.classList.remove("kb-listening");
         this._listening = null;
-
         if (restoreUI && panel) {
-            const noticeEl = panel.querySelector("#kbNotice");
-            if (noticeEl) noticeEl.style.display = "none";
+            const n = panel.querySelector("#kbNotice");
+            if (n) n.style.display = "none";
         }
     }
 
     _assignKey(actionId, slotIdx, key, panel) {
         this._stopListening(true, panel);
-
         const bindings = this.getBindings();
-
-        // Retirer cette touche de toute autre action/slot
-        bindings.forEach(action => {
-            action.keys = action.keys.map(k => (k === key ? null : k)).filter(Boolean);
-        });
-
-        // Affecter la touche
+        bindings.forEach(a => { a.keys = a.keys.map(k => k === key ? null : k).filter(Boolean); });
         const target = bindings.find(b => b.id === actionId);
         if (target) {
             if (slotIdx < target.keys.length) target.keys[slotIdx] = key;
             else target.keys.push(key);
         }
-
         this._renderRows(panel);
-        this._showAssignFeedback(panel, actionId);
+        const row = panel.querySelector(`.kb-row[data-id="${actionId}"]`);
+        if (row) { row.classList.add("kb-row-flash"); setTimeout(() => row.classList.remove("kb-row-flash"), 500); }
     }
 
     _clearKey(actionId, slotIdx, panel) {
-        const bindings = this.getBindings();
-        const target   = bindings.find(b => b.id === actionId);
+        const target = this.getBindings().find(b => b.id === actionId);
         if (target) target.keys.splice(slotIdx, 1);
         this._renderRows(panel);
     }
 
-    // ── Conflits ──────────────────────────────────────────────────────────────
-
     _detectConflicts(bindings) {
-        const seen    = new Map(); // key → actionId
-        const conflicts = new Set();
+        const seen = new Map(), conflicts = new Set();
         bindings.forEach(action => {
             action.keys.forEach(key => {
                 if (!key) return;
-                if (seen.has(key)) {
-                    conflicts.add(`${action.id}:${key}`);
-                    conflicts.add(`${seen.get(key)}:${key}`);
-                } else {
-                    seen.set(key, action.id);
-                }
+                if (seen.has(key)) { conflicts.add(`${action.id}:${key}`); conflicts.add(`${seen.get(key)}:${key}`); }
+                else seen.set(key, action.id);
             });
         });
         return conflicts;
     }
 
-    // ── Feedback visuel ───────────────────────────────────────────────────────
-
-    _showAssignFeedback(panel, actionId) {
-        const row = panel.querySelector(`.kb-row[data-id="${actionId}"]`);
-        if (!row) return;
-        row.classList.add("kb-row-flash");
-        setTimeout(() => row.classList.remove("kb-row-flash"), 500);
-    }
-
-    // ── Footer (appliquer / annuler / reset) ──────────────────────────────────
-
     _attachFooter(panel, onBack) {
         panel.querySelector("#kbApply").onclick = () => {
             this._applyToPlayer();
+            if (this._onPauseKeyChange) this._onPauseKeyChange(this.getPauseKey());
             this._snapshot = null;
             this._stopListening(true, panel);
             onBack();
         };
-
         panel.querySelector("#kbBack").onclick = () => {
-            if (this._snapshot) {
-                this._bindings = this._snapshot.map(a => ({ ...a, keys: [...a.keys] }));
-                this._snapshot = null;
-            }
+            if (this._snapshot) { this._bindings = this._snapshot.map(a => ({ ...a, keys: [...a.keys] })); this._snapshot = null; }
             this._stopListening(true, panel);
             onBack();
         };
-
         panel.querySelector("#kbReset").onclick = () => {
-            this._bindings = KeybindingsMenu.DEFAULT_BINDINGS.map(a => ({
-                ...a,
-                keys: [...a.keys],
-            }));
+            this._bindings = KeybindingsMenu.DEFAULT_BINDINGS.map(a => ({ ...a, keys: [...a.keys] }));
             this._renderRows(panel);
         };
     }
 
-    // ── Application au Player ─────────────────────────────────────────────────
-
     _applyToPlayer() {
         if (!this.player) return;
-        const bindings = this.getBindings();
-        const get = (id) => bindings.find(b => b.id === id)?.keys ?? [];
-
-        const toKeyCodes = (keys) => keys
-            .filter(k => k && !k.startsWith("mouse"))
-            .map(k => this._keyToCode(k))
-            .filter(Boolean);
-
-        const fwd   = get("moveForward");
-        const back  = get("moveBack");
-        const left  = get("moveLeft");
-        const right = get("moveRight");
-
+        const get = (id) => this.getBindings().find(b => b.id === id)?.keys ?? [];
+        const toKeyCodes = (keys) => keys.filter(k => k && !k.startsWith("mouse")).map(k => this._keyToCode(k)).filter(Boolean);
         if (this.player.camera) {
-            this.player.camera.keysUp    = toKeyCodes(fwd);
-            this.player.camera.keysDown  = toKeyCodes(back);
-            this.player.camera.keysLeft  = toKeyCodes(left);
-            this.player.camera.keysRight = toKeyCodes(right);
+            this.player.camera.keysUp    = toKeyCodes(get("moveForward"));
+            this.player.camera.keysDown  = toKeyCodes(get("moveBack"));
+            this.player.camera.keysLeft  = toKeyCodes(get("moveLeft"));
+            this.player.camera.keysRight = toKeyCodes(get("moveRight"));
         }
-
-        // Sauvegarde dans le inputMap du player pour les contrôles custom
         this.player._keybindings = {
-            moveForward:  get("moveForward"),
-            moveBack:     get("moveBack"),
-            moveLeft:     get("moveLeft"),
-            moveRight:    get("moveRight"),
-            jump:         get("jump"),
-            shoot:        get("shoot"),
+            moveForward: get("moveForward"), moveBack: get("moveBack"),
+            moveLeft: get("moveLeft"),       moveRight: get("moveRight"),
+            jump:     get("jump"),           shoot:    get("shoot"),
         };
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     _normalizeKey(key, code) {
         if (key === " " || code === "Space") return "space";
+        if (key === "Enter")  return "enter";
+        if (key === "Escape") return "escape";
         return key.toLowerCase();
     }
 
     _keyToCode(key) {
         const MAP = {
-            "a": 65, "b": 66, "c": 67, "d": 68, "e": 69, "f": 70,
-            "g": 71, "h": 72, "i": 73, "j": 74, "k": 75, "l": 76,
-            "m": 77, "n": 78, "o": 79, "p": 80, "q": 81, "r": 82,
-            "s": 83, "t": 84, "u": 85, "v": 86, "w": 87, "x": 88,
-            "y": 89, "z": 90,
-            "0": 48, "1": 49, "2": 50, "3": 51, "4": 52,
-            "5": 53, "6": 54, "7": 55, "8": 56, "9": 57,
-            "space": 32, "shift": 16, "control": 17, "alt": 18,
-            "arrowup": 38, "arrowdown": 40, "arrowleft": 37, "arrowright": 39,
-            "enter": 13, "tab": 9, "backspace": 8,
-            "f1": 112, "f2": 113, "f3": 114, "f4": 115,
+            "a":65,"b":66,"c":67,"d":68,"e":69,"f":70,"g":71,"h":72,"i":73,"j":74,
+            "k":75,"l":76,"m":77,"n":78,"o":79,"p":80,"q":81,"r":82,"s":83,"t":84,
+            "u":85,"v":86,"w":87,"x":88,"y":89,"z":90,
+            "0":48,"1":49,"2":50,"3":51,"4":52,"5":53,"6":54,"7":55,"8":56,"9":57,
+            "space":32,"shift":16,"control":17,"alt":18,"escape":27,"enter":13,
+            "tab":9,"backspace":8,"arrowup":38,"arrowdown":40,"arrowleft":37,"arrowright":39,
         };
         return MAP[key] ?? null;
     }
 
     _formatKey(key) {
-        const LABELS = {
-            "space":      "ESPACE",
-            "escape":     "ÉCHAP",
-            "mouse0":     "CLIC G",
-            "mouse1":     "CLIC M",
-            "mouse2":     "CLIC D",
-            "arrowup":    "↑",
-            "arrowdown":  "↓",
-            "arrowleft":  "←",
-            "arrowright": "→",
-            "shift":      "SHIFT",
-            "control":    "CTRL",
-            "alt":        "ALT",
-            "enter":      "ENTRÉE",
-            "backspace":  "RETOUR",
-            "tab":        "TAB",
+        const L = {
+            "space":"ESPACE","escape":"ÉCHAP","enter":"ENTRÉE",
+            "mouse0":"CLIC G","mouse1":"CLIC M","mouse2":"CLIC D",
+            "arrowup":"↑","arrowdown":"↓","arrowleft":"←","arrowright":"→",
+            "shift":"SHIFT","control":"CTRL","alt":"ALT","backspace":"RETOUR","tab":"TAB",
         };
-        return LABELS[key] ?? key.toUpperCase();
+        return L[key] ?? key.toUpperCase();
     }
 }

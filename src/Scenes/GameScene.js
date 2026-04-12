@@ -311,9 +311,9 @@ export class GameScene {
 
         this._finishLoading();
 
-        scene.debugLayer.show({
+        /*scene.debugLayer.show({
             embedMode: true, // s'affiche dans la page
-        })
+        })*/
 
 
         // Lumières de la salle de spawn (room 0)

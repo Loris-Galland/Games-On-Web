@@ -14,11 +14,9 @@ export class Player {
         this.maxHealth = 10;
         this.isDead    = false;
 
-        // Callback optionnel injecté par GameScene pour récupérer les stats
-        // Signature : () => { wavesCleared, roomsCleared }
         this.getStatsCallback = null;
 
-        // Création de la caméra
+        // ── Caméra ────────────────────────────────────────────────────────────
         this.camera = new BABYLON.UniversalCamera(
             "playerCam",
             new BABYLON.Vector3(0, 1.5, 0),
@@ -44,7 +42,7 @@ export class Player {
         this._initInputs();
         this._initWeapon();
 
-        this.hud    = new PlayerHUD(this.maxHealth);
+        this.hud             = new PlayerHUD(this.maxHealth);
         this._gameOverScreen = new GameOverScreen();
 
         this.health = new Health(
@@ -58,6 +56,9 @@ export class Player {
         this.bobTimer    = 0;
         this.jumpForce   = 0;
 
+        // Référence au GamepadManager (injectée depuis main.js après construction)
+        this.gamepad = null;
+
         this.scene.registerBeforeRender(() => {
             if (this.isDead) return;
             this._updateCameraTilt();
@@ -67,25 +68,17 @@ export class Player {
         });
     }
 
-    // ── Mort du joueur ────────────────────────────────────────────────────────
+    // ── Mort ──────────────────────────────────────────────────────────────────
 
     _onDeath() {
         if (this.isDead) return;
         this.isDead = true;
-
-        // Détacher les contrôles
         this.camera.detachControl();
-
-        // Récupérer les stats depuis GameScene si disponible
         const stats = this.getStatsCallback ? this.getStatsCallback() : {};
-
-        // Délai court pour que la dernière frame de dégâts soit rendue
-        setTimeout(() => {
-            this._gameOverScreen.show(stats);
-        }, 600);
+        setTimeout(() => { this._gameOverScreen.show(stats); }, 600);
     }
 
-    // ── Inputs ────────────────────────────────────────────────────────────────
+    // ── Inputs clavier ────────────────────────────────────────────────────────
 
     _initInputs() {
         this.scene.onKeyboardObservable.add((kbInfo) => {
@@ -100,6 +93,8 @@ export class Player {
             }
         });
     }
+
+    // ── Saut ──────────────────────────────────────────────────────────────────
 
     _jump() {
         if (this.jumpForce > 0) return;
@@ -176,7 +171,10 @@ export class Player {
         }
     }
 
+    // ── Tilt caméra (clavier + manette) ──────────────────────────────────────
+
     _updateCameraTilt() {
+        // La manette injecte inputMap["a"] / inputMap["d"] directement dans GamepadManager
         let targetTilt = 0;
         if (this.inputMap["q"] || this.inputMap["a"]) targetTilt =  0.05;
         else if (this.inputMap["d"])                  targetTilt = -0.05;
@@ -184,10 +182,15 @@ export class Player {
         this.camera.rotation.z = this.currentTilt;
     }
 
+    // ── Bobbing arme (clavier + manette) ─────────────────────────────────────
+
     _updateWeaponBobbing() {
-        const isMoving =
+        const isMovingKb =
             this.inputMap["z"] || this.inputMap["w"] || this.inputMap["s"] ||
             this.inputMap["q"] || this.inputMap["a"] || this.inputMap["d"];
+
+        // inputMap["_gp_move"] est mis à jour par GamepadManager
+        const isMoving = isMovingKb || this.inputMap["_gp_move"];
 
         if (isMoving) {
             this.bobTimer += 0.2;

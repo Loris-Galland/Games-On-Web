@@ -1,4 +1,4 @@
-# GAMES ON WEB : PROJECT // ROGUE
+# GAMES ON WEB 2026 : PROJECT // ROGUE
 
 > FPS roguelike 3D dans un vaisseau spatial abandonné — survivez aux vagues d'ennemis, explorez des salles générées procéduralement et améliorez votre équipement.
 

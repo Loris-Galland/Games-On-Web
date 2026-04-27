@@ -1376,3 +1376,269 @@ html, body, #app, canvas {
 
 /* ── Toast ─────────────────────────────────────────────────────────────────── */
 @keyframes gp-toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   GAME.CSS — ADDITIONS (coller à la fin du fichier existant Game.css)
+   Nouveaux éléments : weapon slots, score/combo HUD, boss bar, popups,
+   game-over enrichi, forge/shop labels, challenge timer.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Weapon Slots (bas droite, au-dessus de l'ammo) ────────────────────────── */
+#weapon-slots {
+    position: fixed;
+    bottom: 140px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 40;
+}
+
+.weapon-slot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: rgba(0, 10, 20, 0.75);
+    border: 1px solid rgba(0, 255, 204, 0.15);
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: rgba(0, 200, 160, 0.45);
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+    min-width: 180px;
+}
+
+.weapon-slot.ws-active {
+    border-color: #00ffcc;
+    color: #00ffcc;
+    background: rgba(0, 255, 204, 0.08);
+    box-shadow: 0 0 12px rgba(0, 255, 204, 0.2);
+}
+
+.ws-num {
+    font-size: 9px;
+    color: rgba(0, 200, 160, 0.4);
+    min-width: 14px;
+}
+
+.weapon-slot.ws-active .ws-num {
+    color: #00ffcc;
+}
+
+.ws-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Score HUD (haut centre) ───────────────────────────────────────────────── */
+#score-hud {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 40;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+}
+
+#score-value {
+    font-size: 22px;
+    letter-spacing: 5px;
+    color: #00ffcc;
+    text-shadow: 0 0 12px #00ffcc;
+    margin-top: 4px;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+#combo-mult {
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffaa00;
+    text-shadow: 0 0 20px #ffaa00;
+    transition: all 0.2s ease;
+}
+
+#combo-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #ff4400;
+    text-shadow: 0 0 10px #ff4400;
+    text-transform: uppercase;
+    transition: opacity 0.3s;
+}
+
+/* ── Boss Bar (bas centre) ─────────────────────────────────────────────────── */
+#boss-bar {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    max-width: 90vw;
+    pointer-events: none;
+    z-index: 45;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+}
+
+@keyframes bossBarIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Points Popup flottants ────────────────────────────────────────────────── */
+#hud-popups {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 50;
+    width: 0;
+    height: 0;
+    overflow: visible;
+}
+
+@keyframes popupFloat {
+    0%   { opacity: 1; transform: translateY(0)   scale(1);    }
+    30%  { opacity: 1; transform: translateY(-20px) scale(1.1); }
+    100% { opacity: 0; transform: translateY(-60px) scale(0.85); }
+}
+
+/* ── Challenge HUD ─────────────────────────────────────────────────────────── */
+#challenge-hud {
+    position: fixed;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 45;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 12px 28px;
+    border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+/* ── Reload bar dans l'ammo HUD ────────────────────────────────────────────── */
+.hud-reload-bar {
+    height: 3px;
+    background: linear-gradient(90deg, #ff00ff, #00ffff);
+    margin-top: 6px;
+    border-radius: 2px;
+    box-shadow: 0 0 8px #ff00ff;
+    animation: reloadPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes reloadPulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+}
+
+@keyframes reloadAnim {
+    0%   { background-position: 0 0; }
+    100% { background-position: 100% 0; }
+}
+
+/* ── Game Over enrichi ─────────────────────────────────────────────────────── */
+@keyframes gradeIn {
+    0%   { opacity: 0; transform: scale(2); }
+    60%  { opacity: 1; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bossKillIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Wave HUD (override pour meilleur placement) ───────────────────────────── */
+#wave-hud {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: #00ffcc;
+    text-shadow: 0 0 12px #00ffcc;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 40;
+    transition: opacity 0.4s;
+    opacity: 0;
+    white-space: nowrap;
+}
+
+/* ── Boutique / Forge labels (DynamicTexture planes) ───────────────────────── */
+/* (Babylonjs gère le rendu, ces styles s'appliquent aux overlays HTML optionnels) */
+
+/* ── Crosshair (optionnel) ─────────────────────────────────────────────────── */
+#crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 20;
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(0, 255, 204, 0.75);
+    border-radius: 1px;
+}
+
+#crosshair::before {
+    width: 2px;
+    height: 100%;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+}
+
+#crosshair::after {
+    width: 100%;
+    height: 2px;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+}
+
+/* Crosshair en mode sniper (style sniping) */
+#crosshair.sniper-mode {
+    width: 60px;
+    height: 60px;
+}
+
+#crosshair.sniper-mode::before { background: rgba(0, 200, 255, 0.9); }
+#crosshair.sniper-mode::after  { background: rgba(0, 200, 255, 0.9); }
+
+/* ── Mini-map placeholder (désactivée par défaut, prête à l'emploi) ─────────── */
+#minimap {
+    display: none; /* activer si nécessaire */
+    position: fixed;
+    top: 20px;
+    right: 90px;
+    width: 140px;
+    height: 140px;
+    background: rgba(0, 5, 10, 0.85);
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    border-radius: 2px;
+    z-index: 40;
+    overflow: hidden;
+}

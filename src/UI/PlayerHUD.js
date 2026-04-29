@@ -1,20 +1,20 @@
 /**
- * PlayerHUD (version enrichie)
- * ----------------------------
- * Nouveautés :
- *   - Score en temps réel avec animation
- *   - Multiplicateur de combo + label (GODLIKE, ARCHON…)
- *   - Boss health bar avec phases
- *   - Slots d'armes (3 slots)
- *   - Popups points flottants
- *   - Timer défi
- *   - Bonus de fin de vague
+ * PlayerHUD (corrigé)
+ * -------------------
+ * Fix superposition : le texte des vagues est maintenant positionné
+ * à GAUCHE (côté health) au lieu du centre, ce qui l'éloigne du score.
+ * Disposition finale :
+ *   - Score + Combo : haut CENTRE
+ *   - Messages vague : haut GAUCHE (sous le health)
+ *   - Boss bar       : bas CENTRE
+ *   - Health         : bas GAUCHE
+ *   - Ammo + slots   : bas DROITE
+ *   - Challenge timer: haut DROITE
  */
 export class PlayerHUD {
     constructor(maxHealth) {
         this.maxHealth = maxHealth;
         this._createHUD();
-        this._popupPool = [];
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -22,7 +22,7 @@ export class PlayerHUD {
     // ═══════════════════════════════════════════════════════════════════════════
 
     _createHUD() {
-        // ── Health ────────────────────────────────────────────────────────────
+        // ── Health (bas gauche) ───────────────────────────────────────────────
         this.container = document.createElement("div");
         this.container.id = "hud";
 
@@ -43,7 +43,7 @@ export class PlayerHUD {
         this.container.appendChild(this.barContainer);
         document.body.appendChild(this.container);
 
-        // ── Ammo / Weapon ─────────────────────────────────────────────────────
+        // ── Ammo (bas droite) ─────────────────────────────────────────────────
         this.ammoContainer = document.createElement("div");
         this.ammoContainer.id = "ammo-hud";
 
@@ -63,7 +63,6 @@ export class PlayerHUD {
         }
         this.ammoContainer.appendChild(this.ammoBarContainer);
 
-        // Reload bar
         this._reloadBar = document.createElement("div");
         this._reloadBar.className = "hud-reload-bar";
         this._reloadBar.style.display = "none";
@@ -71,21 +70,19 @@ export class PlayerHUD {
 
         document.body.appendChild(this.ammoContainer);
 
-        // ── Weapon slots ──────────────────────────────────────────────────────
+        // ── Weapon slots (bas droite, au-dessus ammo) ─────────────────────────
         this._createWeaponSlots();
 
-        // ── Score & Combo ─────────────────────────────────────────────────────
+        // ── Score + Combo (haut CENTRE) ───────────────────────────────────────
         this._createScoreHUD();
 
-        // ── Boss bar ──────────────────────────────────────────────────────────
+        // ── Message de vague (haut GAUCHE — FIX superposition) ───────────────
+        this._createWaveHUD();
+
+        // ── Boss bar (bas centre) ─────────────────────────────────────────────
         this._createBossBar();
 
-        // ── Wave / message ────────────────────────────────────────────────────
-        this.waveText = document.createElement("div");
-        this.waveText.id = "wave-hud";
-        document.body.appendChild(this.waveText);
-
-        // ── Challenge timer ───────────────────────────────────────────────────
+        // ── Challenge timer (haut DROITE) ─────────────────────────────────────
         this._createChallengeHUD();
 
         // ── FPS ───────────────────────────────────────────────────────────────
@@ -98,24 +95,89 @@ export class PlayerHUD {
         this.fpsContainer.textContent = "0";
         document.body.appendChild(this.fpsContainer);
 
-        // ── Popup container ───────────────────────────────────────────────────
+        // ── Popups flottants ──────────────────────────────────────────────────
         this._popupContainer = document.createElement("div");
         this._popupContainer.id = "hud-popups";
         this._popupContainer.style.cssText = `
             position:fixed;top:50%;left:50%;
             transform:translate(-50%,-50%);
-            pointer-events:none;z-index:50;`;
+            pointer-events:none;z-index:50;
+            width:0;height:0;overflow:visible;`;
         document.body.appendChild(this._popupContainer);
     }
 
-    // ── Weapon Slots ──────────────────────────────────────────────────────────
+    // ── Score HUD (haut CENTRE) ───────────────────────────────────────────────
+
+    _createScoreHUD() {
+        this._scoreEl = document.createElement("div");
+        this._scoreEl.id = "score-hud";
+        // Position : haut centre, assez haut pour ne pas gêner
+        this._scoreEl.style.cssText = `
+            position:fixed;
+            top:16px;
+            left:50%;
+            transform:translateX(-50%);
+            pointer-events:none;z-index:40;
+            text-align:center;
+            font-family:'Courier New',monospace;`;
+
+        this._scoreEl.innerHTML = `
+            <div id="combo-label" style="
+                font-size:11px;letter-spacing:4px;color:#ff4400;
+                text-shadow:0 0 10px #ff4400;text-transform:uppercase;
+                min-height:16px;transition:opacity 0.3s;opacity:0;"></div>
+            <div id="combo-mult" style="
+                font-size:30px;font-weight:bold;letter-spacing:3px;
+                color:#ffaa00;text-shadow:0 0 20px #ffaa00;
+                min-height:36px;transition:all 0.2s;opacity:0;"></div>
+            <div id="score-value" style="
+                font-size:20px;letter-spacing:5px;color:#00ffcc;
+                text-shadow:0 0 12px #00ffcc;margin-top:2px;">
+                000000
+            </div>`;
+        document.body.appendChild(this._scoreEl);
+    }
+
+    // ── Message de vague (haut GAUCHE — FIX) ─────────────────────────────────
+
+    _createWaveHUD() {
+        // FIX : on retire l'ancien #wave-hud centré et on crée un élément
+        // positionné en haut GAUCHE, sous le HUD health, séparé du score.
+        this.waveText = document.createElement("div");
+        this.waveText.id = "wave-hud";
+        // Positionnement : gauche, sous le bloc health (qui est en bas à gauche)
+        // On le met en haut à gauche pour les messages courts de statut.
+        this.waveText.style.cssText = `
+            position:fixed;
+            top:80px;
+            left:30px;
+            font-family:'Courier New',monospace;
+            font-size:13px;
+            letter-spacing:3px;
+            color:#00ffcc;
+            text-shadow:0 0 10px #00ffcc;
+            text-transform:uppercase;
+            pointer-events:none;
+            z-index:40;
+            transition:opacity 0.4s;
+            opacity:0;
+            max-width:320px;
+            white-space:normal;
+            line-height:1.5;
+            background:rgba(0,10,20,0.55);
+            padding:6px 12px;
+            border-left:2px solid rgba(0,255,204,0.4);`;
+        document.body.appendChild(this.waveText);
+    }
+
+    // ── Weapon slots ──────────────────────────────────────────────────────────
 
     _createWeaponSlots() {
         this._weaponSlotsEl = document.createElement("div");
         this._weaponSlotsEl.id = "weapon-slots";
         this._weaponSlotsEl.style.cssText = `
             position:fixed;bottom:140px;right:30px;
-            display:flex;flex-direction:column;gap:6px;
+            display:flex;flex-direction:column;gap:5px;
             pointer-events:none;z-index:40;`;
 
         this._slotEls = [];
@@ -125,46 +187,16 @@ export class PlayerHUD {
             slot.dataset.idx = i;
             slot.innerHTML = `
                 <span class="ws-num">${i + 1}</span>
-                <span class="ws-name">${i === 0 ? "PLASMA DAGGER" : "—"}</span>
-            `;
+                <span class="ws-name">${i === 0 ? "PLASMA DAGGER" : "—"}</span>`;
             this._weaponSlotsEl.appendChild(slot);
             this._slotEls.push(slot);
         }
-
         document.body.appendChild(this._weaponSlotsEl);
+        // Activer slot 0 par défaut
+        this._slotEls[0]?.classList.add("ws-active");
     }
 
-    // ── Score HUD ─────────────────────────────────────────────────────────────
-
-    _createScoreHUD() {
-        this._scoreEl = document.createElement("div");
-        this._scoreEl.id = "score-hud";
-        this._scoreEl.style.cssText = `
-            position:fixed;top:20px;left:50%;transform:translateX(-50%);
-            pointer-events:none;z-index:40;text-align:center;
-            font-family:'Courier New',monospace;`;
-
-        this._scoreEl.innerHTML = `
-            <div id="combo-label" style="
-                font-size:11px;letter-spacing:4px;color:#ff4400;
-                text-shadow:0 0 10px #ff4400;text-transform:uppercase;
-                height:16px;transition:opacity 0.3s;opacity:0;">
-            </div>
-            <div id="combo-mult" style="
-                font-size:32px;font-weight:bold;letter-spacing:3px;
-                color:#ffaa00;text-shadow:0 0 20px #ffaa00;
-                height:38px;transition:all 0.2s;opacity:0;">
-            </div>
-            <div id="score-value" style="
-                font-size:22px;letter-spacing:5px;color:#00ffcc;
-                text-shadow:0 0 12px #00ffcc;margin-top:4px;">
-                000000
-            </div>
-        `;
-        document.body.appendChild(this._scoreEl);
-    }
-
-    // ── Boss Bar ──────────────────────────────────────────────────────────────
+    // ── Boss bar (bas CENTRE) ─────────────────────────────────────────────────
 
     _createBossBar() {
         this._bossBarEl = document.createElement("div");
@@ -177,11 +209,9 @@ export class PlayerHUD {
             font-family:'Courier New',monospace;`;
 
         this._bossBarEl.innerHTML = `
-            <div style="font-size:11px;letter-spacing:4px;color:#cc00ff;
-                text-shadow:0 0 8px #cc00ff;text-transform:uppercase;
-                margin-bottom:5px;">
-                ★ ARCHON-0 ★
-            </div>
+            <div id="boss-name-label" style="font-size:11px;letter-spacing:4px;
+                color:#cc00ff;text-shadow:0 0 8px #cc00ff;text-transform:uppercase;
+                margin-bottom:5px;">★ ARCHON-0 ★</div>
             <div style="position:relative;width:100%;height:14px;
                 background:rgba(0,0,0,0.7);border:1px solid rgba(180,0,255,0.5);
                 border-radius:2px;overflow:hidden;">
@@ -189,46 +219,44 @@ export class PlayerHUD {
                     height:100%;width:100%;
                     background:linear-gradient(90deg,#8800ff,#cc00ff,#ff00aa);
                     transition:width 0.3s ease;
-                    box-shadow:0 0 10px rgba(180,0,255,0.6);">
-                </div>
-                <div id="boss-phase-markers" style="
-                    position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">
-                    <!-- Marqueurs de phase à 60% et 30% -->
-                    <div style="position:absolute;top:0;bottom:0;left:60%;width:2px;background:rgba(255,255,255,0.4);"></div>
-                    <div style="position:absolute;top:0;bottom:0;left:30%;width:2px;background:rgba(255,255,255,0.4);"></div>
+                    box-shadow:0 0 10px rgba(180,0,255,0.6);"></div>
+                <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">
+                    <div style="position:absolute;top:0;bottom:0;left:60%;width:2px;background:rgba(255,255,255,0.35);"></div>
+                    <div style="position:absolute;top:0;bottom:0;left:30%;width:2px;background:rgba(255,255,255,0.35);"></div>
                 </div>
             </div>
-            <div id="boss-phase-label" style="
-                font-size:9px;letter-spacing:3px;color:rgba(180,0,255,0.7);
-                margin-top:4px;">PHASE 1</div>
-        `;
+            <div id="boss-phase-label" style="font-size:9px;letter-spacing:3px;
+                color:rgba(180,0,255,0.7);margin-top:4px;">PHASE 1</div>`;
         document.body.appendChild(this._bossBarEl);
     }
 
-    // ── Challenge HUD ─────────────────────────────────────────────────────────
+    // ── Challenge timer (haut DROITE) ─────────────────────────────────────────
 
     _createChallengeHUD() {
         this._challengeEl = document.createElement("div");
         this._challengeEl.id = "challenge-hud";
+        // Haut droite, séparé du score centré et du message de vague gauche
         this._challengeEl.style.cssText = `
-            position:fixed;top:120px;left:50%;transform:translateX(-50%);
+            position:fixed;
+            top:16px;
+            right:80px;
             pointer-events:none;z-index:45;
-            font-family:'Courier New',monospace;text-align:center;
+            font-family:'Courier New',monospace;
+            text-align:right;
             display:none;`;
 
         this._challengeEl.innerHTML = `
-            <div style="font-size:10px;letter-spacing:4px;color:#ffaa00;
-                text-transform:uppercase;margin-bottom:4px;">DÉFI EN COURS</div>
-            <div id="challenge-timer" style="font-size:36px;font-weight:bold;
+            <div style="font-size:9px;letter-spacing:3px;color:#ffaa00;
+                text-transform:uppercase;margin-bottom:2px;">DÉFI</div>
+            <div id="challenge-timer" style="font-size:32px;font-weight:bold;
                 letter-spacing:4px;color:#ffaa00;text-shadow:0 0 16px #ffaa00;">00</div>
-            <div id="challenge-kills" style="font-size:13px;letter-spacing:3px;
-                color:rgba(255,170,0,0.7);margin-top:3px;">0 / 0</div>
-        `;
+            <div id="challenge-kills" style="font-size:11px;letter-spacing:2px;
+                color:rgba(255,170,0,0.6);margin-top:2px;">0 / 0</div>`;
         document.body.appendChild(this._challengeEl);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // MISE À JOUR
+    // MISES À JOUR
     // ═══════════════════════════════════════════════════════════════════════════
 
     // ── Health ────────────────────────────────────────────────────────────────
@@ -260,10 +288,9 @@ export class PlayerHUD {
         }
     }
 
-    // ── Ammo / Weapon ─────────────────────────────────────────────────────────
+    // ── Ammo ──────────────────────────────────────────────────────────────────
 
     updateAmmo(currentAmmo, maxAmmo) {
-        // Ajuste le nombre de segments si besoin
         while (this.ammoSegments.length < maxAmmo) {
             const seg = document.createElement("div");
             seg.className = "hud-segment ammo-segment";
@@ -282,24 +309,9 @@ export class PlayerHUD {
         }
     }
 
-    /**
-     * Mise à jour unifiée pour les armes secondaires.
-     * @param {number} current
-     * @param {number} max
-     * @param {string} name
-     * @param {boolean} reloading
-     */
     updateWeaponAmmo(current, max, name = "WEAPON", reloading = false) {
         this.ammoTitle.innerText = reloading ? `${name} // RELOADING...` : `WEAPON // ${name}`;
-
-        // Barre de rechargement
-        if (reloading) {
-            this._reloadBar.style.display = "block";
-            this._reloadBar.style.animation = "reloadAnim 1s linear infinite";
-        } else {
-            this._reloadBar.style.display = "none";
-        }
-
+        this._reloadBar.style.display = reloading ? "block" : "none";
         this.updateAmmo(current, max);
         if (current === 0 && reloading) this.ammoContainer.classList.add("empty");
         else this.ammoContainer.classList.remove("empty");
@@ -314,46 +326,38 @@ export class PlayerHUD {
         }
     }
 
-    // ── Weapon Slots ──────────────────────────────────────────────────────────
+    // ── Weapon slots ──────────────────────────────────────────────────────────
 
     addWeaponSlot(slotIdx, weaponInfo) {
         if (slotIdx < 0 || slotIdx >= this._slotEls.length) return;
         const el = this._slotEls[slotIdx];
         el.querySelector(".ws-name").textContent = weaponInfo.name;
-        el.style.borderColor = weaponInfo.iconColor ?? "#00ffcc";
+        if (weaponInfo.iconColor) el.style.setProperty("--ws-accent", weaponInfo.iconColor);
     }
 
     highlightWeaponSlot(slotIdx) {
-        this._slotEls.forEach((el, i) => {
-            el.classList.toggle("ws-active", i === slotIdx);
-        });
+        this._slotEls.forEach((el, i) => el.classList.toggle("ws-active", i === slotIdx));
     }
 
     // ── Score ─────────────────────────────────────────────────────────────────
 
     updateScore(total) {
         const el = document.getElementById("score-value");
-        if (el) {
-            el.textContent = String(total).padStart(6, "0");
-            el.style.transform = "scale(1.12)";
-            el.style.color = "#00ffcc";
-            setTimeout(() => {
-                el.style.transform = "scale(1)";
-            }, 150);
-        }
+        if (!el) return;
+        el.textContent = String(total).padStart(6, "0");
+        el.style.transform = "scale(1.1)";
+        setTimeout(() => { el.style.transform = "scale(1)"; }, 150);
     }
 
     updateCombo(mult, label, decaying = false) {
         const multEl  = document.getElementById("combo-mult");
         const labelEl = document.getElementById("combo-label");
         if (!multEl || !labelEl) return;
-
         if (mult <= 1) {
             multEl.style.opacity  = "0";
             labelEl.style.opacity = "0";
             return;
         }
-
         multEl.style.opacity    = "1";
         labelEl.style.opacity   = "1";
         multEl.textContent      = `×${mult.toFixed(1)}`;
@@ -365,83 +369,70 @@ export class PlayerHUD {
     showPointsPopup(points, opts = {}) {
         if (points <= 0 && !opts.label) return;
         const el = document.createElement("div");
-        el.className = "hud-pts-popup";
+        let txt = opts.label ? opts.label : `+${points}`;
+        if (!opts.label && opts.weakpoint) txt += " ✦ WEAKPOINT";
+        if (!opts.label && opts.streak > 2) txt += ` ×${opts.streak} STREAK`;
 
-        let txt = `+${points}`;
-        if (opts.weakpoint) txt += " ✦ WEAKPOINT";
-        if (opts.streak > 2) txt += ` ×${opts.streak} STREAK`;
-        if (opts.label)      txt = opts.label;
-
-        el.textContent = txt;
         el.style.cssText = `
             position:absolute;
-            left:${-60 + Math.random() * 120}px;
-            top:${Math.random() * 40 - 20}px;
+            left:${-80 + Math.random() * 160}px;
+            top:${Math.random() * 50 - 25}px;
             font-family:'Courier New',monospace;
-            font-size:${opts.label ? 18 : 15}px;
-            font-weight:bold;
-            letter-spacing:2px;
+            font-size:${opts.label ? 17 : 14}px;
+            font-weight:bold;letter-spacing:2px;
             color:${opts.weakpoint ? "#ff88ff" : opts.label ? "#ffaa00" : "#00ffcc"};
             text-shadow:0 0 10px currentColor;
-            white-space:nowrap;
-            pointer-events:none;
-            animation:popupFloat 1.2s ease-out forwards;
-        `;
+            white-space:nowrap;pointer-events:none;
+            animation:popupFloat 1.2s ease-out forwards;`;
+        el.textContent = txt;
         this._popupContainer.appendChild(el);
         setTimeout(() => { try { el.remove(); } catch(_){} }, 1300);
     }
 
-    // ── Wave ──────────────────────────────────────────────────────────────────
+    // ── Vague (FIX : à gauche, pas en superposition avec le score) ────────────
 
     updateWave(waveNumber) {
-        this.waveText.innerText = `VAGUE ${waveNumber}`;
+        this.waveText.innerText = `▶ VAGUE ${waveNumber} / 3`;
         this.waveText.style.opacity = "1";
-        setTimeout(() => { this.waveText.style.opacity = "0"; }, 2000);
+        clearTimeout(this._waveHideTimer);
+        this._waveHideTimer = setTimeout(() => { this.waveText.style.opacity = "0"; }, 2500);
     }
 
     showWaveMessage(message) {
         this.waveText.innerText = message;
         this.waveText.style.opacity = "1";
         clearTimeout(this._waveHideTimer);
-        this._waveHideTimer = setTimeout(() => { this.waveText.style.opacity = "0"; }, 2500);
+        this._waveHideTimer = setTimeout(() => { this.waveText.style.opacity = "0"; }, 3000);
     }
 
     showWaveBonus(bonus, labels = []) {
-        if (bonus <= 0) return;
-        labels.forEach((lbl, i) => {
-            setTimeout(() => this.showPointsPopup(0, { label: lbl }), i * 300);
-        });
+        labels.forEach((lbl, i) => setTimeout(() => this.showPointsPopup(0, { label: lbl }), i * 300));
     }
 
-    // ── Boss Bar ──────────────────────────────────────────────────────────────
+    // ── Boss bar ──────────────────────────────────────────────────────────────
 
     showBossBar(maxHp) {
         this._bossMaxHp = maxHp;
         this._bossBarEl.style.display = "block";
-        this._bossBarEl.style.animation = "bossBarIn 0.5s ease-out";
+        this._bossBarEl.style.opacity = "1";
+        this._bossBarEl.style.transition = "opacity 0.5s";
         this.updateBossBar(maxHp, maxHp);
     }
 
     updateBossBar(current, max) {
         const fill = document.getElementById("boss-bar-fill");
-        if (fill) {
-            const pct = Math.max(0, (current / max) * 100).toFixed(1);
-            fill.style.width = pct + "%";
-
-            // Couleur selon vie
-            if (pct < 30)      fill.style.background = "linear-gradient(90deg,#ff0000,#ff4400)";
-            else if (pct < 60) fill.style.background = "linear-gradient(90deg,#ff4400,#ff8800)";
-            else               fill.style.background = "linear-gradient(90deg,#8800ff,#cc00ff,#ff00aa)";
-        }
+        if (!fill) return;
+        const pct = Math.max(0, (current / max) * 100).toFixed(1);
+        fill.style.width = pct + "%";
+        if (pct < 30)      fill.style.background = "linear-gradient(90deg,#ff0000,#ff4400)";
+        else if (pct < 60) fill.style.background = "linear-gradient(90deg,#ff4400,#ff8800)";
+        else               fill.style.background = "linear-gradient(90deg,#8800ff,#cc00ff,#ff00aa)";
     }
 
     hideBossBar() {
-        this._bossBarEl.style.opacity = "0";
+        this._bossBarEl.style.opacity    = "0";
         this._bossBarEl.style.transition = "opacity 1s";
-        setTimeout(() => {
-            this._bossBarEl.style.display = "none";
-            this._bossBarEl.style.opacity = "1";
-        }, 1000);
+        setTimeout(() => { this._bossBarEl.style.display = "none"; this._bossBarEl.style.opacity = "1"; }, 1000);
     }
 
     showBossPhaseBonus(phase, bonus) {
@@ -457,22 +448,17 @@ export class PlayerHUD {
         const banner = document.createElement("div");
         banner.style.cssText = `
             position:fixed;top:0;left:0;right:0;bottom:0;
-            display:flex;flex-direction:column;
-            align-items:center;justify-content:center;
-            background:rgba(0,0,0,0.7);
-            font-family:'Courier New',monospace;
-            pointer-events:none;z-index:300;
-            animation:bossKillIn 0.5s ease-out;`;
-
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            background:rgba(0,0,0,0.65);font-family:'Courier New',monospace;
+            pointer-events:none;z-index:300;`;
         banner.innerHTML = `
-            <div style="font-size:60px;font-weight:bold;letter-spacing:10px;
-                color:#cc00ff;text-shadow:0 0 40px #cc00ff;
-                animation:glitch 0.5s infinite;">ARCHON-0</div>
-            <div style="font-size:24px;letter-spacing:6px;color:#ffffff;
-                margin-top:10px;">NEUTRALISÉ</div>
-            <div style="font-size:16px;letter-spacing:4px;color:#00ffcc;
-                margin-top:30px;">SCORE : ${String(totalScore).padStart(8, "0")}</div>
-        `;
+            <div style="font-size:56px;font-weight:bold;letter-spacing:10px;
+                color:#cc00ff;text-shadow:0 0 40px #cc00ff;animation:glitch 0.5s infinite;">
+                ARCHON NEUTRALISÉ
+            </div>
+            <div style="font-size:16px;letter-spacing:5px;color:#00ffcc;margin-top:20px;">
+                SCORE : ${String(totalScore).padStart(8,"0")}
+            </div>`;
         document.body.appendChild(banner);
         setTimeout(() => {
             banner.style.opacity = "0";
@@ -481,20 +467,18 @@ export class PlayerHUD {
         }, 3000);
     }
 
-    // ── Challenge Timer ───────────────────────────────────────────────────────
+    // ── Challenge timer ───────────────────────────────────────────────────────
 
     updateChallengeTimer(seconds, killed, target) {
         this._challengeEl.style.display = "block";
-        const timerEl  = document.getElementById("challenge-timer");
-        const killsEl  = document.getElementById("challenge-kills");
+        const timerEl = document.getElementById("challenge-timer");
+        const killsEl = document.getElementById("challenge-kills");
         if (timerEl) {
-            timerEl.textContent = String(seconds).padStart(2, "0");
+            timerEl.textContent = String(Math.max(0, seconds)).padStart(2, "0");
             timerEl.style.color = seconds <= 10 ? "#ff0000" : "#ffaa00";
         }
         if (killsEl) killsEl.textContent = `${killed} / ${target}`;
-        if (seconds <= 0) {
-            setTimeout(() => { this._challengeEl.style.display = "none"; }, 1500);
-        }
+        if (seconds <= 0) setTimeout(() => { this._challengeEl.style.display = "none"; }, 1500);
     }
 
     // ── FPS ───────────────────────────────────────────────────────────────────
@@ -525,8 +509,7 @@ export class PlayerHUD {
                     <img src="${upgrade.iconPath || '/vite.svg'}" alt="icon" class="card-icon">
                 </div>
                 <div class="card-title">${upgrade.name}</div>
-                <div class="card-desc">${upgrade.description}</div>
-            `;
+                <div class="card-desc">${upgrade.description}</div>`;
             card.addEventListener("click", () => {
                 this.upgradeOverlay.remove();
                 onSelectCallback(upgrade);

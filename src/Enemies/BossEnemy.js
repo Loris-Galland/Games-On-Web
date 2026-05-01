@@ -2,131 +2,192 @@ import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "../Enemies/EnemyParticles";
 
 /**
- * BossEnemy — "ARCHON-0" (corrigé)
- * ----------------------------------
- * Fixes :
- *   1. Weakpoint orbital : tourne avec les cristaux à rayon réduit, pickable
- *   2. Contact damage : cooldown correctement initialisé à 0, distance vérifiée
- *      en flatDist (XZ seulement) pour ne pas rater le joueur verticalement
- *   3. Mouvement : le boss se déplace réellement vers le joueur dès le début
+ * BossEnemy — ARCHON
+ * ------------------
+ * Basé sur la structure des mobs standards (HeavyEnemy), taille imposante.
+ *
+ * 3 PHASES DE COMBAT (invincible pendant chaque phase) :
+ *   Phase 1 — "SAUT" : immobile puis saute 5× sur le joueur
+ *   Phase 2 — "LASER" : tire des lasers hitscan, se déplace aléatoirement
+ *   Phase 3 — "INVOCATION" : flotte en l'air, spawne des mobs en continu
+ *
+ * TRANSITION entre phases (5 sec) :
+ *   - Plus invincible
+ *   - Particules VERTES
+ *   - Weakpoint visible et pickable
+ *   - Contact damage actif
+ *
+ * Couleurs particules :
+ *   Phase 1 → Rouge
+ *   Phase 2 → Jaune
+ *   Phase 3 → Violet
+ *   Transition → Vert
  */
 export class BossEnemy {
     constructor(scene, position, player, navManager = null, onSummon = null) {
-        this.scene       = scene;
-        this.player      = player;
-        this._navManager = navManager;
-        this._onSummon   = onSummon;
+        this.scene      = scene;
+        this.player     = player;
+        this._onSummon  = onSummon;
 
         this.onDeath  = null;
         this.onPhase  = null;
         this.onDamage = null;
 
-        this.maxHealth     = 800;
-        this.currentHealth = 800;
-        this.speed         = 2.5;
-        this.phase         = 1;
+        this.maxHealth     = 600;
+        this.currentHealth = 600;
         this._dead         = false;
-        this._invincible   = false;
 
-        this._phaseTransition = false;
-        this._shieldMesh      = null;
+        // ── État de phase ─────────────────────────────────────────────────────
+        // "transition" = fenêtre vulnérable entre phases (particules vertes)
+        // "phase1" / "phase2" / "phase3" = phases de combat (invincible)
+        this._stateLabel      = "transition"; // on commence par une courte intro
+        this._invincible      = true;
+        this._phaseIndex      = 0;           // 0 = pas encore commencé
+        this._transitionTimer = 0;
+        this._TRANSITION_DUR  = 5.0;         // secondes de vulnérabilité entre phases
 
-        // Cooldowns — tous initialisés à 0
-        this._orbCooldown      = 3;
-        this._slamCooldown     = 4;
-        this._summonCooldown   = 10;
-        this._contactCooldown  = 0;   // FIX : était undefined au 1er frame
+        // ── Timers internes ───────────────────────────────────────────────────
+        this._t             = 0; // timer local de phase
+        this._contactTimer  = 0;
+        this._CONTACT_CD    = 1.0;
 
-        this._auraT = 0;
+        // Phase 1 — sauts
+        this._jumpCount    = 0;
+        this._MAX_JUMPS    = 5;
+        this._jumpState    = "idle";  // "idle" | "charging" | "jumping" | "landing"
+        this._jumpTimer    = 0;
+        this._jumpElapsed  = 0;      // compteur dédié à la durée du saut
+        this._jumpOrigin   = null;
+        this._jumpTarget   = null;
 
-        this._spawnWarning(position);
+        // Phase 2 — laser
+        this._laserCooldown  = 0;
+        this._LASER_RATE     = 1.8;
+        this._moveCooldown   = 0;
+        this._moveTarget     = null;
+
+        // Phase 3 — invocation
+        this._summonCooldown = 0;
+        this._SUMMON_RATE    = 4.0;
+        this._floatY         = 12; // hauteur de flotte
+
+        // ── Construction ──────────────────────────────────────────────────────
+        EnemyParticles.spawnWarning(scene, position, new BABYLON.Color3(0.8, 0, 0), 2000);
         this._buildMesh(position);
+        this._buildWeakPoint();
+        this._buildAuraSystem();
 
-        this._updateObs = this.scene.onBeforeRenderObservable.add(() => this._update());
+        // Petite intro : 3 sec d'invincibilité avant la phase 1
+        this._introTimer  = 3.0;
+        this._inIntro     = true;
+
+        this._updateObs = scene.onBeforeRenderObservable.add(() => this._update());
     }
 
-    // ── Construction ──────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTION
+    // ═══════════════════════════════════════════════════════════════════════════
 
     _buildMesh(position) {
         const uid = Math.random().toString(36).slice(2);
 
-        // Corps principal
-        const bodyMat = new BABYLON.StandardMaterial(`bossMat_${uid}`, this.scene);
-        bodyMat.diffuseColor  = new BABYLON.Color3(0.08, 0.0, 0.12);
-        bodyMat.emissiveColor = new BABYLON.Color3(0.25, 0, 0.4);
-        bodyMat.specularColor = new BABYLON.Color3(0.5, 0, 1);
+        // Corps — taille HeavyEnemy ×1.5
+        const mat = new BABYLON.StandardMaterial(`bossMat_${uid}`, this.scene);
+        mat.diffuseColor  = new BABYLON.Color3(0.12, 0.04, 0.18);
+        mat.emissiveColor = new BABYLON.Color3(0.3, 0.0, 0.5);
+        mat.specularColor = new BABYLON.Color3(0.2, 0, 0.4);
 
-        this.body = BABYLON.MeshBuilder.CreateBox("bossBody", { width: 3.5, height: 5.0, depth: 3.5 }, this.scene);
-        this.body.position        = new BABYLON.Vector3(position.x, position.y + 2.5, position.z);
-        this.body.material        = bodyMat;
+        this.body = BABYLON.MeshBuilder.CreateBox("bossBody", {
+            width:  3.3,
+            height: 4.8,
+            depth:  3.3,
+        }, this.scene);
+        this.body.position        = new BABYLON.Vector3(position.x, position.y + 2.4, position.z);
+        this.body.material        = mat;
         this.body.checkCollisions = false;
-        this.body.isPickable      = true;
+        this.body.isPickable      = false; // le weakpoint prend les hits
+        this.body.ellipsoid       = new BABYLON.Vector3(1.6, 2.4, 1.6);
         this.body._isBossBody     = true;
         this.body._takeDamage     = (dmg) => this.takeDamage(dmg);
 
-        // ── Cristaux orbitaux ─────────────────────────────────────────────────
-        this._crystals = [];
-        for (let i = 0; i < 4; i++) {
-            const cMat = new BABYLON.StandardMaterial(`cMat_${uid}_${i}`, this.scene);
-            cMat.emissiveColor   = new BABYLON.Color3(0.6, 0, 1);
-            cMat.disableLighting = true;
+        this._groundY = position.y + 2.4; // Y de référence au sol
+    }
 
-            const crystal = BABYLON.MeshBuilder.CreateBox(`bossCrystal_${i}`, { width: 0.6, height: 1.8, depth: 0.6 }, this.scene);
-            crystal.material   = cMat;
-            crystal.isPickable = false;
-            crystal._baseAngle = (i / 4) * Math.PI * 2;
-            this._crystals.push(crystal);
-        }
+    _buildWeakPoint() {
+        const uid = Math.random().toString(36).slice(2);
+        const mat = new BABYLON.StandardMaterial(`bossWpMat_${uid}`, this.scene);
+        mat.emissiveColor   = new BABYLON.Color3(0, 1, 0.3);
+        mat.disableLighting = true;
 
-        // ── Weakpoint ORBITAL (FIX) ───────────────────────────────────────────
-        // Le weakpoint n'est plus enfant du corps (position fixe) :
-        // il orbite autour du boss comme les cristaux, mais à un rayon plus petit
-        // et légèrement plus haut, pour être visible et atteignable.
-        const wpMat = new BABYLON.StandardMaterial(`bossWpMat_${uid}`, this.scene);
-        wpMat.emissiveColor   = new BABYLON.Color3(1, 0, 0.5);
-        wpMat.disableLighting = true;
+        this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 1.2 }, this.scene);
+        this.weakPoint.material   = mat;
+        this.weakPoint.isPickable = false; // activé seulement en transition
+        this.weakPoint.isVisible  = false;
+        this.weakPoint.parent     = this.body;
+        this.weakPoint.position   = new BABYLON.Vector3(0, 1.5, 0);
 
-        this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 1.0 }, this.scene);
-        this.weakPoint.material   = wpMat;
-        this.weakPoint.isPickable = true;
-        // Angle d'orbite distinct des cristaux (décalé de PI/4)
-        this._wpAngle = Math.PI / 4;
-
-        // Pulse visuel du weakpoint
         this._wpPulseT = 0;
-
-        this.body.ellipsoid = new BABYLON.Vector3(1.75, 2.5, 1.75);
-
-        this._buildAura();
     }
 
-    _buildAura() {
-        const aura = new BABYLON.ParticleSystem("bossAura", 80, this.scene);
-        aura.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
-        aura.emitter         = this.body;
-        aura.minEmitBox      = new BABYLON.Vector3(-1.5, -2, -1.5);
-        aura.maxEmitBox      = new BABYLON.Vector3( 1.5,  2,  1.5);
-        aura.color1          = new BABYLON.Color4(0.7, 0, 1, 0.6);
-        aura.color2          = new BABYLON.Color4(0.4, 0, 0.6, 0.3);
-        aura.colorDead       = new BABYLON.Color4(0, 0, 0, 0);
-        aura.minSize         = 0.08; aura.maxSize     = 0.22;
-        aura.minLifeTime     = 0.5;  aura.maxLifeTime = 1.2;
-        aura.emitRate        = 55;
-        aura.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
-        aura.direction1      = new BABYLON.Vector3(-1, 0.5, -1);
-        aura.direction2      = new BABYLON.Vector3( 1, 2.5,  1);
-        aura.minEmitPower    = 0.5; aura.maxEmitPower = 2;
-        aura.gravity         = new BABYLON.Vector3(0, -1, 0);
-        aura.updateSpeed     = 0.025;
-        aura.start();
-        this._aura = aura;
+    _buildAuraSystem() {
+        const tex = "https://assets.babylonjs.com/textures/flare.png";
+
+        // Aura de phase (couleur change selon la phase)
+        this._phaseAura = new BABYLON.ParticleSystem("bossPhaseAura", 80, this.scene);
+        this._phaseAura.particleTexture = new BABYLON.Texture(tex, this.scene);
+        this._phaseAura.emitter         = this.body;
+        this._phaseAura.minEmitBox      = new BABYLON.Vector3(-1.5, -2, -1.5);
+        this._phaseAura.maxEmitBox      = new BABYLON.Vector3( 1.5,  2,  1.5);
+        this._phaseAura.minSize         = 0.1;
+        this._phaseAura.maxSize         = 0.3;
+        this._phaseAura.minLifeTime     = 0.4;
+        this._phaseAura.maxLifeTime     = 1.0;
+        this._phaseAura.emitRate        = 60;
+        this._phaseAura.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        this._phaseAura.direction1      = new BABYLON.Vector3(-1, 0.5, -1);
+        this._phaseAura.direction2      = new BABYLON.Vector3( 1, 3,    1);
+        this._phaseAura.minEmitPower    = 0.5;
+        this._phaseAura.maxEmitPower    = 2;
+        this._phaseAura.gravity         = new BABYLON.Vector3(0, -0.5, 0);
+        this._phaseAura.updateSpeed     = 0.025;
+        this._setAuraColor(new BABYLON.Color4(0.8, 0, 0, 0.8)); // rouge par défaut
+        this._phaseAura.start();
+
+        // Aura de transition (verte)
+        this._transAura = new BABYLON.ParticleSystem("bossTransAura", 100, this.scene);
+        this._transAura.particleTexture = new BABYLON.Texture(tex, this.scene);
+        this._transAura.emitter         = this.body;
+        this._transAura.minEmitBox      = new BABYLON.Vector3(-1.6, -2.4, -1.6);
+        this._transAura.maxEmitBox      = new BABYLON.Vector3( 1.6,  2.4,  1.6);
+        this._transAura.color1          = new BABYLON.Color4(0, 1, 0.3, 1);
+        this._transAura.color2          = new BABYLON.Color4(0.2, 1, 0.5, 0.7);
+        this._transAura.colorDead       = new BABYLON.Color4(0, 0.5, 0.2, 0);
+        this._transAura.minSize         = 0.12;
+        this._transAura.maxSize         = 0.35;
+        this._transAura.minLifeTime     = 0.5;
+        this._transAura.maxLifeTime     = 1.2;
+        this._transAura.emitRate        = 80;
+        this._transAura.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        this._transAura.direction1      = new BABYLON.Vector3(-2, 0.5, -2);
+        this._transAura.direction2      = new BABYLON.Vector3( 2, 4,    2);
+        this._transAura.minEmitPower    = 1;
+        this._transAura.maxEmitPower    = 3;
+        this._transAura.gravity         = new BABYLON.Vector3(0, -1, 0);
+        this._transAura.updateSpeed     = 0.025;
+        this._transAura.stop(); // inactif au début
     }
 
-    _spawnWarning(pos) {
-        EnemyParticles.spawnWarning(this.scene, pos, new BABYLON.Color3(0.6, 0, 1), 2200);
+    _setAuraColor(color4) {
+        const c2 = color4.clone();
+        c2.a *= 0.5;
+        this._phaseAura.color1   = color4;
+        this._phaseAura.color2   = c2;
+        this._phaseAura.colorDead = new BABYLON.Color4(color4.r * 0.1, color4.g * 0.1, color4.b * 0.1, 0);
     }
 
-    // ── Boucle principale ─────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BOUCLE PRINCIPALE
+    // ═══════════════════════════════════════════════════════════════════════════
 
     _update() {
         if (this._dead || !this.player?.camera) return;
@@ -136,393 +197,534 @@ export class BossEnemy {
         const pos       = this.body.position;
         const playerPos = this.player.camera.globalPosition.clone();
 
-        this._auraT += dt;
+        this._t += dt;
 
-        // Animations
-        this._updateCrystals(dt);
-        this._updateWeakpoint(dt);
-        this._animateBody(dt);
-
-        // Cooldowns
-        this._orbCooldown    -= dt;
-        this._slamCooldown   -= dt;
-        this._summonCooldown -= dt;
-        if (this._contactCooldown > 0) this._contactCooldown -= dt;
-
-        // ── Contact damage (FIX) ──────────────────────────────────────────────
-        // Utiliser flatDist (plan XZ) pour être robuste quand le joueur est
-        // au même niveau Y ou légèrement en dessous du boss qui flotte
-        const dx = pos.x - playerPos.x;
-        const dz = pos.z - playerPos.z;
-        const flatDist = Math.sqrt(dx * dx + dz * dz);
-
-        if (flatDist < 3.5 && !this.player.isDead && this._contactCooldown <= 0) {
-            this.player.health?.takeDamage(1);
-            this._contactCooldown = 1.2;
+        // ── Intro ─────────────────────────────────────────────────────────────
+        if (this._inIntro) {
+            this._introTimer -= dt;
+            if (this._introTimer <= 0) {
+                this._inIntro = false;
+                this._enterPhase(1);
+            }
+            return;
         }
 
-        // Mouvement + attaques
-        this._updateMovement(pos, playerPos, dt);
-        this._updateAttacks(pos, playerPos, dt);
-    }
+        // ── Contact damage (seulement en transition = non invincible) ─────────
+        if (!this._invincible) {
+            if (this._contactTimer > 0) this._contactTimer -= dt;
+            const dx = pos.x - playerPos.x;
+            const dz = pos.z - playerPos.z;
+            const flatDist = Math.sqrt(dx * dx + dz * dz);
+            if (flatDist < 2.5 && !this.player.isDead && this._contactTimer <= 0) {
+                this.player.health?.takeDamage(1);
+                this._contactTimer = this._CONTACT_CD;
+            }
+        }
 
-    // ── Crystaux orbitaux ─────────────────────────────────────────────────────
+        // ── Weakpoint pulse visuel ────────────────────────────────────────────
+        if (!this._invincible && this.weakPoint && !this.weakPoint.isDisposed()) {
+            this._wpPulseT += dt;
+            const sc = 1 + Math.sin(this._wpPulseT * 6) * 0.25;
+            this.weakPoint.scaling = new BABYLON.Vector3(sc, sc, sc);
+        }
 
-    _updateCrystals(dt) {
-        const pos = this.body.position;
-        this._crystals.forEach((c, i) => {
-            if (c.isDisposed()) return;
-            const angle = c._baseAngle + this._auraT * (1.2 + i * 0.15);
-            const r     = 2.8 + Math.sin(this._auraT * 2 + i) * 0.4;
-            const yOff  = Math.sin(this._auraT * 1.5 + i * 0.8) * 0.6;
-            c.position = new BABYLON.Vector3(
-                pos.x + Math.cos(angle) * r,
-                pos.y + yOff,
-                pos.z + Math.sin(angle) * r,
-            );
-            c.rotation.y += dt * 2.5;
-            c.rotation.z  = Math.sin(this._auraT * 3 + i) * 0.4;
-        });
-    }
+        // ── Dispatch état ─────────────────────────────────────────────────────
+        if (this._stateLabel === "transition") {
+            this._updateTransition(dt, playerPos);
+        } else if (this._stateLabel === "phase1") {
+            this._updatePhase1(dt, pos, playerPos);
+        } else if (this._stateLabel === "phase2") {
+            this._updatePhase2(dt, pos, playerPos);
+        } else if (this._stateLabel === "phase3") {
+            this._updatePhase3(dt, pos, playerPos);
+        }
 
-    // ── Weakpoint orbital (FIX) ───────────────────────────────────────────────
-
-    _updateWeakpoint(dt) {
-        if (!this.weakPoint || this.weakPoint.isDisposed()) return;
-        const pos = this.body.position;
-
-        // Orbite plus rapide que les cristaux, rayon plus petit = plus accessible
-        this._wpAngle += dt * 2.0;
-        const r    = 2.0;  // rayon orbite
-        const yOff = 2 + Math.sin(this._auraT * 2.8) * 0.4;
-
-        /*this.weakPoint.position = new BABYLON.Vector3(
-            pos.x + Math.cos(this._wpAngle) * r,
-            pos.y + yOff,
-            pos.z + Math.sin(this._wpAngle) * r,
-        );
-        this.weakPoint.rotation.y += dt * 4.0;*/
-
-        this.weakPoint.position = new BABYLON.Vector3(
-            pos.x,
-            pos.y + 3,
-            pos.z,
-        );
-
-        // Pulse de taille pour indiquer que c'est le point faible
-        this._wpPulseT += dt;
-        const scale = 1.0 + Math.sin(this._wpPulseT * 5) * 0.2;
-        this.weakPoint.scaling = new BABYLON.Vector3(scale, scale, scale);
-
-        // Changement couleur selon la phase
-        if (this.weakPoint.material) {
-            const flash = (Math.sin(this._wpPulseT * 8) + 1) / 2;
-            const phaseColor = this.phase >= 3
-                ? new BABYLON.Color3(1, flash * 0.5, 0)     // rouge-orangé en phase 3
-                : this.phase === 2
-                ? new BABYLON.Color3(1, 0.2, flash * 0.6)  // rose en phase 2
-                : new BABYLON.Color3(1, 0, 0.5);            // magenta en phase 1
-            this.weakPoint.material.emissiveColor = phaseColor;
+        // Regarde toujours vers le joueur (sauf en l'air phase 3)
+        if (this._stateLabel !== "phase3") {
+            this.body.lookAt(new BABYLON.Vector3(playerPos.x, pos.y, playerPos.z));
         }
     }
 
-    _animateBody(dt) {
-        if (this.body.isDisposed()) return;
-        this.body.position.y += Math.sin(this._auraT * 2.2) * dt * 0.3;
-        const ph  = (Math.sin(this._auraT * 3) + 1) / 2;
-        const mul = this.phase === 3 ? 1.5 : 1;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TRANSITION (vulnérable, particules vertes, weakpoint visible)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    _enterTransition(nextPhase) {
+        this._stateLabel      = "transition";
+        this._invincible      = false;
+        this._transitionTimer = this._TRANSITION_DUR;
+        this._nextPhase       = nextPhase;
+
+        // Afficher le weakpoint
+        if (this.weakPoint && !this.weakPoint.isDisposed()) {
+            this.weakPoint.isVisible  = true;
+            this.weakPoint.isPickable = true;
+        }
+
+        // Particules vertes ON, phase OFF
+        this._phaseAura.stop();
+        this._transAura.start();
+
+        // Couleur du corps → vert sombre
         if (this.body.material) {
-            this.body.material.emissiveColor = new BABYLON.Color3(
-                0.25 * mul + ph * 0.15, 0, 0.4 * mul + ph * 0.25,
-            );
+            this.body.material.emissiveColor = new BABYLON.Color3(0.0, 0.4, 0.1);
+        }
+
+        // Assurer que le boss est au sol
+        this.body.position.y = this._groundY;
+    }
+
+    _updateTransition(dt, playerPos) {
+        this._transitionTimer -= dt;
+
+        // Légère oscillation sur place
+        this.body.position.y = this._groundY + Math.sin(this._t * 3) * 0.15;
+
+        if (this._transitionTimer <= 0) {
+            this._enterPhase(this._nextPhase);
         }
     }
 
-    // ── Mouvement (FIX) ───────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PHASES
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    _updateMovement(pos, playerPos, dt) {
-        const toPlayer = playerPos.subtract(pos);
-        // Distance flatMap seulement pour la logique d'approche
-        const flatDist = Math.sqrt(toPlayer.x ** 2 + toPlayer.z ** 2);
-        if (flatDist < 0.1) return;
+    _enterPhase(phaseNum) {
+        this._stateLabel = `phase${phaseNum}`;
+        this._phaseIndex = phaseNum;
+        this._invincible = true;
+        this._t          = 0;
 
-        const desiredDir = new BABYLON.Vector3(toPlayer.x, 0, toPlayer.z).normalize();
-        const lateral    = new BABYLON.Vector3(-desiredDir.z, 0, desiredDir.x);
-        const strafeAmt  = Math.sin(this._auraT * (this.phase === 3 ? 2.5 : 1.3)) * 0.4;
-        const speed      = this.speed * (this.phase === 3 ? 1.55 : 1.0);
-
-        // Approche si trop loin, recul si trop proche
-        if (flatDist > 5.0) {
-            const move = desiredDir.add(lateral.scale(strafeAmt)).normalize().scale(speed * dt);
-            this.body.position.x += move.x;
-            this.body.position.z += move.z;
-        } else if (flatDist < 3.0) {
-            // S'écarter légèrement
-            this.body.position.x -= desiredDir.x * speed * 0.4 * dt;
-            this.body.position.z -= desiredDir.z * speed * 0.4 * dt;
-        } else {
-            // Zone de combat : strafing latéral uniquement
-            this.body.position.x += lateral.x * strafeAmt * speed * dt;
-            this.body.position.z += lateral.z * strafeAmt * speed * dt;
+        // Cacher weakpoint
+        if (this.weakPoint && !this.weakPoint.isDisposed()) {
+            this.weakPoint.isVisible  = false;
+            this.weakPoint.isPickable = false;
         }
 
-        // Orientation vers le joueur
-        this.body.lookAt(new BABYLON.Vector3(playerPos.x, pos.y, playerPos.z));
+        // Particules transition OFF, phase ON
+        this._transAura.stop();
+        this._phaseAura.start();
+
+        // Couleur et particules selon la phase
+        if (phaseNum === 1) {
+            // Rouge
+            this._setAuraColor(new BABYLON.Color4(1, 0.05, 0.05, 0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.5, 0, 0);
+            this._jumpCount = 0;
+            this._jumpState = "idle";
+            this._jumpTimer = 1.5; // délai avant premier saut
+        } else if (phaseNum === 2) {
+            // Jaune
+            this._setAuraColor(new BABYLON.Color4(1, 0.9, 0, 0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.5, 0.45, 0);
+            this._laserCooldown = 0.5;
+            this._moveCooldown  = 0;
+            this._moveTarget    = null;
+            this.body.position.y = this._groundY;
+        } else if (phaseNum === 3) {
+            // Violet
+            this._setAuraColor(new BABYLON.Color4(0.6, 0, 1, 0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.3, 0, 0.6);
+            this._summonCooldown = 1.0;
+        }
+
+        if (this.onPhase) this.onPhase(phaseNum);
+
+        // Message HUD via callback
+        const labels = ["", "PHASE I — IMPACT", "PHASE II — RAFALE", "PHASE III — INVOCATION"];
+        console.log(`[Boss] ${labels[phaseNum] ?? "PHASE " + phaseNum}`);
     }
 
-    // ── Attaques ──────────────────────────────────────────────────────────────
+    // ── PHASE 1 : Sauts ───────────────────────────────────────────────────────
 
-    _updateAttacks(pos, playerPos, dt) {
-        const dist = BABYLON.Vector3.Distance(pos, playerPos);
+    _updatePhase1(dt, pos, playerPos) {
+        if (this._jumpState === "idle") {
+            // Immobile, attend
+            this.body.position.y = this._groundY + Math.sin(this._t * 2) * 0.1;
+            this._jumpTimer -= dt;
+            if (this._jumpTimer <= 0) {
+                this._initiateJump(pos, playerPos);
+            }
+            return;
+        }
 
-        if (this.phase === 1) {
-            if (this._slamCooldown <= 0 && dist < 12) {
-                this._slamAttack(pos);
-                this._slamCooldown = 5;
+        if (this._jumpState === "charging") {
+            // Légère compression avant le saut
+            this._jumpTimer -= dt;
+            const chargeProgress = Math.max(0, 1 - this._jumpTimer / 0.3);
+            this.body.position.y = this._groundY - 0.5 * chargeProgress;
+            if (this._jumpTimer <= 0) {
+                this._jumpState    = "jumping";
+                this._jumpElapsed  = 0; // compteur dédié au saut
             }
-        } else if (this.phase === 2) {
-            if (this._summonCooldown <= 0) {
-                this._summonMinions(pos);
-                this._summonCooldown = 12;
+            return;
+        }
+
+        if (this._jumpState === "jumping") {
+            const JUMP_DUR = 0.7;
+            this._jumpElapsed += dt;
+            const t = Math.min(this._jumpElapsed / JUMP_DUR, 1);
+
+            const orig = this._jumpOrigin;
+            const targ = this._jumpTarget;
+
+            // Interpolation XZ linéaire
+            this.body.position.x = orig.x + (targ.x - orig.x) * t;
+            this.body.position.z = orig.z + (targ.z - orig.z) * t;
+            // Arc Y parabolique (sin de 0 à PI)
+            const arcH = 8.0;
+            this.body.position.y = this._groundY + arcH * Math.sin(t * Math.PI);
+
+            if (t === 1) {
+                this._jumpState = "landing";
+                this._jumpTimer = 0.4;
+                this._onJumpLand(targ);
             }
-            if (this._orbCooldown <= 0) {
-                this._fireOrbs(pos, playerPos, 4);
-                this._orbCooldown = 2.5;
-            }
-        } else if (this.phase === 3) {
-            if (this._slamCooldown <= 0 && dist < 14) {
-                this._slamAttack(pos);
-                this._slamCooldown = 3;
-            }
-            if (this._summonCooldown <= 0) {
-                this._summonMinions(pos);
-                this._summonCooldown = 8;
-            }
-            if (this._orbCooldown <= 0) {
-                this._fireOrbs(pos, playerPos, 8);
-                this._orbCooldown = 1.4;
+            return;
+        }
+
+        if (this._jumpState === "landing") {
+            this._jumpTimer -= dt;
+            this.body.position.y = this._groundY + Math.max(0, this._jumpTimer * 1.2);
+            if (this._jumpTimer <= 0) {
+                this._jumpCount++;
+                this.body.position.y = this._groundY;
+
+                if (this._jumpCount >= this._MAX_JUMPS) {
+                    this._enterTransition(2);
+                } else {
+                    this._jumpState = "idle";
+                    this._jumpTimer = 1.2;
+                }
             }
         }
     }
 
-    _slamAttack(pos) {
-        const SLAM_R     = 7.0;
-        const SLAM_DMG_R = 3.5;
+    _initiateJump(pos, playerPos) {
+        this._jumpOrigin = pos.clone();
+        const offset = new BABYLON.Vector3(
+            (Math.random() - 0.5) * 1.5,
+            0,
+            (Math.random() - 0.5) * 1.5,
+        );
+        this._jumpTarget = new BABYLON.Vector3(
+            playerPos.x + offset.x,
+            this._groundY,
+            playerPos.z + offset.z,
+        );
+        this._jumpState = "charging";
+        this._jumpTimer = 0.3; // durée de la compression
+    }
 
-        const ring = BABYLON.MeshBuilder.CreateDisc("bossSlam", { radius: 0.1, tessellation: 40 }, this.scene);
-        ring.position   = pos.clone();
-        ring.position.y = 0.15;
-        ring.rotation.x = Math.PI / 2;
-        ring.isPickable = false;
+    _onJumpLand(pos) {
+        // Onde de choc à l'atterrissage
+        this._spawnShockwave(new BABYLON.Vector3(pos.x, this._groundY - 2.0, pos.z));
 
-        const mat = new BABYLON.StandardMaterial("slamMat", this.scene);
-        mat.emissiveColor   = new BABYLON.Color3(0.8, 0, 1);
+        // Dégâts si joueur proche
+        const playerPos = this.player.camera.globalPosition;
+        const dist = Math.sqrt(
+            (pos.x - playerPos.x) ** 2 + (pos.z - playerPos.z) ** 2
+        );
+        if (dist < 4.0 && !this.player.isDead) {
+            this.player.health?.takeDamage(1);
+        }
+
+        EnemyParticles.death(this.scene, new BABYLON.Vector3(pos.x, this._groundY, pos.z), new BABYLON.Color3(1, 0.1, 0));
+    }
+
+    _spawnShockwave(center) {
+        const ring = BABYLON.MeshBuilder.CreateDisc("bossShockwave", { radius: 0.2, tessellation: 32 }, this.scene);
+        ring.position    = center.clone();
+        ring.rotation.x  = Math.PI / 2;
+        ring.isPickable  = false;
+
+        const mat = new BABYLON.StandardMaterial("bossShockMat", this.scene);
+        mat.emissiveColor   = new BABYLON.Color3(1, 0.2, 0);
         mat.backFaceCulling = false;
-        mat.alpha           = 0.85;
+        mat.alpha           = 0.8;
         ring.material       = mat;
 
         const start = Date.now();
-        let   hit   = false;
-
-        const obs = this.scene.onBeforeRenderObservable.add(() => {
+        const obs   = this.scene.onBeforeRenderObservable.add(() => {
             if (ring.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            const t = Math.min((Date.now() - start) / 500, 1);
-            ring.scaling = new BABYLON.Vector3(SLAM_R * t, SLAM_R * t, SLAM_R * t);
-            mat.alpha    = 0.85 * (1 - t * 0.8);
-
-            if (!hit && t > 0.35 && t < 0.75) {
-                const d = BABYLON.Vector3.Distance(this.player.camera.globalPosition, pos);
-                if (d < SLAM_DMG_R && !this.player.isDead) {
-                    this.player.health?.takeDamage(1);
-                    hit = true;
-                }
-            }
-
+            const t = Math.min((Date.now() - start) / 600, 1);
+            const r = t * 7;
+            ring.scaling = new BABYLON.Vector3(r, r, r);
+            mat.alpha    = 0.8 * (1 - t);
             if (t >= 1) { this.scene.onBeforeRenderObservable.remove(obs); ring.dispose(); }
         });
-
-        EnemyParticles.death(this.scene, pos.clone(), new BABYLON.Color3(0.6, 0, 1));
     }
 
-    _fireOrbs(pos, playerPos, count = 4) {
-        const dir    = playerPos.subtract(pos).normalize();
-        const spread = (Math.PI * 2) / count;
+    // ── PHASE 2 : Lasers + déplacement aléatoire ──────────────────────────────
 
-        for (let i = 0; i < count; i++) {
-            const angle  = i * spread + this._auraT * 0.5;
-            let orbDir   = new BABYLON.Vector3(
-                Math.cos(angle) * 0.5 + dir.x * 0.5,
-                0,
-                Math.sin(angle) * 0.5 + dir.z * 0.5,
-            ).normalize();
+    _updatePhase2(dt, pos, playerPos) {
+        // Déplacement aléatoire rapide (pas forcément vers le joueur)
+        this._moveCooldown -= dt;
+        if (this._moveCooldown <= 0 || !this._moveTarget) {
+            // Nouvelle cible aléatoire autour du centre de l'arène
+            const angle  = Math.random() * Math.PI * 2;
+            const radius = 5 + Math.random() * 9;
+            const center = playerPos; // se recentre autour du joueur
+            this._moveTarget = new BABYLON.Vector3(
+                center.x + Math.cos(angle) * radius,
+                this._groundY,
+                center.z + Math.sin(angle) * radius,
+            );
+            this._moveCooldown = 1.5 + Math.random() * 1.5;
+        }
 
-            if (this.phase === 3) {
-                orbDir = BABYLON.Vector3.Lerp(orbDir, dir, 0.55).normalize();
-            }
-            this._spawnOrb(pos.clone().add(new BABYLON.Vector3(0, 1.5, 0)), orbDir);
+        // Mouvement vers la cible aléatoire
+        const toTarget = this._moveTarget.subtract(pos);
+        toTarget.y = 0;
+        const dist = toTarget.length();
+        if (dist > 1.0) {
+            const speed = 6.0;
+            const dir   = toTarget.normalize();
+            this.body.position.x += dir.x * speed * dt;
+            this.body.position.z += dir.z * speed * dt;
+        }
+        this.body.position.y = this._groundY + Math.sin(this._t * 4) * 0.12;
+
+        // Tir laser
+        this._laserCooldown -= dt;
+        if (this._laserCooldown <= 0) {
+            this._fireLaser(pos, playerPos);
+            this._laserCooldown = this._LASER_RATE;
+        }
+
+        // Fin de phase 2 : après 12 sec
+        if (this._t >= 12.0) {
+            this._enterTransition(3);
         }
     }
 
-    _spawnOrb(spawnPos, dir) {
-        const orb = BABYLON.MeshBuilder.CreateSphere("bossOrb", { diameter: 0.4 }, this.scene);
-        orb.position   = spawnPos;
-        orb.isPickable = false;
-        orb.alwaysSelectAsActiveMesh = true;
+    _fireLaser(from, playerPos) {
+        const origin  = new BABYLON.Vector3(from.x, from.y + 0.5, from.z);
+        const dir     = playerPos.subtract(origin).normalize();
+        const maxDist = 80;
 
-        const mat = new BABYLON.StandardMaterial("orbMat", this.scene);
-        mat.emissiveColor   = new BABYLON.Color3(1, 0, 0.8);
-        mat.disableLighting = true;
-        orb.material = mat;
+        // Rayon hitscan
+        const ray = new BABYLON.Ray(origin, dir, maxDist);
+        const hit  = this.scene.pickWithRay(ray, m => m.isPickable && m !== this.body);
 
-        const speed = 8 + this.phase * 2;
-        const spawn = Date.now();
-        const scene = this.scene;
+        const endPoint = hit?.hit ? hit.pickedPoint.clone() : origin.add(dir.scale(maxDist));
 
-        const obs = scene.onBeforeRenderObservable.add(() => {
-            if (orb.isDisposed()) { scene.onBeforeRenderObservable.remove(obs); return; }
-            const dt = scene.getEngine().getDeltaTime() / 1000;
-
-            const d = BABYLON.Vector3.Distance(orb.position, this.player.camera.globalPosition);
-            if (d < 1.2 && !this.player.isDead) {
-                this.player.health?.takeDamage(1);
-                scene.onBeforeRenderObservable.remove(obs);
-                orb.dispose();
-                return;
+        // Impact joueur
+        if (hit?.hit && hit.pickedMesh) {
+            const m = hit.pickedMesh;
+            if (m.name !== "weakPoint" && !m._isBossBody
+                && !["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name)) {
+                // touche le joueur (décor ou corps joueur — la caméra n'est pas un mesh)
             }
+        }
+        // Distance directe joueur
+        const laserDist = BABYLON.Vector3.Distance(playerPos, origin);
+        if (laserDist < maxDist) {
+            // Vérifie si le joueur est dans le cone du laser (±5°)
+            const toPlayer = playerPos.subtract(origin).normalize();
+            const dot = BABYLON.Vector3.Dot(dir, toPlayer);
+            if (dot > 0.996 && !this.player.isDead) { // ~5° tolérance
+                this.player.health?.takeDamage(1);
+            }
+        }
 
-            orb.position.addInPlace(dir.scale(speed * dt));
-            if (Date.now() - spawn > 4000) {
-                scene.onBeforeRenderObservable.remove(obs);
-                orb.dispose();
+        this._showLaserBeam(origin, endPoint);
+    }
+
+    _showLaserBeam(from, to) {
+        const diff = to.subtract(from);
+        const len  = diff.length();
+        if (len < 0.1) return;
+
+        const mid   = from.add(diff.scale(0.5));
+        const laser = BABYLON.MeshBuilder.CreateCylinder("bossLaser", {
+            diameter:    0.08,
+            height:      len,
+            tessellation: 6,
+        }, this.scene);
+        laser.position   = mid;
+        laser.isPickable = false;
+        laser.alwaysSelectAsActiveMesh = true;
+
+        // Orienter le cylindre dans la direction du laser
+        const axis  = BABYLON.Vector3.Cross(BABYLON.Vector3.Up(), diff.normalize());
+        const angle = Math.acos(Math.max(-1, Math.min(1, BABYLON.Vector3.Dot(BABYLON.Vector3.Up(), diff.normalize()))));
+        if (axis.length() > 0.001) laser.rotateAround(mid, axis.normalize(), angle);
+
+        const mat = new BABYLON.StandardMaterial("bossLaserMat_" + Math.random().toString(36).slice(2), this.scene);
+        mat.emissiveColor   = new BABYLON.Color3(1, 0.9, 0);
+        mat.disableLighting = true;
+        mat.alpha           = 0.9;
+        laser.material      = mat;
+
+        // Disparaît rapidement
+        let elapsed = 0;
+        const obs   = this.scene.onBeforeRenderObservable.add(() => {
+            if (laser.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
+            elapsed += this.scene.getEngine().getDeltaTime();
+            const a = Math.max(0, 0.9 - elapsed / 150);
+            mat.alpha = a;
+            if (a <= 0) {
+                this.scene.onBeforeRenderObservable.remove(obs);
+                if (!laser.isDisposed()) laser.dispose();
             }
         });
+
+        // Flash jaune à l'impact
+        EnemyParticles.projectileImpact(this.scene, to, BABYLON.Vector3.Up());
     }
 
-    _summonMinions(pos) {
-        if (!this._onSummon) return;
-        const count = this.phase === 3 ? 4 : 2;
-        for (let i = 0; i < count; i++) {
-            const angle = (i / count) * Math.PI * 2;
-            const sp    = new BABYLON.Vector3(pos.x + Math.cos(angle) * 6, 1.5, pos.z + Math.sin(angle) * 6);
-            this._onSummon("scout", sp);
+    // ── PHASE 3 : Flotte + invoque des mobs ───────────────────────────────────
+
+    _updatePhase3(dt, pos, playerPos) {
+        // Flotte en l'air
+        const targetY = this._groundY + this._floatY;
+        this.body.position.y += (targetY - this.body.position.y) * dt * 2.0;
+        // Oscille lentement
+        this.body.position.y += Math.sin(this._t * 1.5) * 0.08;
+
+        // Tourne lentement
+        this.body.rotation.y += dt * 0.4;
+
+        // Spawner des mobs
+        this._summonCooldown -= dt;
+        if (this._summonCooldown <= 0) {
+            this._summonMinions(playerPos);
+            this._summonCooldown = this._SUMMON_RATE;
         }
-        EnemyParticles.spawnWarning(this.scene, pos.clone(), new BABYLON.Color3(0, 0.95, 1), 800);
+
+        // Fin de phase 3 : après 18 sec → retour transition (puis mort si dernier)
+        if (this._t >= 18.0) {
+            // Phase 3 est la dernière : transition finale qui mène à la mort
+            this._enterFinalTransition();
+        }
     }
 
-    // ── Dégâts / phases ───────────────────────────────────────────────────────
+    _summonMinions(center) {
+        if (!this._onSummon) return;
+        const types = ["standard", "scout", "heavy"];
+        const count = 2 + Math.floor(Math.random() * 2); // 2 ou 3
+
+        for (let i = 0; i < count; i++) {
+            const type  = types[Math.floor(Math.random() * types.length)];
+            const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+            const r     = 5 + Math.random() * 5;
+            const sp    = new BABYLON.Vector3(
+                center.x + Math.cos(angle) * r,
+                1.5,
+                center.z + Math.sin(angle) * r,
+            );
+            EnemyParticles.spawnWarning(this.scene, sp, new BABYLON.Color3(0.5, 0, 1), 800);
+            setTimeout(() => this._onSummon(type, sp), 900);
+        }
+    }
+
+    // ── Transition finale (après phase 3) ─────────────────────────────────────
+
+    _enterFinalTransition() {
+        this._stateLabel      = "finalTransition";
+        this._invincible      = false;
+        this._transitionTimer = this._TRANSITION_DUR;
+
+        // Redescend au sol
+        const descObs = this.scene.onBeforeRenderObservable.add(() => {
+            if (this._dead || this.body.isDisposed()) { this.scene.onBeforeRenderObservable.remove(descObs); return; }
+            const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
+            this.body.position.y += (this._groundY - this.body.position.y) * dt2 * 3;
+            if (Math.abs(this.body.position.y - this._groundY) < 0.1) {
+                this.body.position.y = this._groundY;
+                this.scene.onBeforeRenderObservable.remove(descObs);
+            }
+        });
+
+        // Afficher weakpoint
+        if (this.weakPoint && !this.weakPoint.isDisposed()) {
+            this.weakPoint.isVisible  = true;
+            this.weakPoint.isPickable = true;
+        }
+        this._phaseAura.stop();
+        this._transAura.start();
+        if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0, 0.4, 0.1);
+
+        // Remplace la boucle de update pour le final
+        this._stateLabel = "transition";
+        this._nextPhase  = null; // pas de phase suivante — la mort viendra via takeDamage
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DÉGÂTS
+    // ═══════════════════════════════════════════════════════════════════════════
 
     takeDamage(amount) {
-        if (this._dead || this._invincible) return;
+        if (this._dead) return;
+        if (this._invincible) return;
         if (!this.body || this.body.isDisposed()) return;
 
         this.currentHealth = Math.max(0, this.currentHealth - amount);
 
-        // Flash rouge
+        // Flash vert (couleur transition)
         if (this.body.material) {
-            this.body.material.emissiveColor = new BABYLON.Color3(1, 0, 0);
+            const orig = this.body.material.emissiveColor.clone();
+            this.body.material.emissiveColor = new BABYLON.Color3(0.2, 1, 0.4);
             setTimeout(() => {
                 if (!this.body?.isDisposed() && this.body?.material)
-                    this.body.material.emissiveColor = new BABYLON.Color3(0.25, 0, 0.4);
-            }, 100);
+                    this.body.material.emissiveColor = orig;
+            }, 120);
         }
 
         if (this.onDamage) this.onDamage(this.currentHealth, this.maxHealth);
 
-        const pct = this.currentHealth / this.maxHealth;
-        if (this.phase === 1 && pct <= 0.60) this._enterPhase(2);
-        else if (this.phase === 2 && pct <= 0.30) this._enterPhase(3);
-
         if (this.currentHealth <= 0) this._die();
     }
 
-    _enterPhase(newPhase) {
-        if (this._phaseTransition) return;
-        this._phaseTransition = true;
-        this.phase = newPhase;
-        this._invincible = true;
-
-        this._spawnPhaseShield();
-        EnemyParticles.death(this.scene, this.body.position.clone(), new BABYLON.Color3(0.5, 0, 1));
-
-        setTimeout(() => {
-            this._removePhaseShield();
-            this._invincible      = false;
-            this._phaseTransition = false;
-            if (this.onPhase) this.onPhase(newPhase);
-
-            if (!this.body?.isDisposed() && this.body?.material) {
-                if (newPhase === 2) this.body.material.emissiveColor = new BABYLON.Color3(0.6, 0.1, 0);
-                if (newPhase === 3) this.body.material.emissiveColor = new BABYLON.Color3(1, 0, 0);
-            }
-            if (newPhase === 3) {
-                this._crystals.forEach(c => {
-                    if (!c.isDisposed() && c.material)
-                        c.material.emissiveColor = new BABYLON.Color3(1, 0.3, 0);
-                });
-                this.speed = 3.5;
-            }
-        }, 2200);
-    }
-
-    _spawnPhaseShield() {
-        const mat = new BABYLON.StandardMaterial("phaseShield", this.scene);
-        mat.emissiveColor   = new BABYLON.Color3(0.5, 0, 1);
-        mat.alpha           = 0.3;
-        mat.backFaceCulling = false;
-
-        this._shieldMesh = BABYLON.MeshBuilder.CreateSphere("bossShield", { diameter: 9 }, this.scene);
-        this._shieldMesh.parent     = this.body;
-        this._shieldMesh.position   = BABYLON.Vector3.Zero();
-        this._shieldMesh.material   = mat;
-        this._shieldMesh.isPickable = false;
-    }
-
-    _removePhaseShield() {
-        if (this._shieldMesh && !this._shieldMesh.isDisposed()) {
-            this._shieldMesh.dispose();
-            this._shieldMesh = null;
-        }
-    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MORT
+    // ═══════════════════════════════════════════════════════════════════════════
 
     _die() {
         if (this._dead) return;
         this._dead = true;
 
-        try { this.scene.onBeforeRenderObservable.remove(this._updateObs); } catch(_) {}
+        try { this.scene.onBeforeRenderObservable.remove(this._updateObs); } catch (_) {}
 
         const pos = this.body.position.clone();
-        for (let i = 0; i < 7; i++) {
+
+        // Cascade d'explosions
+        for (let i = 0; i < 8; i++) {
             setTimeout(() => {
-                if (this.scene) {
-                    const offset = new BABYLON.Vector3(
-                        (Math.random() - 0.5) * 5, Math.random() * 3, (Math.random() - 0.5) * 5,
-                    );
-                    EnemyParticles.death(this.scene, pos.add(offset), new BABYLON.Color3(0.8, 0, 1));
-                }
-            }, i * 200);
+                if (!this.scene) return;
+                const offset = new BABYLON.Vector3(
+                    (Math.random() - 0.5) * 5,
+                    Math.random() * 4,
+                    (Math.random() - 0.5) * 5,
+                );
+                EnemyParticles.death(this.scene, pos.add(offset), new BABYLON.Color3(0.6, 0, 1));
+            }, i * 180);
         }
 
         setTimeout(() => {
-            this._crystals.forEach(c => { try { if (!c.isDisposed()) c.dispose(); } catch(_){} });
-            this._aura?.stop();
-            this._aura?.dispose();
-            this._removePhaseShield();
+            this._phaseAura?.stop();
+            this._phaseAura?.dispose();
+            this._transAura?.stop();
+            this._transAura?.dispose();
             if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
-            if (!this.body.isDisposed()) this.body.dispose();
-        }, 1400);
+            if (this.body && !this.body.isDisposed()) this.body.dispose();
+        }, 1500);
 
         if (this.onDeath) this.onDeath();
     }
 
-    // ── Nettoyage ─────────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NETTOYAGE
+    // ═══════════════════════════════════════════════════════════════════════════
 
     dispose() {
         this._dead = true;
-        try { this.scene.onBeforeRenderObservable.remove(this._updateObs); } catch(_) {}
-        this._crystals.forEach(c => { try { if (!c.isDisposed()) c.dispose(); } catch(_){} });
-        this._aura?.stop();
-        this._aura?.dispose();
-        this._removePhaseShield();
+        try { this.scene.onBeforeRenderObservable.remove(this._updateObs); } catch (_) {}
+        this._phaseAura?.stop();
+        this._phaseAura?.dispose();
+        this._transAura?.stop();
+        this._transAura?.dispose();
         if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
         if (this.body && !this.body.isDisposed()) this.body.dispose();
     }

@@ -60,7 +60,7 @@ function getRoomType(roomIdx) {
     const posInCycle = ((roomIdx - 1) % cycleLen) + 1; // 1..6
 
     if (posInCycle <= 4) return "normal";
-    if (posInCycle === 5) return "boss";
+    if (posInCycle === 5) return "normal";
     // posInCycle === 6
     if (cycle === 1) return "shop";
     if (cycle === 2) return "forge";

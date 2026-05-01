@@ -39,8 +39,8 @@ export class BossEnemy {
 
         this._auraT = 0;
 
-        this._buildMesh(position);
         this._spawnWarning(position);
+        this._buildMesh(position);
 
         this._updateObs = this.scene.onBeforeRenderObservable.add(() => this._update());
     }
@@ -194,14 +194,20 @@ export class BossEnemy {
         // Orbite plus rapide que les cristaux, rayon plus petit = plus accessible
         this._wpAngle += dt * 2.0;
         const r    = 2.0;  // rayon orbite
-        const yOff = 0.5 + Math.sin(this._auraT * 2.8) * 0.4;
+        const yOff = 2 + Math.sin(this._auraT * 2.8) * 0.4;
 
-        this.weakPoint.position = new BABYLON.Vector3(
+        /*this.weakPoint.position = new BABYLON.Vector3(
             pos.x + Math.cos(this._wpAngle) * r,
             pos.y + yOff,
             pos.z + Math.sin(this._wpAngle) * r,
         );
-        this.weakPoint.rotation.y += dt * 4.0;
+        this.weakPoint.rotation.y += dt * 4.0;*/
+
+        this.weakPoint.position = new BABYLON.Vector3(
+            pos.x,
+            pos.y + 3,
+            pos.z,
+        );
 
         // Pulse de taille pour indiquer que c'est le point faible
         this._wpPulseT += dt;

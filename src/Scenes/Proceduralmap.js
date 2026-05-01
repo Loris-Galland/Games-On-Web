@@ -136,23 +136,31 @@ export class ProceduralMap {
         const cIn  = idx > 0                     ? this.corridors[idx - 1] : null;
         const cOut = idx < this.corridors.length  ? this.corridors[idx]    : null;
 
-        let roomNode;
-        if (this._builtRooms.has(idx)) {
-            roomNode = this._builtRooms.get(idx);
-        } else {
-            roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
-            roomNode.parent = this._root;
-            await this._buildRoom(room, cIn, cOut, roomNode);
-            this._builtRooms.set(idx, roomNode);
+        // Dispose la salle précédente complètement (meshes + matériaux)
+        if (this._activeNode && this._activeNode !== this._root) {
+            this._activeNode.getChildMeshes(false).forEach(m => {
+                // Ne dispose le matériau QUE sur les meshes procéduraux (pas les GLB)
+                const isProcedural = m.name.match(/^(fRDC_|wN_|wS_|wE_|wW_|wNH_|wSH_|wEH_|wWH_|w2|roof_|f2_)/);
+                if (isProcedural) m.material?.dispose();
+                m.dispose(false, false); // false, false = ne pas disposer matériaux ni textures enfants
+            });
+            this._activeNode.dispose();
+            this._activeNode = null;
+            // Retirer du cache pour forcer la reconstruction
+            this._builtRooms.delete(this._activeIdx);
         }
 
-        if (this._activeNode && this._activeNode !== roomNode) this._activeNode.setEnabled(false);
-        roomNode.setEnabled(true);
+        // Toujours reconstruire (la salle n'est plus en mémoire)
+        const roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
+        roomNode.parent = this._root;
+        await this._buildRoom(room, cIn, cOut, roomNode);
+        this._builtRooms.set(idx, roomNode);  // stocke temporairement pour la session
+
         this._activeNode = roomNode;
         this._activeIdx  = idx;
 
-        await this._buildCorridorDisplay(idx);
         await this._buildCorridorInDisplay(idx);
+        await this._buildCorridorDisplay(idx);
 
         const comingBack = comingFromIdx !== null && comingFromIdx > idx;
         const spawnEntry = this._calcEntrySpawn(room, cIn);
@@ -177,7 +185,9 @@ export class ProceduralMap {
             this._corridorNode.dispose();
             this._corridorNode = null;
         }
-        if (roomIdx >= this.corridors.length) return;
+        if (roomIdx >= this.corridors.length) {
+            return;
+        }
         const corridor = this.corridors[roomIdx];
         const node = new BABYLON.TransformNode(`corrOut_${roomIdx}`, this.scene);
         node.parent = this._root;
@@ -187,7 +197,7 @@ export class ProceduralMap {
 
     async _buildCorridorInDisplay(roomIdx) {
         if (this._corridorInNode) {
-            this._corridorInNode.getChildMeshes().forEach(m => m.dispose());
+            this._corridorNode.getChildMeshes().forEach(m => m.dispose());
             this._corridorInNode.dispose();
             this._corridorInNode = null;
         }

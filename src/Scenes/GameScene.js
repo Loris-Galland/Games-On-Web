@@ -162,7 +162,7 @@ export class GameScene {
 
         this.map = new ProceduralMap(scene, {
             seed,
-            roomCount: 6,
+            roomCount: 18,
             assetBase: "assets/models/",
         });
 

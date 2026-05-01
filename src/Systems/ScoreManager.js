@@ -77,6 +77,13 @@ export class ScoreManager {
         this._startDecayLoop();
     }
 
+    // ── Shop ─────────────────────────────────────────────────────────────────
+    onShop(cost){
+        this.totalScore = this.totalScore - cost;
+        this._notifyHUD({ total: this.totalScore });
+    }
+
+
     // ── Kill ─────────────────────────────────────────────────────────────────
 
     /**

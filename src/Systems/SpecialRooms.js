@@ -71,7 +71,7 @@ export class WeaponShopRoom {
         baseMat.diffuseColor  = new BABYLON.Color3(0.05, 0.1, 0.2);
         baseMat.emissiveColor = new BABYLON.Color3(0, 0.3, 0.5);
 
-        const base = BABYLON.MeshBuilder.CreateCylinder("pedestal", { diameter: 1.2, height: 0.6, tessellation: 12 }, this.scene);
+        const base = BABYLON.MeshBuilder.CreateCylinder("pedestal", { diameter: 1.2, height: 0.3, tessellation: 12 }, this.scene);
         base.position   = new BABYLON.Vector3(pos.x, 0.3, pos.z);
         base.material   = baseMat;
         base.isPickable = false;
@@ -159,7 +159,8 @@ export class WeaponShopRoom {
         ctx.fillStyle = weaponInfo.iconColor ?? "#00ffff";
         ctx.textAlign = "center";
         ctx.fillText(weaponInfo.name, 256, 50);
-        ctx.font      = "18px Courier New";
+        ctx.fillText(weaponInfo.cost + " pts", 256, 70);
+        ctx.font      = "15px Courier New";
         ctx.fillStyle = "#aaaaaa";
         ctx.fillText(weaponInfo.description.substring(0, 40), 256, 88);
         tex.update();
@@ -173,8 +174,10 @@ export class WeaponShopRoom {
     }
 
     _pickupWeapon(weaponInfo, pedestal) {
+        if (this._sm.getSummary().totalScore < weaponInfo.cost) return;
         this._wm?.give?.(weaponInfo.id);
         this._hud?.showWaveMessage?.(`ARMEMENT : ${weaponInfo.name}`);
+        this._sm.onShop(weaponInfo.cost);
 
         // Dispose socle
         setTimeout(() => {

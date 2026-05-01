@@ -19,6 +19,7 @@ export class WeaponManager {
             description: "7 plombs plasma, dévastateur à courte portée.",
             category:    "ASSAULT",
             iconColor:   "#ff4400",
+            cost : 200,
             Class:       PlasmaShotgun,
         },
         sniper: {
@@ -27,6 +28,7 @@ export class WeaponManager {
             description: "Hitscan longue portée, zoom, perfore l'armure.",
             category:    "PRECISION",
             iconColor:   "#00ccff",
+            cost : 200,
             Class:       QuantumSniper,
         },
         rocket: {
@@ -35,6 +37,7 @@ export class WeaponManager {
             description: "Explosion de zone AoE, danger de splash.",
             category:    "EXPLOSIVE",
             iconColor:   "#aa00ff",
+            cost : 200,
             Class:       VoidRocket,
         },
     };

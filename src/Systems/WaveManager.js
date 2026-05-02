@@ -55,13 +55,13 @@ function getRoomType(roomIdx) {
     // Cycle 1 : salles 1-6
     // Cycle 2 : salles 7-12
     // Cycle 3 : salles 13-18
-    const cycleLen  = 6;
+    const cycleLen  = 5;
     const cycle     = Math.ceil(roomIdx / cycleLen); // 1, 2 ou 3
     const posInCycle = ((roomIdx - 1) % cycleLen) + 1; // 1..6
 
-    if (posInCycle <= 4) return "normal";
-    if (posInCycle === 5) return "boss";
-    // posInCycle === 6
+    if (posInCycle <= 3) return "normal";
+    if (posInCycle === 4) return "boss";
+    // posInCycle === 5
     if (cycle === 1) return "shop";
     if (cycle === 2) return "forge";
     return "challenge"; // cycle 3

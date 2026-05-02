@@ -33,9 +33,10 @@ export class BossEnemy {
         this.onPhase  = null;
         this.onDamage = null;
 
-        this.maxHealth     = 600;
-        this.currentHealth = 600;
+        this.maxHealth     = 20;
+        this.currentHealth = 20;
         this._dead         = false;
+        this._dying        = false; // guard contre les appels multiples à _die()
 
         // ── État de phase ─────────────────────────────────────────────────────
         // "transition" = fenêtre vulnérable entre phases (particules vertes)
@@ -66,10 +67,11 @@ export class BossEnemy {
         this._moveCooldown   = 0;
         this._moveTarget     = null;
 
-        // Phase 3 — invocation
-        this._summonCooldown = 0;
-        this._SUMMON_RATE    = 4.0;
-        this._floatY         = 12; // hauteur de flotte
+        // Phase 3 — vague unique de minions
+        this._minionWaveSpawned = false;
+        this._minionWaveDone    = false;
+        this._floatY            = 12; // hauteur de flotte
+        this._minionsSpawned = 0;
 
         // ── Construction ──────────────────────────────────────────────────────
         EnemyParticles.spawnWarning(scene, position, new BABYLON.Color3(0.8, 0, 0), 2000);
@@ -116,7 +118,9 @@ export class BossEnemy {
     _buildWeakPoint() {
         const uid = Math.random().toString(36).slice(2);
         const mat = new BABYLON.StandardMaterial(`bossWpMat_${uid}`, this.scene);
-        mat.emissiveColor   = new BABYLON.Color3(0, 1, 0.3);
+        // Blanc brillant pour se démarquer du corps vert
+        mat.emissiveColor   = new BABYLON.Color3(1, 1, 1);
+        mat.diffuseColor    = new BABYLON.Color3(0.5, 1, 0.5);
         mat.disableLighting = true;
 
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 1.2 }, this.scene);
@@ -124,7 +128,8 @@ export class BossEnemy {
         this.weakPoint.isPickable = false; // activé seulement en transition
         this.weakPoint.isVisible  = false;
         this.weakPoint.parent     = this.body;
-        this.weakPoint.position   = new BABYLON.Vector3(0, 1.5, 0);
+        // Devant le boss comme les ennemis standard (z+ = avant local)
+        this.weakPoint.position   = new BABYLON.Vector3(0, 0.8, 1.9);
 
         this._wpPulseT = 0;
     }
@@ -153,25 +158,25 @@ export class BossEnemy {
         this._setAuraColor(new BABYLON.Color4(0.8, 0, 0, 0.8)); // rouge par défaut
         this._phaseAura.start();
 
-        // Aura de transition (verte)
-        this._transAura = new BABYLON.ParticleSystem("bossTransAura", 100, this.scene);
+        // Aura de transition (verte — très visible)
+        this._transAura = new BABYLON.ParticleSystem("bossTransAura", 200, this.scene);
         this._transAura.particleTexture = new BABYLON.Texture(tex, this.scene);
         this._transAura.emitter         = this.body;
         this._transAura.minEmitBox      = new BABYLON.Vector3(-1.6, -2.4, -1.6);
         this._transAura.maxEmitBox      = new BABYLON.Vector3( 1.6,  2.4,  1.6);
-        this._transAura.color1          = new BABYLON.Color4(0, 1, 0.3, 1);
-        this._transAura.color2          = new BABYLON.Color4(0.2, 1, 0.5, 0.7);
-        this._transAura.colorDead       = new BABYLON.Color4(0, 0.5, 0.2, 0);
-        this._transAura.minSize         = 0.12;
-        this._transAura.maxSize         = 0.35;
+        this._transAura.color1          = new BABYLON.Color4(0, 1, 0.2, 1);
+        this._transAura.color2          = new BABYLON.Color4(0.1, 1, 0.4, 1);
+        this._transAura.colorDead       = new BABYLON.Color4(0, 0.6, 0.1, 0);
+        this._transAura.minSize         = 0.2;
+        this._transAura.maxSize         = 0.55;
         this._transAura.minLifeTime     = 0.5;
-        this._transAura.maxLifeTime     = 1.2;
-        this._transAura.emitRate        = 80;
+        this._transAura.maxLifeTime     = 1.4;
+        this._transAura.emitRate        = 160;
         this._transAura.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
-        this._transAura.direction1      = new BABYLON.Vector3(-2, 0.5, -2);
-        this._transAura.direction2      = new BABYLON.Vector3( 2, 4,    2);
-        this._transAura.minEmitPower    = 1;
-        this._transAura.maxEmitPower    = 3;
+        this._transAura.direction1      = new BABYLON.Vector3(-2.5, 0.5, -2.5);
+        this._transAura.direction2      = new BABYLON.Vector3( 2.5, 5,    2.5);
+        this._transAura.minEmitPower    = 1.5;
+        this._transAura.maxEmitPower    = 4;
         this._transAura.gravity         = new BABYLON.Vector3(0, -1, 0);
         this._transAura.updateSpeed     = 0.025;
         this._transAura.stop(); // inactif au début
@@ -259,15 +264,18 @@ export class BossEnemy {
         if (this.weakPoint && !this.weakPoint.isDisposed()) {
             this.weakPoint.isVisible  = true;
             this.weakPoint.isPickable = true;
+        } else {
+            console.warn(`[Boss._enterTransition] weakPoint is null or already disposed!`);
         }
 
         // Particules vertes ON, phase OFF
         this._phaseAura.stop();
         this._transAura.start();
 
-        // Couleur du corps → vert sombre
+        // Corps vert foncé (le weakpoint blanc se démarque bien)
         if (this.body.material) {
-            this.body.material.emissiveColor = new BABYLON.Color3(0.0, 0.4, 0.1);
+            this.body.material.emissiveColor = new BABYLON.Color3(0.0, 0.25, 0.05);
+            this.body.material.diffuseColor  = new BABYLON.Color3(0.0, 0.2, 0.05);
         }
 
         // Assurer que le boss est au sol
@@ -325,14 +333,14 @@ export class BossEnemy {
             // Violet
             this._setAuraColor(new BABYLON.Color4(0.6, 0, 1, 0.9));
             if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.3, 0, 0.6);
-            this._summonCooldown = 1.0;
+            this._minionWaveSpawned   = false; // la vague n'a pas encore été lancée
+            this._minionWaveDone      = false; // la vague n'est pas encore terminée
         }
 
         if (this.onPhase) this.onPhase(phaseNum);
 
         // Message HUD via callback
         const labels = ["", "PHASE I — IMPACT", "PHASE II — RAFALE", "PHASE III — INVOCATION"];
-        console.log(`[Boss] ${labels[phaseNum] ?? "PHASE " + phaseNum}`);
     }
 
     // ── PHASE 1 : Sauts ───────────────────────────────────────────────────────
@@ -499,134 +507,161 @@ export class BossEnemy {
     }
 
     _fireLaser(from, playerPos) {
-        const origin  = new BABYLON.Vector3(from.x, from.y + 0.5, from.z);
-        const dir     = playerPos.subtract(origin).normalize();
-        const maxDist = 80;
+        const origin = new BABYLON.Vector3(from.x, from.y + 0.5, from.z);
+        const dir    = playerPos.subtract(origin).normalize();
 
-        // Rayon hitscan
-        const ray = new BABYLON.Ray(origin, dir, maxDist);
-        const hit  = this.scene.pickWithRay(ray, m => m.isPickable && m !== this.body);
-
-        const endPoint = hit?.hit ? hit.pickedPoint.clone() : origin.add(dir.scale(maxDist));
-
-        // Impact joueur
-        if (hit?.hit && hit.pickedMesh) {
-            const m = hit.pickedMesh;
-            if (m.name !== "weakPoint" && !m._isBossBody
-                && !["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name)) {
-                // touche le joueur (décor ou corps joueur — la caméra n'est pas un mesh)
-            }
-        }
-        // Distance directe joueur
-        const laserDist = BABYLON.Vector3.Distance(playerPos, origin);
-        if (laserDist < maxDist) {
-            // Vérifie si le joueur est dans le cone du laser (±5°)
-            const toPlayer = playerPos.subtract(origin).normalize();
-            const dot = BABYLON.Vector3.Dot(dir, toPlayer);
-            if (dot > 0.996 && !this.player.isDead) { // ~5° tolérance
-                this.player.health?.takeDamage(1);
-            }
-        }
-
-        this._showLaserBeam(origin, endPoint);
-    }
-
-    _showLaserBeam(from, to) {
-        const diff = to.subtract(from);
-        const len  = diff.length();
-        if (len < 0.1) return;
-
-        const mid   = from.add(diff.scale(0.5));
-        const laser = BABYLON.MeshBuilder.CreateCylinder("bossLaser", {
-            diameter:    0.08,
-            height:      len,
-            tessellation: 6,
+        // Projectile visible et lent (esquivable)
+        const bullet = BABYLON.MeshBuilder.CreateCylinder("bossBullet", {
+            height: 0.7, diameter: 0.18, tessellation: 8,
         }, this.scene);
-        laser.position   = mid;
-        laser.isPickable = false;
-        laser.alwaysSelectAsActiveMesh = true;
+        bullet.position   = origin.clone();
+        bullet.isPickable = false;
+        bullet.alwaysSelectAsActiveMesh = true;
 
-        // Orienter le cylindre dans la direction du laser
-        const axis  = BABYLON.Vector3.Cross(BABYLON.Vector3.Up(), diff.normalize());
-        const angle = Math.acos(Math.max(-1, Math.min(1, BABYLON.Vector3.Dot(BABYLON.Vector3.Up(), diff.normalize()))));
-        if (axis.length() > 0.001) laser.rotateAround(mid, axis.normalize(), angle);
+        // Orienter le cylindre dans la direction de tir
+        bullet.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionRH(
+            dir, BABYLON.Vector3.Up(),
+        );
+        bullet.rotate(BABYLON.Axis.X, Math.PI / 2, BABYLON.Space.LOCAL);
 
-        const mat = new BABYLON.StandardMaterial("bossLaserMat_" + Math.random().toString(36).slice(2), this.scene);
-        mat.emissiveColor   = new BABYLON.Color3(1, 0.9, 0);
+        const mat = new BABYLON.StandardMaterial("bossBulletMat_" + Math.random().toString(36).slice(2), this.scene);
+        mat.emissiveColor   = new BABYLON.Color3(1, 0.85, 0);
         mat.disableLighting = true;
-        mat.alpha           = 0.9;
-        laser.material      = mat;
+        bullet.material     = mat;
 
-        // Disparaît rapidement
-        let elapsed = 0;
-        const obs   = this.scene.onBeforeRenderObservable.add(() => {
-            if (laser.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            elapsed += this.scene.getEngine().getDeltaTime();
-            const a = Math.max(0, 0.9 - elapsed / 150);
-            mat.alpha = a;
-            if (a <= 0) {
-                this.scene.onBeforeRenderObservable.remove(obs);
-                if (!laser.isDisposed()) laser.dispose();
+        // Trainée jaune
+        const tex   = "https://assets.babylonjs.com/textures/flare.png";
+        const trail = new BABYLON.ParticleSystem("bossBulletTrail", 20, this.scene);
+        trail.particleTexture = new BABYLON.Texture(tex, this.scene);
+        trail.emitter         = bullet;
+        trail.minEmitBox      = BABYLON.Vector3.Zero();
+        trail.maxEmitBox      = BABYLON.Vector3.Zero();
+        trail.color1          = new BABYLON.Color4(1, 0.9, 0, 0.8);
+        trail.color2          = new BABYLON.Color4(1, 0.5, 0, 0.5);
+        trail.colorDead       = new BABYLON.Color4(0, 0, 0, 0);
+        trail.minSize         = 0.06;
+        trail.maxSize         = 0.15;
+        trail.minLifeTime     = 0.08;
+        trail.maxLifeTime     = 0.2;
+        trail.emitRate        = 40;
+        trail.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        trail.direction1      = new BABYLON.Vector3(-0.3, -0.3, -1);
+        trail.direction2      = new BABYLON.Vector3( 0.3,  0.3, -3);
+        trail.minEmitPower    = 1;
+        trail.maxEmitPower    = 3;
+        trail.updateSpeed     = 0.025;
+        trail.start();
+
+        const SPEED     = 14; // lent et esquivable
+        const spawnTime = Date.now();
+        const scene     = this.scene;
+
+        const obs = scene.onBeforeRenderObservable.add(() => {
+            if (bullet.isDisposed()) {
+                scene.onBeforeRenderObservable.remove(obs);
+                return;
+            }
+
+            const dt = scene.getEngine().getDeltaTime() / 1000;
+
+            // Vérification collision joueur (distance à la caméra)
+            const toCam = this.player.camera.globalPosition.subtract(bullet.position);
+            if (toCam.length() < 1.0 && !this.player.isDead) {
+                this.player.health?.takeDamage(1);
+                trail.stop();
+                scene.onBeforeRenderObservable.remove(obs);
+                setTimeout(() => { trail.dispose(); if (!bullet.isDisposed()) bullet.dispose(); }, 300);
+                return;
+            }
+
+            // Collision décor via ray
+            const ray = new BABYLON.Ray(bullet.position, dir, SPEED * dt * 1.5);
+            const hit  = scene.pickWithRay(ray, m => m.checkCollisions && !m.name.startsWith("boss"));
+            if (hit?.hit) {
+                EnemyParticles.projectileImpact(scene, hit.pickedPoint ?? bullet.position.clone(), hit.getNormal(true) ?? BABYLON.Vector3.Up());
+                trail.stop();
+                scene.onBeforeRenderObservable.remove(obs);
+                setTimeout(() => { trail.dispose(); if (!bullet.isDisposed()) bullet.dispose(); }, 300);
+                return;
+            }
+
+            bullet.position.addInPlace(dir.scale(SPEED * dt));
+
+            // Durée de vie max
+            if (Date.now() - spawnTime > 4000) {
+                trail.stop();
+                scene.onBeforeRenderObservable.remove(obs);
+                setTimeout(() => { trail.dispose(); if (!bullet.isDisposed()) bullet.dispose(); }, 300);
             }
         });
-
-        // Flash jaune à l'impact
-        EnemyParticles.projectileImpact(this.scene, to, BABYLON.Vector3.Up());
     }
 
-    // ── PHASE 3 : Flotte + invoque des mobs ───────────────────────────────────
+    // ── PHASE 3 : Flotte + 1 vague de 5 minions ──────────────────────────────
 
     _updatePhase3(dt, pos, playerPos) {
         // Flotte en l'air
         const targetY = this._groundY + this._floatY;
         this.body.position.y += (targetY - this.body.position.y) * dt * 2.0;
-        // Oscille lentement
         this.body.position.y += Math.sin(this._t * 1.5) * 0.08;
 
         // Tourne lentement
         this.body.rotation.y += dt * 0.4;
 
-        // Spawner des mobs
-        this._summonCooldown -= dt;
-        if (this._summonCooldown <= 0) {
-            this._summonMinions(playerPos);
-            this._summonCooldown = this._SUMMON_RATE;
+        // Lancer la vague une seule fois, après 2 sec (le temps de monter)
+        if (!this._minionWaveSpawned && this._t >= 2.0) {
+            this._spawnMinionWave(playerPos);
+            this._minionWaveSpawned = true;
         }
 
-        // Fin de phase 3 : après 18 sec → retour transition (puis mort si dernier)
-        if (this._t >= 18.0) {
-            // Phase 3 est la dernière : transition finale qui mène à la mort
-            this._enterFinalTransition();
+        // Une fois la vague lancée, attendre que tous les minions soient morts
+        if (this._minionWaveSpawned && !this._minionWaveDone) {
+
+            if (this._minionsSpawned < this._minionsToSpawn) return;
+
+            const alive = this.scene.meshes.filter(m =>
+                !m.isDisposed() &&
+                (
+                    m.name.startsWith("enemyBody") ||
+                    m.name.startsWith("enemyBodyHeavy") ||
+                    m.name.startsWith("enemyBodyScout")
+                )
+            ).length;
+
+            if (alive === 0) {
+                this._minionWaveDone = true;
+                this._enterFinalTransition();
+            }
         }
     }
 
-    _summonMinions(center) {
+    _spawnMinionWave(center) {
         if (!this._onSummon) return;
-        const types = ["standard", "scout", "heavy"];
-        const count = 2 + Math.floor(Math.random() * 2); // 2 ou 3
 
-        for (let i = 0; i < count; i++) {
-            const type  = types[Math.floor(Math.random() * types.length)];
-            const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
-            const r     = 5 + Math.random() * 5;
+        // Exactement 5 mobs : 3 standard, 1 scout, 1 heavy — positions fixes en cercle
+        const composition = ["standard", "standard", "standard", "scout", "heavy"];
+        this._minionsToSpawn = composition.length;
+
+        composition.forEach((type, i) => {
+            const angle = (i / composition.length) * Math.PI * 2;
+            const r     = 7;
             const sp    = new BABYLON.Vector3(
                 center.x + Math.cos(angle) * r,
                 1.5,
                 center.z + Math.sin(angle) * r,
             );
-            EnemyParticles.spawnWarning(this.scene, sp, new BABYLON.Color3(0.5, 0, 1), 800);
-            setTimeout(() => this._onSummon(type, sp), 900);
-        }
+            EnemyParticles.spawnWarning(this.scene, sp, new BABYLON.Color3(0.5, 0, 1), 1800);
+            setTimeout(() => {
+                if (this._dead) return;
+                this._onSummon(type, sp);
+                this._minionsSpawned++;
+            }, 1900);
+        });
     }
 
-    // ── Transition finale (après phase 3) ─────────────────────────────────────
+    // ── Transition finale (après phase 3) → repart en phase 1 en boucle ─────────
 
     _enterFinalTransition() {
-        this._stateLabel      = "finalTransition";
-        this._invincible      = false;
-        this._transitionTimer = this._TRANSITION_DUR;
-
-        // Redescend au sol
+        // Redescend progressivement au sol via un observer dédié
         const descObs = this.scene.onBeforeRenderObservable.add(() => {
             if (this._dead || this.body.isDisposed()) { this.scene.onBeforeRenderObservable.remove(descObs); return; }
             const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
@@ -637,18 +672,8 @@ export class BossEnemy {
             }
         });
 
-        // Afficher weakpoint
-        if (this.weakPoint && !this.weakPoint.isDisposed()) {
-            this.weakPoint.isVisible  = true;
-            this.weakPoint.isPickable = true;
-        }
-        this._phaseAura.stop();
-        this._transAura.start();
-        if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0, 0.4, 0.1);
-
-        // Remplace la boucle de update pour le final
-        this._stateLabel = "transition";
-        this._nextPhase  = null; // pas de phase suivante — la mort viendra via takeDamage
+        // Repart en phase 1 — le boss boucle jusqu'à la mort
+        this._enterTransition(1);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -656,25 +681,39 @@ export class BossEnemy {
     // ═══════════════════════════════════════════════════════════════════════════
 
     takeDamage(amount) {
-        if (this._dead) return;
-        if (this._invincible) return;
-        if (!this.body || this.body.isDisposed()) return;
+
+        if (this._dead || this._dying) {
+            return;
+        }
+        if (this._invincible) {
+            return;
+        }
+        if (!this.body || this.body.isDisposed()) {
+            return;
+        }
 
         this.currentHealth = Math.max(0, this.currentHealth - amount);
 
-        // Flash vert (couleur transition)
+        // Flash blanc sur le corps
         if (this.body.material) {
             const orig = this.body.material.emissiveColor.clone();
-            this.body.material.emissiveColor = new BABYLON.Color3(0.2, 1, 0.4);
+            this.body.material.emissiveColor = new BABYLON.Color3(1, 1, 1);
             setTimeout(() => {
                 if (!this.body?.isDisposed() && this.body?.material)
                     this.body.material.emissiveColor = orig;
-            }, 120);
+            }, 100);
         }
 
-        if (this.onDamage) this.onDamage(this.currentHealth, this.maxHealth);
+        if (this.onDamage) {
+            this.onDamage(this.currentHealth, this.maxHealth);
+        } else {
+            console.warn(`[Boss.takeDamage] onDamage is NULL — boss bar won't update`);
+        }
 
-        if (this.currentHealth <= 0) this._die();
+        if (this.currentHealth <= 0) {
+            this._dying = true;
+            this._die();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

@@ -231,7 +231,7 @@ export class WaveManager {
             );
 
             // Appliquer les modificateurs de cycle
-            this._boss.maxHealth     = Math.round(800 * hpMultiplier);
+            this._boss.maxHealth     = Math.round(20 * hpMultiplier);
             this._boss.currentHealth = this._boss.maxHealth;
             this._boss.speed         = 2.5 * speedMultiplier;
 
@@ -442,8 +442,8 @@ export class WaveManager {
     _createEnemy(type, spawnPos, speedMult = 1) {
         switch (type) {
             case "heavy":    return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
-            case "scout":    return new ScoutEnemy(this.scene, spawnPos, this.player, 6 * speedMult, this._navManager);
-            default:         return new StandardEnemy(this.scene, spawnPos, this.player, 4 * speedMult, this._navManager);
+            case "scout":    return new ScoutEnemy(this.scene, spawnPos, this.player, 4 * speedMult, this._navManager);
+            default:         return new StandardEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
         }
     }
 

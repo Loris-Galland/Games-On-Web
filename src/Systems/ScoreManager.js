@@ -48,7 +48,7 @@ export class ScoreManager {
     constructor(hud = null) {
         this.hud = hud;
 
-        this.totalScore      = 10000000000000;
+        this.totalScore      = 0;
         this.sessionKills    = { standard: 0, scout: 0, heavy: 0, boss: 0 };
         this.totalKills      = 0;
         this.weakpointKills  = 0;

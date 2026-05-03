@@ -199,7 +199,6 @@ export class EnemyParticles {
             setTimeout(() => {
                 burst.dispose();
                 debris.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 900);
         }, 80);
@@ -259,7 +258,6 @@ export class EnemyParticles {
             emitter.parent = null;
             setTimeout(() => {
                 ps.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 200);
         }, 80);
@@ -314,7 +312,6 @@ export class EnemyParticles {
             ps.stop();
             setTimeout(() => {
                 ps.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 400);
         }, 60);

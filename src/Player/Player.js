@@ -87,7 +87,6 @@ export class Player {
             if (kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN) {
                 this.inputMap[key] = true;
                 if (kbInfo.event.code === "Space") this._jump();
-                if (kbInfo.event.code === "KeyK")  this.health.takeDamage(1);
             } else {
                 this.inputMap[key] = false;
             }

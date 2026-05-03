@@ -104,6 +104,57 @@ export class PlayerHUD {
             pointer-events:none;z-index:50;
             width:0;height:0;overflow:visible;`;
         document.body.appendChild(this._popupContainer);
+
+        // ── Indicateur de sortie (affiché quand les portes s'ouvrent) ─────────
+        this._exitIndicator = document.createElement("div");
+        this._exitIndicator.id = "exit-indicator";
+        this._exitIndicator.style.cssText = `
+            position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+            pointer-events:none;z-index:48;
+            font-family:'Courier New',monospace;text-align:center;
+            opacity:0;transition:opacity 0.5s ease;`;
+        this._exitIndicator.innerHTML = `
+            <div style="font-size:26px;letter-spacing:2px;color:#00ffcc;
+                text-shadow:0 0 20px #00ffcc;animation:exit-pulse 1.2s ease-in-out infinite;">
+                ▶ SORTIE DISPONIBLE ◀
+            </div>
+            <div style="font-size:11px;letter-spacing:3px;color:rgba(0,255,204,0.5);
+                margin-top:6px;text-transform:uppercase;">
+                Avancez vers le couloir
+            </div>
+            <style>
+                @keyframes exit-pulse{0%,100%{opacity:0.6;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+            </style>`;
+        document.body.appendChild(this._exitIndicator);
+
+        // ── Rappel des contrôles (disparaît après 8s) ─────────────────────────
+        this._createControlsHint();
+    }
+
+    _createControlsHint() {
+        const hint = document.createElement("div");
+        hint.id = "controls-hint";
+        hint.style.cssText = `
+            position:fixed;bottom:145px;left:50%;transform:translateX(-50%);
+            pointer-events:none;z-index:35;
+            font-family:'Courier New',monospace;font-size:10px;letter-spacing:1.5px;
+            color:rgba(0,255,204,0.65);text-transform:uppercase;text-align:center;
+            background:rgba(0,10,20,0.8);padding:10px 22px;
+            border:1px solid rgba(0,255,204,0.18);border-radius:2px;
+            transition:opacity 1.5s ease;white-space:nowrap;`;
+        hint.innerHTML = `
+            <div style="margin-bottom:5px;color:rgba(0,255,204,0.35);font-size:9px;letter-spacing:3px;">CONTRÔLES</div>
+            <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
+                <span><b style="color:#00ffcc">Z/W A/Q S D</b> Déplacement</span>
+                <span><b style="color:#00ffcc">ESPACE</b> Saut</span>
+                <span><b style="color:#00ffcc">CLIC G</b> Tirer</span>
+                <span><b style="color:#00ffcc">1-4 / MOLETTE</b> Changer d'arme</span>
+                <span><b style="color:#00ffcc">CLIC D / ALT</b> Zoom Sniper</span>
+                <span><b style="color:#00ffcc">ENTRÉE</b> Pause</span>
+            </div>`;
+        document.body.appendChild(hint);
+        setTimeout(() => { hint.style.opacity = "0"; }, 8000);
+        setTimeout(() => { try { hint.remove(); } catch(_){} }, 9600);
     }
 
     // ── Score HUD (haut CENTRE) ───────────────────────────────────────────────
@@ -149,8 +200,8 @@ export class PlayerHUD {
         // On le met en haut à gauche pour les messages courts de statut.
         this.waveText.style.cssText = `
             position:fixed;
-            top:80px;
-            left:30px;
+            top:110px;
+            left:36px;
             font-family:'Courier New',monospace;
             font-size:13px;
             letter-spacing:3px;
@@ -161,12 +212,13 @@ export class PlayerHUD {
             z-index:40;
             transition:opacity 0.4s;
             opacity:0;
-            max-width:320px;
+            max-width:340px;
             white-space:normal;
             line-height:1.5;
-            background:rgba(0,10,20,0.55);
-            padding:6px 12px;
-            border-left:2px solid rgba(0,255,204,0.4);`;
+            background:rgba(0,10,20,0.7);
+            padding:8px 14px;
+            border-left:2px solid rgba(0,255,204,0.5);
+            border-radius:0 2px 2px 0;`;
         document.body.appendChild(this.waveText);
     }
 
@@ -181,12 +233,12 @@ export class PlayerHUD {
             pointer-events:none;z-index:40;`;
 
         this._slotEls = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
             const slot = document.createElement("div");
             slot.className = "weapon-slot";
             slot.dataset.idx = i;
             slot.innerHTML = `
-                <span class="ws-num">${i + 1}</span>
+                <span class="ws-num">[${i + 1}]</span>
                 <span class="ws-name">${i === 0 ? "PLASMA DAGGER" : "—"}</span>`;
             this._weaponSlotsEl.appendChild(slot);
             this._slotEls.push(slot);
@@ -479,6 +531,21 @@ export class PlayerHUD {
         }
         if (killsEl) killsEl.textContent = `${killed} / ${target}`;
         if (seconds <= 0) setTimeout(() => { this._challengeEl.style.display = "none"; }, 1500);
+    }
+
+    // ── Indicateur de sortie ──────────────────────────────────────────────────
+
+    showExitIndicator() {
+        if (!this._exitIndicator) return;
+        this._exitIndicator.style.opacity = "1";
+        // Disparaît automatiquement après 5 secondes
+        clearTimeout(this._exitHideTimer);
+        this._exitHideTimer = setTimeout(() => this.hideExitIndicator(), 5000);
+    }
+
+    hideExitIndicator() {
+        if (!this._exitIndicator) return;
+        this._exitIndicator.style.opacity = "0";
     }
 
     // ── FPS ───────────────────────────────────────────────────────────────────

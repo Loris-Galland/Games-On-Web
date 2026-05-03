@@ -12,6 +12,8 @@ export class PlayerShoot {
         this.fireRate      = 200;
         this.lastFireTime  = 0;
         this.multishotEnabled = false;
+        // Mis à false par WeaponManager quand une arme secondaire est active
+        this._enabled = true;
 
         this.daggerAmmo = new Ammo(5, 1000, (current, max) => {
             this.player.hud.updateAmmo(current, max);
@@ -23,22 +25,27 @@ export class PlayerShoot {
     }
 
     _initShootControl() {
-        this.scene.onPointerDown = (evt) => {
-            const engine = this.scene.getEngine();
+        // Utilise onPointerObservable (add) au lieu de onPointerDown (=) pour
+        // ne pas écraser l'handler de WeaponManager et ne pas être écrasé par lui.
+        this.scene.onPointerObservable.add((pointerInfo) => {
+            if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERDOWN) return;
+            const evt = pointerInfo.event;
 
+            const engine = this.scene.getEngine();
             if (!engine.isPointerLock) {
                 engine.enterPointerlock();
                 return;
             }
 
+            if (!this._enabled) return;
+            if (evt.button !== 0) return;
+
             const now = Date.now();
             if (now - this.lastFireTime < this.fireRate) return;
 
-            if (evt.button === 0) {
-                this.lastFireTime = now;
-                this.fireBasicDagger();
-            }
-        };
+            this.lastFireTime = now;
+            this.fireBasicDagger();
+        });
     }
 
     fireBasicDagger() {

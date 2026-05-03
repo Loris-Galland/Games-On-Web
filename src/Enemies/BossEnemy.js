@@ -637,7 +637,6 @@ export class BossEnemy {
     _spawnMinionWave(center) {
         if (!this._onSummon) return;
 
-        // Exactement 5 mobs : 3 standard, 1 scout, 1 heavy — positions fixes en cercle
         const composition = ["standard", "standard", "standard", "scout", "heavy"];
         this._minionsToSpawn = composition.length;
 
@@ -651,7 +650,8 @@ export class BossEnemy {
             );
             EnemyParticles.spawnWarning(this.scene, sp, new BABYLON.Color3(0.5, 0, 1), 1800);
             setTimeout(() => {
-                if (this._dead) return;
+                // Guard: ne pas spawner si le boss est déjà mort ou la scène détruite
+                if (this._dead || !this.scene || this.body?.isDisposed()) return;
                 this._onSummon(type, sp);
                 this._minionsSpawned++;
             }, 1900);

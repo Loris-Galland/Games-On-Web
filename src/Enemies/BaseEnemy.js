@@ -395,16 +395,26 @@ export class BaseEnemy {
     _applySeparation(pos, desiredDir) {
         const radius = 2.2;
         let push = BABYLON.Vector3.Zero();
+        // On itère uniquement sur les meshes qui ont le bon nom, sans autre vérification coûteuse
         for (const mesh of this.scene.meshes) {
             if (mesh === this.body) continue;
-            if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(mesh.name)) continue;
-            const diff = pos.subtract(mesh.position);
-            const d    = diff.length();
-            if (d > 0.01 && d < radius) push.addInPlace(diff.normalize().scale((radius - d) / radius));
+            const n = mesh.name;
+            if (n !== "enemyBody" && n !== "enemyBodyHeavy" && n !== "enemyBodyScout") continue;
+            const dx = pos.x - mesh.position.x;
+            const dz = pos.z - mesh.position.z;
+            const d2 = dx * dx + dz * dz;
+            if (d2 < 0.0001 || d2 >= radius * radius) continue;
+            const d = Math.sqrt(d2);
+            const w = (radius - d) / radius;
+            push.x += (dx / d) * w;
+            push.z += (dz / d) * w;
         }
-        if (push.length() > 0.01) {
-            const b = desiredDir.add(push.normalize().scale(0.55));
-            return b.length() > 0.01 ? b.normalize() : desiredDir;
+        if (push.x * push.x + push.z * push.z > 0.0001) {
+            const pl = Math.sqrt(push.x * push.x + push.z * push.z);
+            const bx = desiredDir.x + push.x / pl * 0.55;
+            const bz = desiredDir.z + push.z / pl * 0.55;
+            const bl = Math.sqrt(bx * bx + bz * bz);
+            if (bl > 0.01) return new BABYLON.Vector3(bx / bl, 0, bz / bl);
         }
         return desiredDir;
     }

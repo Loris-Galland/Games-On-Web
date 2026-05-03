@@ -68,7 +68,7 @@ function getRoomType(roomIdx) {
 }
 
 function getCycleForRoom(roomIdx) {
-    return Math.ceil(roomIdx / 6);
+    return Math.ceil(roomIdx / 5);
 }
 
 export class WaveManager {
@@ -161,6 +161,7 @@ export class WaveManager {
         this._waveStartTime     = Date.now();
         this._damageTakenInWave = 0;
         this._prevHealth        = this.player.health?.currentHealth ?? 10;
+        this._pendingSpawns     = 0;
 
         resetSlotCounter();
         this.hud?.updateWave?.(this.currentWave);
@@ -173,7 +174,6 @@ export class WaveManager {
         let   globalIdx   = 0;
 
         for (const group of composition) {
-            // Scale le count selon le cycle
             const scaledCount = Math.round(group.count * diff);
             for (let i = 0; i < scaledCount; i++) {
                 const angle    = (globalIdx / Math.max(total, 1)) * Math.PI * 2 + Math.random() * 0.4;
@@ -188,7 +188,9 @@ export class WaveManager {
 
                 const type      = group.type;
                 const speedMult = group.speedMult * diff;
+                this._pendingSpawns++;
                 setTimeout(() => {
+                    this._pendingSpawns = Math.max(0, (this._pendingSpawns ?? 1) - 1);
                     if (!this.isWaveActive) return;
                     const enemy = this._createEnemy(type, spawnPos, speedMult);
                     if (enemy) {
@@ -342,56 +344,60 @@ export class WaveManager {
         const summary = this.scoreManager?.getSummary?.() ?? {};
 
         const overlay = document.createElement("div");
+        overlay.id = "victory-overlay";
         overlay.style.cssText = `
             position:fixed;inset:0;z-index:600;
             background:#000;display:flex;flex-direction:column;
             align-items:center;justify-content:center;
             font-family:'Courier New',monospace;
-            opacity:0;transition:opacity 0.8s;
-        `;
+            opacity:0;transition:opacity 0.8s;overflow:hidden;`;
 
         const gradeColors = { S:"#ffcc00", A:"#00ffcc", B:"#00aaff", C:"#aaaaaa", D:"#ff4444" };
         const grade       = summary.grade ?? "B";
         const gc          = gradeColors[grade] ?? "#00ffcc";
 
         overlay.innerHTML = `
-            <div style="font-size:64px;font-weight:bold;letter-spacing:10px;
-                color:#00ffcc;text-shadow:0 0 40px #00ffcc;margin-bottom:20px;
-                animation:glitch 0.5s infinite;">VICTOIRE</div>
-            <div style="font-size:14px;letter-spacing:6px;color:rgba(0,255,204,0.5);
-                margin-bottom:40px;">ARCHON PROTOCOL — TERMINÉ</div>
-            <div style="font-size:96px;font-weight:bold;letter-spacing:6px;
-                color:${gc};text-shadow:0 0 50px ${gc};margin-bottom:16px;">${grade}</div>
-            <div style="font-size:32px;letter-spacing:5px;color:#00ffcc;
-                text-shadow:0 0 20px #00ffcc;margin-bottom:40px;">
-                ${String(summary.totalScore ?? 0).padStart(8,"0")}
-            </div>
-            <div style="display:flex;gap:40px;border:1px solid rgba(0,255,204,0.2);
-                padding:20px 40px;margin-bottom:40px;">
-                ${this._victoryStatEl("KILLS", summary.totalKills ?? 0, "#ff4466")}
-                ${this._victoryStatEl("VAGUES", summary.wavesCleared ?? 0, "#00ffcc")}
-                ${this._victoryStatEl("PARFAITES", summary.perfectWaves ?? 0, "#aaffaa")}
-                ${this._victoryStatEl("PRÉCISION", (summary.accuracy ?? 0)+"%", "#ffaa00")}
-            </div>
-            <button id="win-restart" style="
-                background:transparent;border:2px solid #00ffcc;
-                color:#00ffcc;font-family:'Courier New',monospace;
-                font-size:18px;letter-spacing:3px;text-transform:uppercase;
-                padding:14px 40px;cursor:pointer;
-                clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%);">
-                ↺ REJOUER
-            </button>
-        `;
+            <style>
+                @keyframes vic-glitch{0%,90%,100%{transform:translate(0)}91%{transform:translate(-3px,1px)}93%{transform:translate(3px,-1px)}95%{transform:translate(-2px,2px)}97%{transform:translate(2px,-2px)}}
+                @keyframes vic-scan{0%{background-position:0 0}100%{background-position:0 100vh}}
+                @keyframes vic-grade{0%{opacity:0;transform:scale(2.5)}60%{opacity:1;transform:scale(0.9)}100%{opacity:1;transform:scale(1)}}
+                @keyframes vic-flicker{0%,19%,21%,23%,75%,77%,100%{opacity:1}20%,22%,76%{opacity:0.3}}
+                #vic-scanline{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,204,0.015) 2px,rgba(0,255,204,0.015) 4px);pointer-events:none;z-index:0;animation:vic-scan 8s linear infinite;}
+                #vic-title{font-size:64px;font-weight:bold;letter-spacing:12px;color:#00ffcc;text-shadow:0 0 30px #00ffcc,0 0 60px #00ffcc44;animation:vic-glitch 2.5s infinite;}
+                #vic-grade-el{font-size:96px;font-weight:bold;letter-spacing:8px;color:${gc};text-shadow:0 0 50px ${gc};animation:vic-grade 0.7s ease-out;line-height:1;}
+                #vic-subtitle{font-size:12px;letter-spacing:5px;color:rgba(0,255,204,0.4);animation:vic-flicker 3s infinite;}
+                #vic-restart{background:transparent;border:2px solid #00ffcc;color:#00ffcc;font-family:'Courier New',monospace;font-size:18px;letter-spacing:3px;text-transform:uppercase;padding:14px 50px;cursor:pointer;clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%);transition:all 0.2s ease;}
+                #vic-restart:hover{background:#00ffcc;color:#000;box-shadow:0 0 30px #00ffcc88;}
+                .vic-stat{display:flex;flex-direction:column;align-items:center;gap:6px;}
+            </style>
+            <div id="vic-scanline"></div>
+            <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:18px;max-width:800px;width:100%;padding:40px;">
+                <div id="vic-subtitle">ARCHON PROTOCOL — MISSION ACCOMPLIE</div>
+                <div id="vic-title">VICTOIRE</div>
+                <div id="vic-grade-el">${grade}</div>
+                <div style="font-size:9px;letter-spacing:3px;color:rgba(0,255,204,0.4);text-transform:uppercase;">PERFORMANCE RATING</div>
+                <div style="font-size:38px;font-weight:bold;letter-spacing:6px;color:#00ffcc;text-shadow:0 0 20px #00ffcc;">
+                    ${String(summary.totalScore ?? 0).padStart(8,"0")}
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;width:100%;max-width:640px;border:1px solid rgba(0,255,204,0.2);padding:20px 30px;background:rgba(0,255,204,0.03);">
+                    ${this._victoryStatEl("KILLS",     summary.totalKills   ?? 0, "#ff4466")}
+                    ${this._victoryStatEl("VAGUES",    summary.wavesCleared ?? 0, "#00ffcc")}
+                    ${this._victoryStatEl("PARFAITES", summary.perfectWaves ?? 0, "#aaffaa")}
+                    ${this._victoryStatEl("PRÉCISION", (summary.accuracy ?? 0)+"%", "#ffaa00")}
+                </div>
+                <button id="vic-restart">↺ REJOUER</button>
+                <div style="font-size:10px;letter-spacing:2px;color:#223344;margin-top:8px;">ROGUE PROTOCOL v2.7 — TOUTES MENACES NEUTRALISÉES</div>
+            </div>`;
 
         document.body.appendChild(overlay);
         requestAnimationFrame(() => requestAnimationFrame(() => { overlay.style.opacity = "1"; }));
-        document.getElementById("win-restart")?.addEventListener("click", () => window.location.reload());
+        overlay.querySelector("#vic-restart")?.addEventListener("click", () => window.location.reload());
     }
 
     _victoryStatEl(label, value, color) {
-        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <span style="font-size:26px;font-weight:bold;color:${color};text-shadow:0 0 10px ${color};">${value}</span>
-            <span style="font-size:9px;letter-spacing:2px;color:rgba(200,200,200,0.5);">${label}</span>
+        return `<div class="vic-stat">
+            <span style="font-size:28px;font-weight:bold;color:${color};text-shadow:0 0 10px ${color};">${value}</span>
+            <span style="font-size:9px;letter-spacing:2px;color:rgba(200,200,200,0.5);text-transform:uppercase;">${label}</span>
         </div>`;
     }
 
@@ -414,8 +420,9 @@ export class WaveManager {
 
         if (!this.isWaveActive || this._boss) return;
 
-        const allSpawned = this.enemiesAlive.length > 0;
-        if (!allSpawned) return;
+        // Attendre que tous les spawns soient résolus
+        if ((this._pendingSpawns ?? 0) > 0) return;
+        if (this.enemiesAlive.length === 0) return;
 
         this.enemiesAlive = this.enemiesAlive.filter(e => e.body && !e.body.isDisposed());
 
@@ -493,6 +500,9 @@ export class WaveManager {
     }
 
     _openDoors() {
+        // Signaler au joueur qu'il peut sortir
+        this.hud?.showExitIndicator?.();
+
         this._doors.forEach(door => {
             if (door._obs) this.scene.onBeforeRenderObservable.remove(door._obs);
             let elapsed = 0;

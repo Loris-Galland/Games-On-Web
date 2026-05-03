@@ -109,20 +109,9 @@ window.addEventListener('DOMContentLoaded', () => {
         crosshair.id = "crosshair";
         document.body.appendChild(crosshair);
 
-        // ── Tir via WeaponManager (override clic) ─────────────────────────────
-        if (game.player && weaponManager) {
-            // Désactive le clic natif de PlayerShoot quand l'arme secondaire est active
-            const origShootControl = game.player.shootController?._initShootControl?.bind(game.player.shootController);
-
-            game.scene?.onPointerDown?.((evt) => {
-                if (!game.scene?.getEngine()?.isPointerLock) return;
-                if (weaponManager.isSecondaryActive && evt.button === 0) {
-                    const now = Date.now();
-                    const sc  = weaponManager;
-                    sc.fire();
-                }
-            });
-        }
+        // NOTE: Le tir des armes secondaires est géré directement dans WeaponManager._initInputs
+        // via scene.onPointerDown. PlayerShoot utilise scene.onPointerObservable pour le dagger
+        // afin d'éviter tout conflit.
 
         // ── Toggle pause ──────────────────────────────────────────────────────
         function togglePause() {

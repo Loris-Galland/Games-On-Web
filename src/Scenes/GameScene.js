@@ -19,7 +19,8 @@ export class GameScene {
         });
         this.engine.setHardwareScalingLevel(2);
         this._loadingScreen = null;
-        this.upgradeManager = new UpgradeManager(this.player);
+        // upgradeManager est instancié après la création du player dans _generateMap
+        this.upgradeManager = null;
 
         this.isInUpgrade = false;
         this.isPaused = false;
@@ -256,40 +257,41 @@ export class GameScene {
             this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );
 
+        // ── UpgradeManager (nécessite this.player) ────────────────────────
+        this.upgradeManager = new UpgradeManager(this.player);
+
         // ── Stats pour le Game Over ───────────────────────────────────────
-        // Injecte un callback dans Player pour récupérer les stats au moment de la mort
         this.player.getStatsCallback = () => ({
             wavesCleared: this.waveManager ? this.waveManager.currentWave : 0,
             roomsCleared: this.waveManager ? this.waveManager._clearedRooms.size : 0,
         });
 
         // ── Pipeline post-process sur la caméra joueur ────────────────────
-        // (la pipeline est déjà créée dans LightingManager.init(),
-        //  on l'attache à la vraie caméra une fois qu'elle existe)
         if (this.lightingManager._pipeline) {
             this.lightingManager._pipeline.addCamera(this.player.camera);
         }
 
-        // ── WaveManager avec hook mode combat ─────────────────────────────
+        // ── WaveManager ───────────────────────────────────────────────────
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);
 
-        // Monkey-patch pour synchroniser les lumières combat
-        const origLaunch = this.waveManager._launchNextWave.bind(this.waveManager);
-        this.waveManager._launchNextWave = () => {
+        // Monkey-patch APRÈS instanciation pour capturer les bonnes références
+        const _wm = this.waveManager;
+        const _lm = this.lightingManager;
+
+        const origLaunch = _wm._launchNextWave.bind(_wm);
+        _wm._launchNextWave = () => {
             origLaunch();
-            const active = this.waveManager.currentWave <= 5 && this.waveManager.isWaveActive;
-            this.lightingManager.setCombatMode(active);
+            if (_lm) _lm.setCombatMode(_wm.isWaveActive);
         };
-        const origClear = this.waveManager._clearEnemies.bind(this.waveManager);
-        this.waveManager._clearEnemies = () => {
+        const origClear = _wm._clearEnemies.bind(_wm);
+        _wm._clearEnemies = () => {
             origClear();
-            this.lightingManager.setCombatMode(false);
+            if (_lm) _lm.setCombatMode(false);
         };
-        // Désactive le mode combat quand les portes s'ouvrent
-        const origOpen = this.waveManager._openDoors.bind(this.waveManager);
-        this.waveManager._openDoors = () => {
+        const origOpen = _wm._openDoors.bind(_wm);
+        _wm._openDoors = () => {
             origOpen();
-            this.lightingManager.setCombatMode(false);
+            if (_lm) _lm.setCombatMode(false);
         };
 
         // ── Navigation ────────────────────────────────────────────────────

@@ -259,6 +259,61 @@ export class ProceduralMap {
             trigger.isVisible = false; trigger.checkCollisions = false; trigger.isPickable = false; trigger.parent = node;
             trigger._toRoom   = isReturn ? roomIdx - 1 : roomIdx + 1;
             trigger._fromRoom = roomIdx;
+
+            // ── Flèche directionnelle au sol à l'entrée du couloir ───────────
+            if (!isReturn && tiles.length >= 1) {
+                const firstTile = tiles[0];
+                const secondTile = tiles[1] ?? tiles[0];
+                const fx = firstTile.x * T + T / 2;
+                const fz = firstTile.z * T + T / 2;
+                // Direction vers la salle suivante
+                const dx = secondTile.x - firstTile.x;
+                const dz = secondTile.z - firstTile.z;
+                const rotY = dx !== 0 ? (dx > 0 ? -Math.PI / 2 : Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
+
+                const arrowMat = new BABYLON.StandardMaterial(`arrowMat_${roomIdx}`, this.scene);
+                arrowMat.emissiveColor   = new BABYLON.Color3(0, 1, 0.6);
+                arrowMat.disableLighting = true;
+                arrowMat.alpha           = 0.85;
+                arrowMat.backFaceCulling = false;
+
+                const arrowPlane = BABYLON.MeshBuilder.CreatePlane(`exitArrow_${roomIdx}`, { width: T * 0.7, height: T * 0.7 }, this.scene);
+                arrowPlane.position   = new BABYLON.Vector3(fx, 0.05, fz);
+                arrowPlane.rotation   = new BABYLON.Vector3(Math.PI / 2, rotY, 0);
+                arrowPlane.material   = arrowMat;
+                arrowPlane.isPickable = false;
+                arrowPlane.parent     = node;
+
+                // Texture dynamique avec flèche
+                const dynTex = new BABYLON.DynamicTexture(`arrowTex_${roomIdx}`, { width: 128, height: 128 }, this.scene, false);
+                const ctx = dynTex.getContext();
+                ctx.clearRect(0, 0, 128, 128);
+                ctx.fillStyle = "rgba(0,255,160,0.0)";
+                ctx.fillRect(0, 0, 128, 128);
+                ctx.fillStyle = "rgba(0,255,160,0.9)";
+                ctx.beginPath();
+                ctx.moveTo(64, 8);
+                ctx.lineTo(110, 90);
+                ctx.lineTo(80, 78);
+                ctx.lineTo(80, 120);
+                ctx.lineTo(48, 120);
+                ctx.lineTo(48, 78);
+                ctx.lineTo(18, 90);
+                ctx.closePath();
+                ctx.fill();
+                dynTex.update();
+                arrowMat.diffuseTexture   = dynTex;
+                arrowMat.emissiveTexture  = dynTex;
+                arrowMat.opacityTexture   = dynTex;
+
+                // Pulse d'opacité
+                let pulseT = 0;
+                const pulseObs = this.scene.onBeforeRenderObservable.add(() => {
+                    if (arrowPlane.isDisposed()) { this.scene.onBeforeRenderObservable.remove(pulseObs); return; }
+                    pulseT += this.scene.getEngine().getDeltaTime() / 1000;
+                    arrowMat.alpha = 0.5 + Math.sin(pulseT * 3) * 0.35;
+                });
+            }
         }
         await Promise.all(ps);
     }

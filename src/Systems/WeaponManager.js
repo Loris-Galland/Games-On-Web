@@ -19,7 +19,7 @@ export class WeaponManager {
             description: "7 plombs plasma, dévastateur à courte portée.",
             category:    "ASSAULT",
             iconColor:   "#ff4400",
-            cost : 20000,
+            cost:        800,
             Class:       PlasmaShotgun,
         },
         sniper: {
@@ -28,7 +28,7 @@ export class WeaponManager {
             description: "Hitscan longue portée, zoom, perfore l'armure.",
             category:    "PRECISION",
             iconColor:   "#00ccff",
-            cost : 1000,
+            cost:        600,
             Class:       QuantumSniper,
         },
         rocket: {
@@ -37,7 +37,7 @@ export class WeaponManager {
             description: "Explosion de zone AoE, danger de splash.",
             category:    "EXPLOSIVE",
             iconColor:   "#aa00ff",
-            cost : 90000,
+            cost:        1200,
             Class:       VoidRocket,
         },
     };
@@ -46,7 +46,7 @@ export class WeaponManager {
         this.player  = player;
         this.scene   = player.scene;
 
-        this._slots        = [null, null, null]; // slot 0 = dagger natif
+        this._slots        = [null, null, null, null]; // slot 0 = dagger natif, 1-3 = armes secondaires
         this._activeSlot   = 0;
         this._activeWeapon = null;
         this._daggerMesh   = player.weapon ?? null;
@@ -57,13 +57,13 @@ export class WeaponManager {
     // ── Inputs ───────────────────────────────────────────────────────────────
 
     _initInputs() {
-        // Touches 1-3
         this.scene.onKeyboardObservable?.add((kbInfo) => {
             if (kbInfo.type !== 1) return;
             const code = kbInfo.event.code;
             if (code === "Digit1") this.switchTo(0);
             if (code === "Digit2") this.switchTo(1);
             if (code === "Digit3") this.switchTo(2);
+            if (code === "Digit4") this.switchTo(3);
             // Zoom sniper clavier (Alt)
             if ((code === "AltLeft" || code === "AltRight") && this._activeWeapon instanceof QuantumSniper) {
                 this._activeWeapon.toggleZoom();
@@ -79,11 +79,22 @@ export class WeaponManager {
         });
 
         // Clic droit → zoom sniper
-        this.scene.onPointerDown?.((evt) => {
+        this.scene.onPointerDown = (evt) => {
+            if (!this.scene.getEngine().isPointerLock) {
+                this.scene.getEngine().enterPointerlock();
+                return;
+            }
+            // Tir arme secondaire — clic gauche
+            if (evt.button === 0 && this._activeSlot > 0) {
+                this.fire();
+                return;
+            }
+            // Tir dagger — clic gauche, slot 0 géré par PlayerShoot via _enabled
+            // Zoom sniper — clic droit
             if (evt.button === 2 && this._activeWeapon instanceof QuantumSniper) {
                 this._activeWeapon.toggleZoom();
             }
-        });
+        };
     }
 
     _scrollSwitch(delta) {

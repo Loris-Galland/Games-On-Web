@@ -66,8 +66,11 @@ export class GraphicsMenu {
 
     _rollback() {
         if (!this._snapshot || !this.lm) return;
-        const saved = this._snapshot;
-        Object.keys(saved).forEach(key => this.lm.setGraphicsParam(key, saved[key]));
+        // Restaurer directement le dictionnaire interne puis tout appliquer d'un coup
+        // (évite le bug où certaines clés ne sont pas couvertes par _applyParam)
+        this.lm._params = { ...this._snapshot };
+        this.lm._currentPreset = "custom";
+        this.lm._applyAllParams();
         this._snapshot = null;
     }
 

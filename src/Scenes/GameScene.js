@@ -7,6 +7,8 @@ import { LightingManager } from "../Systems/LightingManager";
 import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
 import { UpgradeManager }  from "../Systems/UpgradeManager";
+import { MinimapManager } from '../Systems/MinimapManager';
+
 
 export class GameScene {
     constructor(canvasId) {
@@ -21,6 +23,7 @@ export class GameScene {
         this._loadingScreen = null;
         // upgradeManager est instancié après la création du player dans _generateMap
         this.upgradeManager = null;
+        this.minimap = null;
 
         this.isInUpgrade = false;
         this.isPaused = false;
@@ -36,6 +39,7 @@ export class GameScene {
             if (this.player)         this.player.hud.updateFps(this.engine);
             if (this.navManager)     this.navManager.update(this.engine.getDeltaTime() / 1000);
             if (this.lightingManager) this.lightingManager.update(this.engine.getDeltaTime() / 1000);
+            if (this.minimap) this.minimap.update();
         });
         window.addEventListener("resize", () => this.engine.resize());
     }
@@ -192,6 +196,7 @@ export class GameScene {
 
             // ── Mise à jour lumières pour la nouvelle salle ───────────────
             this.lightingManager.setRoom(room);
+            if (this.minimap) this.minimap.onRoomEnter(idx);
 
             // ── Notifier le WaveManager ───────────────────────────────────
             if (this.waveManager && idx !== 0) {
@@ -320,6 +325,8 @@ export class GameScene {
 
         // Lumières de la salle de spawn (room 0)
         this.lightingManager.setRoom(this.map.rooms[0]);
+        this.minimap = new MinimapManager(this.map, this.player, this.waveManager);
+        this.minimap.onRoomEnter(0);
     }
 
     _waitForUpgradeChoice(scene) {

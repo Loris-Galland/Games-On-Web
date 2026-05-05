@@ -1629,16 +1629,28 @@ html, body, #app, canvas {
 #crosshair.sniper-mode::after  { background: rgba(0, 200, 255, 0.9); }
 
 /* ── Mini-map placeholder (désactivée par défaut, prête à l'emploi) ─────────── */
-#minimap {
-    display: none; /* activer si nécessaire */
+#minimap-container {
     position: fixed;
-    top: 20px;
-    right: 90px;
-    width: 140px;
-    height: 140px;
-    background: rgba(0, 5, 10, 0.85);
-    border: 1px solid rgba(0, 255, 204, 0.25);
-    border-radius: 2px;
-    z-index: 40;
-    overflow: hidden;
+    top: 16px;
+    right: 80px;
+    width: 160px;
+    height: 160px;
+    z-index: 42;
+    pointer-events: auto;
+    cursor: pointer;
+ 
+    border: 1px solid rgba(0, 180, 255, 0.20);
+    box-shadow:
+        0 0 0 1px rgba(0, 180, 255, 0.05),
+        0 0 16px rgba(0, 100, 255, 0.08);
+ 
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+ 
+#minimap-canvas {
+    display: block;
+    width: 160px;
+    height: 160px;
+    image-rendering: pixelated;
 }

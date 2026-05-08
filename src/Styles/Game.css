@@ -1628,7 +1628,7 @@ html, body, #app, canvas {
 #crosshair.sniper-mode::before { background: rgba(0, 200, 255, 0.9); }
 #crosshair.sniper-mode::after  { background: rgba(0, 200, 255, 0.9); }
 
-/* ── Mini-map placeholder (désactivée par défaut, prête à l'emploi) ─────────── */
+/* Mini-map placeholder */
 #minimap-container {
     position: fixed;
     top: 16px;
@@ -1653,4 +1653,181 @@ html, body, #app, canvas {
     width: 160px;
     height: 160px;
     image-rendering: pixelated;
+}
+
+/* Rareté badge sur les cartes  */
+.upgrade-rarity-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.9;
+}
+ 
+.upgrade-card {
+    border-color: #30363d;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+ 
+.upgrade-card:hover {
+    border-color: var(--rarity-color, #00ffff) !important;
+    box-shadow: 0 0 24px var(--rarity-glow, rgba(0,255,255,0.3)) !important;
+}
+ 
+.card-category {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    opacity: 0.7;
+}
+ 
+/* Reroll */
+.upgrade-reroll-row {
+    margin-top: 30px;
+    display: flex;
+    justify-content: center;
+}
+ 
+.upgrade-reroll-btn {
+    background: transparent;
+    color: #ff9900;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 12px 36px;
+    border: 2px solid #ff990066;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+ 
+.upgrade-reroll-btn:not(:disabled):hover {
+    border-color: #ff9900;
+    box-shadow: 0 0 16px rgba(255,153,0,0.4);
+    color: #ffcc44;
+}
+ 
+.upgrade-reroll-btn:disabled {
+    cursor: not-allowed;
+    color: #555;
+    border-color: #333;
+}
+ 
+/* Panneau Tab (stats + upgrades acquis) */
+#stats-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    max-height: 80vh;
+    background: rgba(0, 8, 14, 0.92);
+    border: 1px solid #00ffff44;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    color: #00ffcc;
+    z-index: 500;
+    pointer-events: none;
+    flex-direction: column;
+    gap: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    backdrop-filter: blur(6px);
+    overflow: hidden;
+}
+ 
+.stats-title {
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-align: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #00ffff22;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+}
+ 
+.stats-body {
+    display: flex;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+}
+ 
+.stats-col {
+    flex: 1;
+    padding: 16px 20px;
+    overflow-y: auto;
+}
+ 
+.stats-col + .stats-col {
+    border-left: 1px solid #00ffff22;
+}
+ 
+.stats-section-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #00ffcc66;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+ 
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #ffffff08;
+    font-size: 12px;
+}
+ 
+.stats-label {
+    color: rgba(0, 220, 200, 0.55);
+    letter-spacing: 1px;
+}
+ 
+.stats-val {
+    color: #ffffff;
+    font-weight: bold;
+}
+ 
+.stats-val-yes {
+    color: #00ff88;
+    text-shadow: 0 0 8px rgba(0, 255,136, 0.5);
+}
+ 
+.stats-upgrade-tag {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border: 1px solid #00ffff44;
+    border-radius: 2px;
+    margin: 4px 4px 0 0;
+    cursor: default;
+    transition: background 0.15s;
+}
+ 
+.stats-upgrade-tag:hover {
+    background: rgba(255,255,255,0.05);
+}
+ 
+.stats-empty {
+    font-size: 11px;
+    color: #444;
+    font-style: italic;
+}
+ 
+.stats-hint {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #00ffcc33;
+    text-align: center;
+    padding: 10px;
+    border-top: 1px solid #00ffff11;
 }

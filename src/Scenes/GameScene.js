@@ -264,6 +264,7 @@ export class GameScene {
 
         // ── UpgradeManager (nécessite this.player) ────────────────────────
         this.upgradeManager = new UpgradeManager(this.player);
+        this._setupTabKey();
 
         // ── Stats pour le Game Over ───────────────────────────────────────
         this.player.getStatsCallback = () => ({
@@ -330,22 +331,48 @@ export class GameScene {
     }
 
     _waitForUpgradeChoice(scene) {
-        this.isInUpgrade = true;
-        this.map._paused = true;
-        document.exitPointerLock();
+    this.isInUpgrade = true;
+    this.map._paused = true;
+    document.exitPointerLock();
 
-        const randomCards = this.upgradeManager.getRandomUpgrades(3);
+    return new Promise(resolve => {
+        const doShow = (upgrades) => {
+            this.player.hud.showUpgradeScreen(
+                upgrades,
+                (choix) => {
+                    this.upgradeManager.applyUpgrade(choix); // ← mémorise + applique
+                    scene.getEngine().enterPointerlock();
+                    this.map._paused = false;
+                    this.isInUpgrade = false;
+                    resolve();
+                },
+                800,
+                () => this.scoreManager?.totalScore ?? 0,
+                () => {
+                    const score = this.scoreManager?.totalScore ?? 0;
+                    if (score < 800) return false;
+                    this.scoreManager.totalScore -= 800;
+                    this.player.hud.updateScore?.(this.scoreManager.totalScore);
+                    document.getElementById("upgrade-overlay")?.remove();
+                    doShow(this.upgradeManager.getRandomUpgrades(3));
+                    return true;
+                },
+            );
+        };
 
-        return new Promise(resolve => {
-            this.player.hud.showUpgradeScreen(randomCards, (choix) => {
-                choix.apply(this.player);
-                scene.getEngine().enterPointerlock();
+        doShow(this.upgradeManager.getRandomUpgrades(3));
+    });
+}
 
-                this.map._paused = false;
-                this.isInUpgrade = false;
+_setupTabKey() {
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Tab" && !this.isInUpgrade && !this.isPaused) {
+            e.preventDefault();
+            const stats    = this.upgradeManager?.getPlayerStats() ?? {};
+            const acquired = this.upgradeManager?.acquiredUpgrades  ?? [];
+            this.player?.hud?.toggleStatsPanel(stats, acquired);
+        }
+    });
+}
 
-                resolve();
-            });
-        });
-    }
 }

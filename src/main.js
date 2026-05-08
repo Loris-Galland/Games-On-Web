@@ -7,6 +7,8 @@ import { KeybindingsMenu } from './UI/KeybindingsMenu.js';
 import { GamepadManager }  from './Systems/GamepadManager.js';
 import { ScoreManager }    from './Systems/ScoreManager.js';
 import { WeaponManager }   from './Systems/WeaponManager.js';
+import { DebugPanel } from './UI/DebugPanel';
+
 
 window.addEventListener('DOMContentLoaded', () => {
     const game = new GameScene('renderCanvas');
@@ -104,6 +106,13 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }, 300);
 
+        const debugPanel = new DebugPanel(
+            game.player,
+            game.upgradeManager,
+            game.waveManager,
+            scoreManager
+        );
+
         // ── Crosshair DOM ─────────────────────────────────────────────────────
         const crosshair = document.createElement("div");
         crosshair.id = "crosshair";
@@ -135,7 +144,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 : evt.key === 'Escape'        ? 'escape'
                 : evt.key.toLowerCase();
 
-            if (pressed !== pauseKey) return;
+            if (pressed !== pauseKey && pressed !== 'escape') return;
             if (document.querySelector('.kb-listening')) return;
             if (mainMenu.overlay && mainMenu.overlay.style.display !== 'none') return;
             togglePause();

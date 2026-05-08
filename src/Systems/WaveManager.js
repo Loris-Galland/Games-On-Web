@@ -52,7 +52,6 @@ const BASE_WAVE_COMPOSITIONS = {
 // Généré dynamiquement pour les 3 cycles
 function getRoomType(roomIdx) {
     if (roomIdx === 0) return "spawn";
-    if (roomIdx === 1) return "boss";
 
     // Cycles : chaque cycle = 6 salles (4 normales + 1 boss + 1 spéciale)
     // Cycle 1 : salles 1-6
@@ -125,7 +124,7 @@ export class WaveManager {
                 break;
             case "boss":
                 this._spawnDoors(entryPos, exitPos, entryRot, exitRot);
-                this._startBossRoom(roomCenter, 3);
+                this._startBossRoom(roomCenter, cycle);
                 break;
             case "shop":
                 this._handleShopRoom(roomCenter);

@@ -118,6 +118,7 @@ export class Player {
     // ── Inputs ────────────────────────────────────────────────────────────────
 
     _initInputs() {
+        this._installMouseSmoothing();
         // window.addEventListener pour pouvoir faire preventDefault sur Space/Shift/Tab
         window.addEventListener("keydown", (e) => {
             if (this.isDead) return;
@@ -163,6 +164,24 @@ export class Player {
             if (this._blinkEnabled) this._tryBlink();
         });
     }
+
+    _installMouseSmoothing() {
+    const MAX_Y = 80;   // au-delà = spike, on clamp
+    const MAX_X = 200;
+    this.canvas.addEventListener("pointermove", (e) => {
+        if (document.pointerLockElement !== this.canvas) return;
+        const my = e.movementY, mx = e.movementX;
+        if (Math.abs(my) > MAX_Y || Math.abs(mx) > MAX_X) {
+            e.stopImmediatePropagation();
+            this.canvas.dispatchEvent(new MouseEvent("pointermove", {
+                bubbles: true, cancelable: true,
+                movementX: Math.sign(mx) * Math.min(Math.abs(mx), MAX_X),
+                movementY: Math.sign(my) * Math.min(Math.abs(my), MAX_Y),
+                clientX: e.clientX, clientY: e.clientY,
+            }));
+        }
+    }, true); // capture=true → intercepte AVANT Babylon
+}
 
     // ── Cooldowns ─────────────────────────────────────────────────────────────
 

@@ -27,6 +27,7 @@ export class UpgradeManager {
 
         // Légendaires déjà pris (pour ne pas les redonner)
         this._usedLegendaries = new Set();
+        this._acquiredIds     = new Set();
 
         this.availableUpgrades = [
 
@@ -338,8 +339,9 @@ export class UpgradeManager {
      * - Pondération : common ×6, rare ×3, legendary ×1
      */
     getRandomUpgrades(count = 3) {
-        const pool = this.availableUpgrades.filter(u => {
-            if (u.rarity === RARITY.LEGENDARY && this._usedLegendaries.has(u.id)) return false;
+         const pool = this.availableUpgrades.filter(u => {
+            // Exclure TOUS les upgrades déjà acquis (toutes raretés)
+            if (this._acquiredIds.has(u.id)) return false;
             return true;
         });
 
@@ -376,6 +378,7 @@ export class UpgradeManager {
     applyUpgrade(upgrade) {
         upgrade.apply(this.player);
         this.acquiredUpgrades.push(upgrade);
+        this._acquiredIds.add(upgrade.id); 
         if (upgrade.rarity === RARITY.LEGENDARY) {
             this._usedLegendaries.add(upgrade.id);
         }

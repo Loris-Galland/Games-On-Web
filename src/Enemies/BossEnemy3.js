@@ -1,729 +1,336 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "../Enemies/EnemyParticles";
 
-/**
- * BossEnemy3 — VOIDBRINGER
- * ------------------------
- * Boss final de cycle 3. Le plus intense. Patterns de zone très agressifs.
- *
- * 3 PHASES :
- *   Phase 1 — "TEMPÊTE" : pluie de projectiles qui tombent du ciel sur le joueur
- *   Phase 2 — "MUR" : 3 murs de balles qui traversent l'arène en alternance
- *   Phase 3 — "SINGULARITÉ" : zones de dégâts brûlantes pulsantes au sol (×5 zones)
- *             + tirs directs sur le joueur en continu
- *
- * TRANSITION (4s seulement, plus courte) : particules violettes, weakpoint visible
- */
 export class BossEnemy3 {
     constructor(scene, position, player, navManager = null, onSummon = null) {
-        this.scene     = scene;
-        this.player    = player;
-        this._onSummon = onSummon;
-
-        this.onDeath  = null;
-        this.onPhase  = null;
-        this.onDamage = null;
-
-        this.maxHealth     = 45;
-        this.currentHealth = 45;
-        this._dead         = false;
-        this._dying        = false;
-
-        this._stateLabel      = "transition";
-        this._invincible      = true;
-        this._phaseIndex      = 0;
-        this._transitionTimer = 0;
-        this._TRANSITION_DUR  = 4.0;
-        this._nextPhase       = 1;
-
-        this._t            = 0;
-        this._contactTimer = 0;
-        this._CONTACT_CD   = 1.0;
-        this._wpPulseT     = 0;
-
-        // Phase 1 — pluie céleste
-        this._rainTimer    = 0;
-        this._RAIN_RATE    = 0.35; // secondes entre chaque impact
-        this._rainCount    = 0;
-        this._MAX_RAIN     = 30;
-
-        // Phase 2 — murs de balles
-        this._wallTimer    = 0;
-        this._WALL_RATE    = 3.5;
-        this._wallCount    = 0;
-        this._MAX_WALLS    = 5;
-
-        // Phase 3 — singularités + tirs
-        this._singZones    = [];   // { mesh, mat, x, z, timer }
-        this._singSpawned  = false;
-        this._directTimer  = 0;
-        this._DIRECT_RATE  = 0.8;
-
-        // Spawn
-        this._groundY = position.y;
-        this._arenaCenter = position.clone();
-
-        this._buildBody(position);
-        this._buildWeakPoint();
-        this._buildAuras();
-        this._buildIntro();
+        this.scene = scene; this.player = player; this._onSummon = onSummon;
+        this.onDeath = null; this.onPhase = null; this.onDamage = null;
+        this.maxHealth = 45; this.currentHealth = 45;
+        this._dead = false; this._dying = false;
+        this._stateLabel = "transition"; this._invincible = true;
+        this._phaseIndex = 0; this._transitionTimer = 0; this._TRANSITION_DUR = 5.0; this._nextPhase = 1;
+        this._t = 0; this._contactTimer = 0; this._CONTACT_CD = 0.7; this._wpPulseT = 0;
+        this._chargeState = "idle"; this._chargeTimer = 0; this._chargeDir = null;
+        this._chargeCount = 0; this._MAX_CHARGES = 4; this._chargeVelX = 0; this._chargeVelZ = 0;
+        this._spinTimer = 0; this._SPIN_DUR = 2.5; this._spinCount = 0; this._MAX_SPINS = 3;
+        this._spinCooldown = 0; this._damZoneTimer = 0;
+        this._stompTimer = 0; this._STOMP_RATE = 1.2;
+        this._dashTimer = 0; this._DASH_RATE = 3.0; this._dashDir = null; this._dashActive = false; this._dashElapsed = 0;
+        this._groundY = position.y + 1.25;
+        EnemyParticles.spawnWarning(scene, position, new BABYLON.Color3(1, 0.15, 0), 2000);
+        this._buildMesh(position); this._buildWeakPoint(); this._buildAuraSystem();
+        this._introTimer = 3.0; this._inIntro = true;
+        this._obs = scene.onBeforeRenderObservable.add(() => this._update());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTRUCTION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    _buildBody(position) {
-        this.body = BABYLON.MeshBuilder.CreatePolyhedron("voidBody", {
-            type: 2, // icosaèdre
-            size: 1.7,
-        }, this.scene);
-        this.body.position   = new BABYLON.Vector3(position.x, position.y + 1.7, position.z);
+    _buildMesh(position) {
+        const uid = Math.random().toString(36).slice(2);
+        const mat = new BABYLON.StandardMaterial(`bruteMat_${uid}`, this.scene);
+        mat.diffuseColor = new BABYLON.Color3(0.2, 0.04, 0.02);
+        mat.emissiveColor = new BABYLON.Color3(0.55, 0.08, 0.0);
+        mat.specularColor = new BABYLON.Color3(0.6, 0.2, 0.0);
+        this.body = BABYLON.MeshBuilder.CreateBox("bossBody", { width: 2.0, height: 2.5, depth: 2.0 }, this.scene);
+        this.body.position = new BABYLON.Vector3(position.x, position.y + 1.25, position.z);
+        this.body.material = mat; this.body.checkCollisions = true;
+        this.body.ellipsoid = new BABYLON.Vector3(1.0, 1.25, 1.0);
         this.body.isPickable = false;
-        this.body.checkCollisions = false;
-        this.body.alwaysSelectAsActiveMesh = true;
-
-        // CRITIQUE : requis par Projectile.js et PlayerShoot.js
-        this.body._isBossBody = true;
-        this.body._takeDamage = (dmg) => this.takeDamage(dmg);
-
-        const mat = new BABYLON.StandardMaterial("voidBodyMat", this.scene);
-        mat.diffuseColor  = new BABYLON.Color3(0.25, 0.0, 0.4);
-        mat.emissiveColor = new BABYLON.Color3(0.4, 0.0, 0.6);
-        mat.specularColor = new BABYLON.Color3(0.8, 0.4, 1.0);
-        this.body.material = mat;
-
-        this._groundY = position.y + 1.7; // Y de référence
-
-        this._obs = this.scene.onBeforeRenderObservable.add(() => this._update());
+        this.body._isBossBody = true; this.body._takeDamage = (dmg) => this.takeDamage(dmg);
+        this._groundY = position.y + 1.25;
     }
 
     _buildWeakPoint() {
-        // CRITIQUE : le nom DOIT être "weakPoint" — les raycasts filtrent par ce nom exact
-        this.weakPoint = BABYLON.MeshBuilder.CreateIcoSphere("weakPoint", { radius: 0.6, subdivisions: 2 }, this.scene);
-        this.weakPoint.parent     = this.body;
-        this.weakPoint.position   = new BABYLON.Vector3(0, 0, 0);
-        this.weakPoint.isVisible  = false;
-        this.weakPoint.isPickable = false;
-
-        const mat = new BABYLON.StandardMaterial("voidWPMat", this.scene);
-        mat.diffuseColor  = new BABYLON.Color3(1, 1, 1);
-        mat.emissiveColor = new BABYLON.Color3(1, 0.8, 1);
-        mat.disableLighting = true;
-        this.weakPoint.material = mat;
+        const uid = Math.random().toString(36).slice(2);
+        const mat = new BABYLON.StandardMaterial(`bruteWpMat_${uid}`, this.scene);
+        mat.emissiveColor = new BABYLON.Color3(1, 1, 1); mat.diffuseColor = new BABYLON.Color3(1, 0.5, 0.3); mat.disableLighting = true;
+        this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 0.9 }, this.scene);
+        this.weakPoint.material = mat; this.weakPoint.isPickable = false; this.weakPoint.isVisible = false;
+        this.weakPoint.parent = this.body; this.weakPoint.position = new BABYLON.Vector3(0, 0.2, 1.05);
+        this._wpPulseT = 0;
     }
 
-    _buildAuras() {
-        const makePS = (name, count) => {
+    _buildAuraSystem() {
+        const tex = "https://assets.babylonjs.com/textures/flare.png";
+        const make = (name, count) => {
             const ps = new BABYLON.ParticleSystem(name, count, this.scene);
-            ps.particleTexture  = new BABYLON.Texture("https://assets.babylonjs.com/particles/flare.png", this.scene);
-            ps.emitter          = this.body;
-            ps.minEmitBox       = new BABYLON.Vector3(-1.5, -1.5, -1.5);
-            ps.maxEmitBox       = new BABYLON.Vector3(1.5, 1.5, 1.5);
-            ps.minSize          = 0.15;
-            ps.maxSize          = 0.5;
-            ps.minLifeTime      = 0.4;
-            ps.maxLifeTime      = 1.0;
-            ps.emitRate         = 100;
-            ps.minEmitPower     = 1.5;
-            ps.maxEmitPower     = 4;
-            ps.updateSpeed      = 0.02;
+            ps.particleTexture = new BABYLON.Texture(tex, this.scene);
+            ps.emitter = this.body; ps.minEmitBox = new BABYLON.Vector3(-2,-2.5,-2); ps.maxEmitBox = new BABYLON.Vector3(2,2.5,2);
+            ps.minSize = 0.15; ps.maxSize = 0.5; ps.minLifeTime = 0.3; ps.maxLifeTime = 0.8; ps.emitRate = 90;
+            ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+            ps.direction1 = new BABYLON.Vector3(-2,1,-2); ps.direction2 = new BABYLON.Vector3(2,4,2);
+            ps.minEmitPower = 1; ps.maxEmitPower = 3; ps.gravity = new BABYLON.Vector3(0,-1,0); ps.updateSpeed = 0.025;
             return ps;
         };
-
-        this._phaseAura = makePS("voidPhasePS", 300);
-        this._phaseAura.color1    = new BABYLON.Color4(0.6, 0, 1, 0.9);
-        this._phaseAura.color2    = new BABYLON.Color4(0.3, 0, 0.6, 0.5);
-        this._phaseAura.colorDead = new BABYLON.Color4(0.05, 0, 0.1, 0);
-
-        this._transAura = makePS("voidTransPS", 150);
-        this._transAura.color1    = new BABYLON.Color4(0.8, 0, 1, 0.9);
-        this._transAura.color2    = new BABYLON.Color4(0.4, 0, 0.5, 0.5);
-        this._transAura.colorDead = new BABYLON.Color4(0.05, 0, 0.05, 0);
+        this._phaseAura = make("brutePhasePS", 100);
+        this._setAuraColor(new BABYLON.Color4(1, 0.15, 0, 0.9)); this._phaseAura.start();
+        this._transAura = make("bruteTransPS", 200);
+        this._transAura.emitRate = 160;
+        this._transAura.color1 = new BABYLON.Color4(0,1,0.2,1); this._transAura.color2 = new BABYLON.Color4(0.1,1,0.4,1);
+        this._transAura.colorDead = new BABYLON.Color4(0,0.6,0.1,0); this._transAura.stop();
     }
 
-    _buildIntro() {
-        this._inIntro    = true;
-        this._introTimer = 3.0;
-        this._phaseAura.start();
+    _setAuraColor(c4) {
+        const c2 = c4.clone(); c2.a *= 0.5;
+        this._phaseAura.color1 = c4; this._phaseAura.color2 = c2;
+        this._phaseAura.colorDead = new BABYLON.Color4(c4.r*0.1, c4.g*0.1, c4.b*0.1, 0);
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BOUCLE PRINCIPALE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _update() {
         if (this._dead || !this.player?.camera) return;
         if (!this.body || this.body.isDisposed()) return;
-
-        const dt        = this.scene.getEngine().getDeltaTime() / 1000;
-        const pos       = this.body.position;
+        const dt = this.scene.getEngine().getDeltaTime() / 1000;
+        const pos = this.body.position;
         const playerPos = this.player.camera.globalPosition.clone();
-
         this._t += dt;
-
-        // Rotation lente permanente
-        this.body.rotation.y += dt * 0.5;
-        this.body.rotation.z += dt * 0.2;
 
         if (this._inIntro) {
             this._introTimer -= dt;
-            this.body.position.y = this._groundY + Math.sin(this._t) * 0.3;
-            if (this._introTimer <= 0) {
-                this._inIntro = false;
-                this._enterPhase(1);
-            }
+            this.body.position.y = this._groundY;
+            if (Math.random() < 0.3) { this.body.position.x += (Math.random()-0.5)*0.08; this.body.position.z += (Math.random()-0.5)*0.08; }
+            if (this._introTimer <= 0) { this._inIntro = false; this._enterPhase(1); }
             return;
         }
 
-        // Contact
-        if (!this._invincible) {
-            if (this._contactTimer > 0) this._contactTimer -= dt;
-            const dx = pos.x - playerPos.x;
-            const dz = pos.z - playerPos.z;
-            if (Math.sqrt(dx*dx + dz*dz) < 2.5 && !this.player.isDead && this._contactTimer <= 0) {
-                this.player.health?.takeDamage(1);
-                this._contactTimer = this._CONTACT_CD;
-            }
+        // Contact damage toujours actif
+        if (this._contactTimer > 0) this._contactTimer -= dt;
+        const dx0 = pos.x - playerPos.x, dz0 = pos.z - playerPos.z;
+        if (Math.sqrt(dx0*dx0 + dz0*dz0) < 3.2 && !this.player.isDead && this._contactTimer <= 0) {
+            this.player.health?.takeDamage(1); this._contactTimer = this._CONTACT_CD;
         }
 
-        // Weakpoint pulse
         if (!this._invincible && this.weakPoint && !this.weakPoint.isDisposed()) {
             this._wpPulseT += dt;
-            const sc = 1 + Math.sin(this._wpPulseT * 6) * 0.35;
+            const sc = 1 + Math.sin(this._wpPulseT * 6) * 0.3;
             this.weakPoint.scaling = new BABYLON.Vector3(sc, sc, sc);
         }
 
-        if      (this._stateLabel === "transition") this._updateTransition(dt, playerPos);
-        else if (this._stateLabel === "phase1")     this._updatePhase1(dt, pos, playerPos);
-        else if (this._stateLabel === "phase2")     this._updatePhase2(dt, pos, playerPos);
-        else if (this._stateLabel === "phase3")     this._updatePhase3(dt, pos, playerPos);
+        if (this._stateLabel === "transition") this._updateTransition(dt, playerPos);
+        else if (this._stateLabel === "phase1") this._updatePhase1(dt, pos, playerPos);
+        else if (this._stateLabel === "phase2") this._updatePhase2(dt, pos, playerPos);
+        else if (this._stateLabel === "phase3") this._updatePhase3(dt, pos, playerPos);
+
+        if (this._stateLabel !== "phase2" || this._spinTimer <= 0)
+            this.body.lookAt(new BABYLON.Vector3(playerPos.x, pos.y, playerPos.z));
+        this.body.position.y = Math.max(this.body.position.y, this._groundY - 0.1);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSITIONS / PHASES
-    // ═══════════════════════════════════════════════════════════════════════════
-
     _enterTransition(nextPhase) {
-        this._stateLabel      = "transition";
-        this._invincible      = false;
-        this._transitionTimer = this._TRANSITION_DUR;
-        this._nextPhase       = nextPhase;
-
-        this._clearSingZones();
-
-        if (this.weakPoint && !this.weakPoint.isDisposed()) {
-            this.weakPoint.isVisible  = true;
-            this.weakPoint.isPickable = true;
-        }
-        this._phaseAura.stop();
-        this._transAura.start();
-
-        if (this.body.material) {
-            this.body.material.emissiveColor = new BABYLON.Color3(0.4, 0.0, 0.5);
-            this.body.material.diffuseColor  = new BABYLON.Color3(0.2, 0.0, 0.3);
-        }
+        this._stateLabel = "transition"; this._invincible = false;
+        this._transitionTimer = this._TRANSITION_DUR; this._nextPhase = nextPhase;
+        if (this.weakPoint && !this.weakPoint.isDisposed()) { this.weakPoint.isVisible = true; this.weakPoint.isPickable = true; }
+        this._phaseAura.stop(); this._transAura.start();
+        if (this.body.material) { this.body.material.emissiveColor = new BABYLON.Color3(0,0.25,0.05); this.body.material.diffuseColor = new BABYLON.Color3(0,0.2,0.05); }
+        this.body.position.y = this._groundY;
     }
 
     _updateTransition(dt, playerPos) {
         this._transitionTimer -= dt;
-        this.body.position.y += (this._groundY - this.body.position.y) * dt * 3;
-        // Reste au-dessus du joueur
-        this.body.position.x += (playerPos.x - this.body.position.x) * dt * 1.5;
-        this.body.position.z += (playerPos.z - this.body.position.z) * dt * 1.5;
+        this.body.position.y = this._groundY + Math.abs(Math.sin(this._t * 10)) * 0.06;
+        const dx = playerPos.x - this.body.position.x, dz = playerPos.z - this.body.position.z;
+        const d = Math.sqrt(dx*dx + dz*dz);
+        if (d > 3) { this.body.moveWithCollisions(new BABYLON.Vector3((dx/d)*2.0*dt, 0, (dz/d)*2.0*dt)); }
         if (this._transitionTimer <= 0) this._enterPhase(this._nextPhase);
     }
 
     _enterPhase(phaseNum) {
-        this._stateLabel = `phase${phaseNum}`;
-        this._phaseIndex = phaseNum;
-        this._invincible = true;
-        this._t          = 0;
-
-        if (this.weakPoint && !this.weakPoint.isDisposed()) {
-            this.weakPoint.isVisible  = false;
-            this.weakPoint.isPickable = false;
-        }
-        this._transAura.stop();
-        this._phaseAura.start();
-
+        this._stateLabel = `phase${phaseNum}`; this._phaseIndex = phaseNum; this._invincible = true; this._t = 0;
+        if (this.weakPoint && !this.weakPoint.isDisposed()) { this.weakPoint.isVisible = false; this.weakPoint.isPickable = false; }
+        this._transAura.stop(); this._phaseAura.start();
         if (phaseNum === 1) {
-            this._setAuraColor(new BABYLON.Color4(0.6, 0, 1, 0.9));
-            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.4, 0, 0.7);
-            this._rainCount = 0;
-            this._rainTimer = 0.5;
+            this._setAuraColor(new BABYLON.Color4(1,0.05,0,0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.65,0.05,0);
+            this._chargeState = "idle"; this._chargeTimer = 1.5; this._chargeCount = 0;
         } else if (phaseNum === 2) {
-            this._setAuraColor(new BABYLON.Color4(1, 0.3, 0, 0.9));
-            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.7, 0.2, 0);
-            this._wallCount = 0;
-            this._wallTimer = 1.0;
+            this._setAuraColor(new BABYLON.Color4(1,0.35,0,0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.7,0.18,0);
+            this._spinTimer = 0; this._spinCount = 0; this._spinCooldown = 1.0; this._damZoneTimer = 0;
         } else if (phaseNum === 3) {
-            this._setAuraColor(new BABYLON.Color4(1, 0, 0.8, 0.9));
-            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.8, 0, 0.5);
-            this._singSpawned = false;
-            this._directTimer = 0.5;
+            this._setAuraColor(new BABYLON.Color4(1,0,0.2,0.9));
+            if (this.body.material) this.body.material.emissiveColor = new BABYLON.Color3(0.8,0,0.1);
+            this._stompTimer = 0.5; this._dashTimer = this._DASH_RATE; this._dashActive = false;
         }
-
         if (this.onPhase) this.onPhase(phaseNum);
+        const labels = ["","BRUTE — PHASE I : CHARGE","BRUTE — PHASE II : BERSERKER","BRUTE — PHASE III : FURIE"];
+        this.player.hud?.showWaveMessage?.(labels[phaseNum] ?? "");
     }
-
-    _setAuraColor(color4) {
-        const c2 = color4.clone(); c2.a *= 0.4;
-        this._phaseAura.color1    = color4;
-        this._phaseAura.color2    = c2;
-        this._phaseAura.colorDead = new BABYLON.Color4(color4.r * 0.05, color4.g * 0.05, color4.b * 0.05, 0);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 1 — PLUIE CÉLESTE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _updatePhase1(dt, pos, playerPos) {
-        // Flotte légèrement en orbite
-        const targetY = this._groundY + 0.3;
-        this.body.position.y += (targetY - this.body.position.y) * dt * 2;
-
-        // Se déplace lentement en cercle
-        const orbitR = 6;
-        this.body.position.x = playerPos.x + Math.cos(this._t * 0.5) * orbitR;
-        this.body.position.z = playerPos.z + Math.sin(this._t * 0.5) * orbitR;
-
-        // Pluie de météores
-        this._rainTimer -= dt;
-        if (this._rainTimer <= 0 && this._rainCount < this._MAX_RAIN) {
-            this._spawnRainStrike(playerPos);
-            this._rainCount++;
-            this._rainTimer = this._RAIN_RATE;
-        }
-
-        if (this._rainCount >= this._MAX_RAIN && this._rainTimer < -1.0) {
-            this._enterTransition(2);
+        if (this._chargeState === "idle") {
+            const dx = playerPos.x-pos.x, dz = playerPos.z-pos.z, d = Math.sqrt(dx*dx+dz*dz);
+            if (d > 4) { this.body.moveWithCollisions(new BABYLON.Vector3((dx/d)*3.5*dt, 0, (dz/d)*3.5*dt)); }
+            this.body.position.y = this._groundY;
+            this._chargeTimer -= dt;
+            if (this._chargeTimer <= 0) {
+                this._chargeDir = new BABYLON.Vector3(playerPos.x-pos.x,0,playerPos.z-pos.z).normalize();
+                this._chargeState = "telegraphing"; this._chargeTimer = 0.8;
+            }
+        } else if (this._chargeState === "telegraphing") {
+            this.body.position.x -= this._chargeDir.x*3.0*dt; this.body.position.z -= this._chargeDir.z*3.0*dt;
+            this.body.position.y = this._groundY + Math.sin(this._t*25)*0.12;
+            this._chargeTimer -= dt;
+            if (this._chargeTimer <= 0) {
+                this._chargeState = "charging"; this._chargeTimer = 0.55;
+                this._chargeVelX = this._chargeDir.x*22; this._chargeVelZ = this._chargeDir.z*22;
+            }
+        } else if (this._chargeState === "charging") {
+            this.body.moveWithCollisions(new BABYLON.Vector3(this._chargeVelX*dt, 0, this._chargeVelZ*dt));
+            this.body.position.y = this._groundY;
+            const dx2 = pos.x-playerPos.x, dz2 = pos.z-playerPos.z;
+            if (Math.sqrt(dx2*dx2+dz2*dz2) < 3.5 && !this.player.isDead && this._contactTimer <= 0) {
+                this.player.health?.takeDamage(2);
+                this.player.camera.position.addInPlace(new BABYLON.Vector3(dx2,0,dz2).normalize().scale(4));
+                this._contactTimer = this._CONTACT_CD;
+            }
+            this._chargeTimer -= dt;
+            if (this._chargeTimer <= 0) {
+                this._chargeState = "recovery"; this._chargeTimer = 0.7;
+                this._spawnShockwave(pos, 5.5);
+                EnemyParticles.death(this.scene, new BABYLON.Vector3(pos.x,this._groundY-2,pos.z), new BABYLON.Color3(1,0.2,0));
+            }
+        } else if (this._chargeState === "recovery") {
+            this._chargeVelX *= 0.85; this._chargeVelZ *= 0.85;
+            this.body.moveWithCollisions(new BABYLON.Vector3(this._chargeVelX*dt, 0, this._chargeVelZ*dt));
+            this.body.position.y = this._groundY + Math.abs(Math.sin(this._t*8))*0.07;
+            this._chargeTimer -= dt;
+            if (this._chargeTimer <= 0) {
+                this._chargeCount++;
+                if (this._chargeCount >= this._MAX_CHARGES) this._enterTransition(2);
+                else { this._chargeState = "idle"; this._chargeTimer = 1.2; }
+            }
         }
     }
 
-    _spawnRainStrike(playerPos) {
-        // Choisit une position aléatoire proche du joueur
-        const angle  = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 6;
-        const tx     = playerPos.x + Math.cos(angle) * radius;
-        const tz     = playerPos.z + Math.sin(angle) * radius;
-
-        // Indicateur au sol (cercle rouge qui rétrécie = indicateur d'impact)
-        const warn = BABYLON.MeshBuilder.CreateDisc("rainWarn", { radius: 1.5, tessellation: 24 }, this.scene);
-        warn.position   = new BABYLON.Vector3(tx, this._groundY + 0.06, tz);
-        warn.rotation.x = Math.PI / 2;
-        warn.isPickable = false;
-
-        const wMat = new BABYLON.StandardMaterial("rainWarnMat", this.scene);
-        wMat.emissiveColor   = new BABYLON.Color3(0.8, 0, 1);
-        wMat.backFaceCulling = false;
-        wMat.alpha           = 0.55;
-        warn.material = wMat;
-
-        // Météore (sphère tombant du ciel)
-        const meteor = BABYLON.MeshBuilder.CreateSphere("meteor", { diameter: 0.4 }, this.scene);
-        meteor.position   = new BABYLON.Vector3(tx, this._groundY + 14, tz);
-        meteor.isPickable = false;
-        meteor.alwaysSelectAsActiveMesh = true;
-
-        const mMat = new BABYLON.StandardMaterial("meteorMat", this.scene);
-        mMat.diffuseColor  = new BABYLON.Color3(0.8, 0.2, 1);
-        mMat.emissiveColor = new BABYLON.Color3(0.8, 0.2, 1);
-        meteor.material    = mMat;
-
-        const FALL_TIME = 0.7; // secondes avant impact
-        let elapsed     = 0;
-
-        const obs = this.scene.onBeforeRenderObservable.add(() => {
-            if (meteor.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
-            elapsed  += dt2;
-            const t   = Math.min(elapsed / FALL_TIME, 1);
-
-            // Descente accélérée
-            meteor.position.y = this._groundY + 14 * (1 - t * t);
-
-            // Réduction de l'indicateur
-            const sc = 1 - t * 0.5;
-            warn.scaling = new BABYLON.Vector3(sc, sc, sc);
-            wMat.alpha   = 0.55 * (1 - t * 0.3);
-
-            if (t >= 1) {
-                this.scene.onBeforeRenderObservable.remove(obs);
-                meteor.dispose();
-                warn.dispose();
-                this._meteorImpact(new BABYLON.Vector3(tx, this._groundY, tz));
+    _updatePhase2(dt, pos, playerPos) {
+        this._spinCooldown -= dt;
+        if (this._spinTimer > 0) {
+            this.body.rotation.y += 7*dt;
+            const dx = playerPos.x-pos.x, dz = playerPos.z-pos.z, d = Math.sqrt(dx*dx+dz*dz);
+            if (d > 1.5) { this.body.moveWithCollisions(new BABYLON.Vector3((dx/d)*4.5*dt, 0, (dz/d)*4.5*dt)); }
+            this.body.position.y = this._groundY;
+            this._damZoneTimer -= dt;
+            if (this._damZoneTimer <= 0) {
+                const fd = Math.sqrt((pos.x-playerPos.x)**2 + (pos.z-playerPos.z)**2);
+                if (fd < 5.0 && !this.player.isDead) {
+                    this.player.health?.takeDamage(1);
+                    EnemyParticles.death(this.scene, new BABYLON.Vector3(pos.x+(Math.random()-0.5)*5,this._groundY-2,pos.z+(Math.random()-0.5)*5), new BABYLON.Color3(1,0.3,0));
+                }
+                this._damZoneTimer = 0.25;
             }
+            this._spinTimer -= dt;
+            if (this._spinTimer <= 0) {
+                this._spinCount++; this._spawnShockwave(pos, 7);
+                if (this._spinCount >= this._MAX_SPINS) this._enterTransition(3);
+                else this._spinCooldown = 1.5;
+            }
+        } else if (this._spinCooldown <= 0) {
+            this._spinTimer = this._SPIN_DUR; this._damZoneTimer = 0;
+        } else {
+            const dx = playerPos.x-pos.x, dz = playerPos.z-pos.z, d = Math.sqrt(dx*dx+dz*dz);
+            if (d > 2) { this.body.moveWithCollisions(new BABYLON.Vector3((dx/d)*6.0*dt, 0, (dz/d)*6.0*dt)); }
+            this.body.position.y = this._groundY;
+        }
+    }
+
+    _updatePhase3(dt, pos, playerPos) {
+        if (this._dashActive) {
+            this.body.moveWithCollisions(new BABYLON.Vector3(this._dashDir.x*18*dt, 0, this._dashDir.z*18*dt));
+            this.body.position.y = this._groundY; this._dashElapsed += dt;
+            if (this._dashElapsed >= 0.35) { this._dashActive = false; this._spawnShockwave(pos, 4.5); }
+            return;
+        }
+        const dx = playerPos.x-pos.x, dz = playerPos.z-pos.z, d = Math.sqrt(dx*dx+dz*dz);
+        if (d > 1.5) { this.body.moveWithCollisions(new BABYLON.Vector3((dx/d)*7.5*dt, 0, (dz/d)*7.5*dt)); }
+        this.body.position.y = this._groundY + Math.abs(Math.sin(this._t*9))*0.12;
+        this._stompTimer -= dt;
+        if (this._stompTimer <= 0) { this._doStomp(pos); this._stompTimer = this._STOMP_RATE; }
+        this._dashTimer -= dt;
+        if (this._dashTimer <= 0) {
+            this._dashDir = new BABYLON.Vector3(dx,0,dz).normalize();
+            this._dashActive = true; this._dashElapsed = 0; this._dashTimer = this._DASH_RATE;
+            this.player._screenFlash?.("rgba(255,50,0,0.25)", 150);
+        }
+    }
+
+    _doStomp(pos) {
+        this.body.position.y = this._groundY - 0.35;
+        setTimeout(() => { if (!this.body?.isDisposed()) this.body.position.y = this._groundY; }, 100);
+        EnemyParticles.death(this.scene, new BABYLON.Vector3(pos.x,this._groundY-2,pos.z), new BABYLON.Color3(1,0.15,0));
+        [new BABYLON.Vector3(1,0,0), new BABYLON.Vector3(-1,0,0), new BABYLON.Vector3(0,0,1), new BABYLON.Vector3(0,0,-1)]
+            .forEach(d => this._spawnWave(pos, d));
+    }
+
+    _spawnWave(origin, dir) {
+        const wave = BABYLON.MeshBuilder.CreateBox("bruteWave", { width:0.6, height:0.4, depth:0.6 }, this.scene);
+        wave.position = new BABYLON.Vector3(origin.x, this._groundY-2.3, origin.z); wave.isPickable = false;
+        const mat = new BABYLON.StandardMaterial("bruteWaveMat", this.scene);
+        mat.emissiveColor = new BABYLON.Color3(1,0.2,0); mat.backFaceCulling = false; mat.alpha = 0.85;
+        wave.material = mat;
+        const SPEED = 12, MAX_DIST = 12; let traveled = 0;
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
+            if (wave.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
+            const step = SPEED * (this.scene.getEngine().getDeltaTime()/1000);
+            wave.position.x += dir.x*step; wave.position.z += dir.z*step; traveled += step;
+            mat.alpha = 0.85 * (1 - traveled/MAX_DIST);
+            const p = this.player.camera.globalPosition;
+            const dx = wave.position.x-p.x, dz = wave.position.z-p.z;
+            if (Math.sqrt(dx*dx+dz*dz) < 1.2 && !this.player.isDead) {
+                this.player.health?.takeDamage(1);
+                this.player.camera.position.addInPlace(dir.scale(2.5));
+            }
+            if (traveled >= MAX_DIST) { this.scene.onBeforeRenderObservable.remove(obs); wave.dispose(); }
         });
     }
 
-    _meteorImpact(center) {
-        const BLAST_R = 2.0;
-
-        EnemyParticles.death(this.scene, new BABYLON.Vector3(center.x, center.y + 0.5, center.z), new BABYLON.Color3(0.8, 0.2, 1));
-
-        // Onde d'impact
-        const ring = BABYLON.MeshBuilder.CreateDisc("meteorBlast", { radius: 0.1, tessellation: 32 }, this.scene);
-        ring.position   = new BABYLON.Vector3(center.x, center.y + 0.08, center.z);
-        ring.rotation.x = Math.PI / 2;
-        ring.isPickable = false;
-
-        const rMat = new BABYLON.StandardMaterial("meteorBlastMat", this.scene);
-        rMat.emissiveColor   = new BABYLON.Color3(0.8, 0.2, 1);
-        rMat.backFaceCulling = false;
-        rMat.alpha           = 0.9;
-        ring.material        = rMat;
-
-        // Dégâts joueur
-        const pPos = this.player.camera.globalPosition;
-        const d = Math.sqrt((center.x - pPos.x)**2 + (center.z - pPos.z)**2);
-        if (d < BLAST_R && !this.player.isDead) this.player.health?.takeDamage(2);
-
+    _spawnShockwave(pos, radius) {
+        const ring = BABYLON.MeshBuilder.CreateDisc("bruteShock", { radius:0.2, tessellation:32 }, this.scene);
+        ring.position = new BABYLON.Vector3(pos.x, this._groundY-2.3, pos.z);
+        ring.rotation.x = Math.PI/2; ring.isPickable = false;
+        const mat = new BABYLON.StandardMaterial("bruteShockMat", this.scene);
+        mat.emissiveColor = new BABYLON.Color3(1,0.2,0); mat.backFaceCulling = false; mat.alpha = 0.85;
+        ring.material = mat;
+        const p = this.player.camera.globalPosition;
+        if (Math.sqrt((pos.x-p.x)**2+(pos.z-p.z)**2) < radius && !this.player.isDead) this.player.health?.takeDamage(1);
         const start = Date.now();
-        const obs   = this.scene.onBeforeRenderObservable.add(() => {
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
             if (ring.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            const t = Math.min((Date.now() - start) / 350, 1);
-            const r = t * BLAST_R * 2;
-            ring.scaling = new BABYLON.Vector3(r, r, r);
-            rMat.alpha   = 0.9 * (1 - t);
+            const t = Math.min((Date.now()-start)/500,1);
+            ring.scaling = new BABYLON.Vector3(t*radius*2, t*radius*2, t*radius*2);
+            mat.alpha = 0.85*(1-t);
             if (t >= 1) { this.scene.onBeforeRenderObservable.remove(obs); ring.dispose(); }
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 2 — MUR DE BALLES
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    _updatePhase2(dt, pos, playerPos) {
-        // Reste au sol
-        const targetY = this._groundY;
-        this.body.position.y += (targetY - this.body.position.y) * dt * 2;
-
-        // Reste au-dessus du centre
-        this.body.position.x += (this._arenaCenter.x - this.body.position.x) * dt * 1.5;
-        this.body.position.z += (this._arenaCenter.z - this.body.position.z) * dt * 1.5;
-
-        // Lance un mur toutes les X secondes
-        this._wallTimer -= dt;
-        if (this._wallTimer <= 0 && this._wallCount < this._MAX_WALLS) {
-            this._spawnBulletWall(pos, playerPos);
-            this._wallCount++;
-            this._wallTimer = this._WALL_RATE;
-        }
-
-        if (this._wallCount >= this._MAX_WALLS && this._wallTimer < -1.5) {
-            this._enterTransition(3);
-        }
-    }
-
-    _spawnBulletWall(bossPos, playerPos) {
-        // Direction du mur : perpendiculaire à la direction vers le joueur
-        const toPlayer = playerPos.subtract(bossPos);
-        toPlayer.y = 0;
-        toPlayer.normalize();
-
-        // Perpendiculaire
-        const perp = new BABYLON.Vector3(-toPlayer.z, 0, toPlayer.x);
-
-        // Centre du mur : position du joueur
-        const wallCenter = new BABYLON.Vector3(playerPos.x, this._groundY + 1.0, playerPos.z);
-
-        const N    = 9;   // nb de projectiles dans le mur
-        const SPAN = 12;  // largeur du mur en unités
-
-        for (let i = 0; i < N; i++) {
-            const t      = (i / (N - 1)) - 0.5; // -0.5 à 0.5
-            const offset = perp.scale(t * SPAN);
-            const origin = wallCenter.add(offset);
-            // Direction : vers le joueur + légère variation
-            const dir = toPlayer.clone();
-
-            // Délai léger par position (vague)
-            const delay = Math.abs(t) * 150;
-            setTimeout(() => {
-                if (!this.scene || this._dead) return;
-                this._fireWallProjectile(origin, dir);
-            }, delay);
-        }
-
-        // Indicateur ligne au sol (avertissement)
-        this._spawnWallIndicator(playerPos, perp);
-    }
-
-    _spawnWallIndicator(playerPos, perp) {
-        const N = 9, SPAN = 12;
-        const indicators = [];
-
-        for (let i = 0; i < N; i++) {
-            const t      = (i / (N - 1)) - 0.5;
-            const offset = perp.scale(t * SPAN);
-            const ind    = BABYLON.MeshBuilder.CreateDisc("wallInd", { radius: 0.6, tessellation: 16 }, this.scene);
-            ind.position   = new BABYLON.Vector3(playerPos.x + offset.x, this._groundY + 0.06, playerPos.z + offset.z);
-            ind.rotation.x = Math.PI / 2;
-            ind.isPickable = false;
-
-            const mat = new BABYLON.StandardMaterial("wallIndMat", this.scene);
-            mat.emissiveColor   = new BABYLON.Color3(1, 0.4, 0);
-            mat.backFaceCulling = false;
-            mat.alpha           = 0.5;
-            ind.material = mat;
-            indicators.push(ind);
-        }
-
-        // Disparaît après 0.5s (avant l'impact)
-        setTimeout(() => {
-            indicators.forEach(ind => { if (!ind.isDisposed()) ind.dispose(); });
-        }, 450);
-    }
-
-    _fireWallProjectile(origin, dir) {
-        const bullet = BABYLON.MeshBuilder.CreateCylinder("voidWallBullet", {
-            height: 0.6, diameter: 0.28, tessellation: 8,
-        }, this.scene);
-        bullet.position   = origin.clone();
-        bullet.isPickable = false;
-        bullet.alwaysSelectAsActiveMesh = true;
-
-        try {
-            bullet.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionRH(
-                dir, BABYLON.Vector3.Up(),
-            );
-            bullet.rotate(BABYLON.Axis.X, Math.PI / 2, BABYLON.Space.LOCAL);
-        } catch(_){}
-
-        const mat = new BABYLON.StandardMaterial("voidWallBulMat", this.scene);
-        mat.diffuseColor  = new BABYLON.Color3(1, 0.4, 0);
-        mat.emissiveColor = new BABYLON.Color3(1, 0.4, 0);
-        bullet.material   = mat;
-
-        const SPEED    = 11.0;
-        const spawnTime = Date.now();
-
-        const obs = this.scene.onBeforeRenderObservable.add(() => {
-            if (bullet.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
-
-            const pPos = this.player.camera.globalPosition;
-            const dx = bullet.position.x - pPos.x;
-            const dy = bullet.position.y - (pPos.y - 1.0);
-            const dz = bullet.position.z - pPos.z;
-            if (Math.sqrt(dx*dx + dy*dy + dz*dz) < 0.65 && !this.player.isDead) {
-                this.player.health?.takeDamage(1);
-                this.scene.onBeforeRenderObservable.remove(obs);
-                bullet.dispose();
-                return;
-            }
-
-            bullet.position.addInPlace(dir.scale(SPEED * dt2));
-
-            if (Date.now() - spawnTime > 3500) {
-                this.scene.onBeforeRenderObservable.remove(obs);
-                bullet.dispose();
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 3 — SINGULARITÉS + TIRS DIRECTS
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    _updatePhase3(dt, pos, playerPos) {
-        const targetY = this._groundY + 1.0;
-        this.body.position.y += (targetY - this.body.position.y) * dt * 2;
-        // Reste centré
-        this.body.position.x += (this._arenaCenter.x - this.body.position.x) * dt;
-        this.body.position.z += (this._arenaCenter.z - this.body.position.z) * dt;
-
-        // Spawn zones une fois
-        if (!this._singSpawned) {
-            this._spawnSingularities(playerPos);
-            this._singSpawned = true;
-        }
-
-        // Mise à jour des zones (pulsation + dégâts)
-        this._updateSingZones(dt, playerPos);
-
-        // Tirs directs sur le joueur
-        this._directTimer -= dt;
-        if (this._directTimer <= 0) {
-            this._fireDirectShot(pos, playerPos);
-            this._directTimer = this._DIRECT_RATE;
-        }
-
-        // Phase infinie jusqu'à la mort
-    }
-
-    _spawnSingularities(playerPos) {
-        const N = 5;
-        for (let i = 0; i < N; i++) {
-            const angle  = (i / N) * Math.PI * 2;
-            const radius = 6 + Math.random() * 4;
-            const sx     = playerPos.x + Math.cos(angle) * radius;
-            const sz     = playerPos.z + Math.sin(angle) * radius;
-
-            const zone = BABYLON.MeshBuilder.CreateDisc("singZone", { radius: 2.5, tessellation: 32 }, this.scene);
-            zone.position   = new BABYLON.Vector3(sx, this._groundY + 0.07, sz);
-            zone.rotation.x = Math.PI / 2;
-            zone.isPickable = false;
-
-            const mat = new BABYLON.StandardMaterial("singZoneMat", this.scene);
-            mat.emissiveColor   = new BABYLON.Color3(1, 0, 0.6);
-            mat.backFaceCulling = false;
-            mat.alpha           = 0.45;
-            zone.material = mat;
-
-            this._singZones.push({ mesh: zone, mat, damTimer: 0, pulseT: Math.random() * Math.PI * 2 });
-        }
-    }
-
-    _updateSingZones(dt, playerPos) {
-        for (const z of this._singZones) {
-            if (!z.mesh || z.mesh.isDisposed()) continue;
-
-            z.pulseT += dt * 3;
-            const pulse = 0.3 + Math.sin(z.pulseT) * 0.25;
-            z.mat.alpha           = 0.2 + Math.abs(Math.sin(z.pulseT)) * 0.5;
-            z.mat.emissiveColor   = new BABYLON.Color3(1, pulse * 0.2, 0.6);
-
-            // Agrandissement progressif
-            const sc = 1 + Math.min(this._t * 0.015, 0.8);
-            z.mesh.scaling = new BABYLON.Vector3(sc, sc, sc);
-
-            // Dégâts si joueur dessus
-            z.damTimer -= dt;
-            if (z.damTimer <= 0) {
-                const dx = z.mesh.position.x - playerPos.x;
-                const dz = z.mesh.position.z - playerPos.z;
-                if (Math.sqrt(dx*dx + dz*dz) < 2.5 * sc && !this.player.isDead) {
-                    this.player.health?.takeDamage(1);
-                }
-                z.damTimer = 0.6;
-            }
-        }
-    }
-
-    _clearSingZones() {
-        for (const z of this._singZones) {
-            if (z.mesh && !z.mesh.isDisposed()) z.mesh.dispose();
-        }
-        this._singZones = [];
-    }
-
-    _fireDirectShot(from, playerPos) {
-        const origin = new BABYLON.Vector3(from.x, from.y, from.z);
-        const dir    = playerPos.subtract(origin).normalize();
-
-        const bullet = BABYLON.MeshBuilder.CreateSphere("voidDirectBul", { diameter: 0.3 }, this.scene);
-        bullet.position   = origin.clone();
-        bullet.isPickable = false;
-        bullet.alwaysSelectAsActiveMesh = true;
-
-        const mat = new BABYLON.StandardMaterial("voidDirMat", this.scene);
-        mat.diffuseColor  = new BABYLON.Color3(1, 0, 0.8);
-        mat.emissiveColor = new BABYLON.Color3(1, 0, 0.8);
-        bullet.material   = mat;
-
-        const SPEED     = 13.0;
-        const spawnTime = Date.now();
-
-        const obs = this.scene.onBeforeRenderObservable.add(() => {
-            if (bullet.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
-            const dt2  = this.scene.getEngine().getDeltaTime() / 1000;
-
-            const pPos = this.player.camera.globalPosition;
-            const dx = bullet.position.x - pPos.x;
-            const dy = bullet.position.y - (pPos.y - 1.0);
-            const dz = bullet.position.z - pPos.z;
-            if (Math.sqrt(dx*dx + dy*dy + dz*dz) < 0.6 && !this.player.isDead) {
-                this.player.health?.takeDamage(1);
-                this.scene.onBeforeRenderObservable.remove(obs);
-                bullet.dispose();
-                return;
-            }
-
-            bullet.position.addInPlace(dir.scale(SPEED * dt2));
-
-            if (Date.now() - spawnTime > 3000) {
-                this.scene.onBeforeRenderObservable.remove(obs);
-                bullet.dispose();
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DÉGÂTS / MORT
-    // ═══════════════════════════════════════════════════════════════════════════
-
     takeDamage(amount) {
         if (this._dead || this._dying || this._invincible) return;
         if (!this.body || this.body.isDisposed()) return;
-
         this.currentHealth = Math.max(0, this.currentHealth - amount);
-
         if (this.body.material) {
             const orig = this.body.material.emissiveColor.clone();
-            this.body.material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-            setTimeout(() => {
-                if (!this.body?.isDisposed() && this.body?.material)
-                    this.body.material.emissiveColor = orig;
-            }, 100);
+            this.body.material.emissiveColor = new BABYLON.Color3(1,1,1);
+            setTimeout(() => { if (!this.body?.isDisposed() && this.body?.material) this.body.material.emissiveColor = orig; }, 100);
         }
-
         if (this.onDamage) this.onDamage(this.currentHealth, this.maxHealth);
-
-        if (this.currentHealth <= 0) {
-            this._dying = true;
-            this._die();
-        }
+        if (this.currentHealth <= 0) { this._dying = true; this._die(); }
     }
 
     _die() {
-        if (this._dead) return;
-        this._dead = true;
-        this._clearSingZones();
-
+        if (this._dead) return; this._dead = true;
         this.scene.onBeforeRenderObservable.remove(this._obs);
-        this._phaseAura.stop();
-        this._transAura.stop();
-
-        EnemyParticles.death(this.scene, this.body.position.clone(), new BABYLON.Color3(0.6, 0, 1));
-
-        if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
-
-        // Mort spectaculaire : plusieurs explosions en cascade
-        let burst = 0;
-        const burstInterval = setInterval(() => {
-            if (this.body.isDisposed() || burst >= 5) { clearInterval(burstInterval); return; }
-            const offset = new BABYLON.Vector3(
-                (Math.random() - 0.5) * 3,
-                (Math.random() - 0.5) * 3,
-                (Math.random() - 0.5) * 3,
-            );
-            EnemyParticles.death(this.scene, this.body.position.add(offset), new BABYLON.Color3(0.8, 0, 1));
-            burst++;
+        this._phaseAura.stop(); this._transAura.stop();
+        EnemyParticles.death(this.scene, this.body.position.clone(), new BABYLON.Color3(1,0.15,0));
+        let n = 0;
+        const burst = setInterval(() => {
+            if (this.body?.isDisposed() || n >= 5) { clearInterval(burst); return; }
+            const off = new BABYLON.Vector3((Math.random()-0.5)*4,(Math.random()-0.5)*3,(Math.random()-0.5)*4);
+            EnemyParticles.death(this.scene, this.body.position.add(off), new BABYLON.Color3(1,0.2,0)); n++;
         }, 200);
-
-        const startY = this.body.position.y;
-        const start  = Date.now();
-        const deathObs = this.scene.onBeforeRenderObservable.add(() => {
-            if (this.body.isDisposed()) { this.scene.onBeforeRenderObservable.remove(deathObs); return; }
-            const t = Math.min((Date.now() - start) / 1500, 1);
-            this.body.scaling = new BABYLON.Vector3(1 - t * 0.8, 1 + t * 0.4, 1 - t * 0.8);
-            this.body.position.y = startY + t * 5;
-            if (t >= 1) {
-                this.scene.onBeforeRenderObservable.remove(deathObs);
-                this.body.dispose();
-                if (this.onDeath) this.onDeath();
-            }
-        });
+        if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
+        setTimeout(() => { if (!this.body?.isDisposed()) this.body.dispose(); if (this.onDeath) this.onDeath(); }, 1500);
     }
 
     dispose() {
         this._dead = true;
-        this._clearSingZones();
         try { this.scene.onBeforeRenderObservable.remove(this._obs); } catch(_){}
-        this._phaseAura?.stop();
-        this._transAura?.stop();
+        this._phaseAura?.stop(); this._transAura?.stop();
         if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
         if (this.body && !this.body.isDisposed()) this.body.dispose();
     }

@@ -10,6 +10,18 @@ import { UpgradeManager }  from "../Systems/UpgradeManager";
 import { MinimapManager } from '../Systems/MinimapManager';
 
 
+function _getRoomTypeForUpgrade(roomIdx) {
+    if (roomIdx === 0) return "spawn";
+    const cycleLen   = 5;
+    const posInCycle = ((roomIdx - 1) % cycleLen) + 1; // 1..5
+    const cycle      = Math.ceil(roomIdx / cycleLen);
+    if (posInCycle <= 3) return "normal";
+    if (posInCycle === 4) return "boss";
+    if (cycle === 1) return "shop";
+    if (cycle === 2) return "forge";
+    return "challenge";
+}
+
 export class GameScene {
     constructor(canvasId) {
         const canvas = document.getElementById(canvasId);
@@ -182,9 +194,12 @@ export class GameScene {
             const isNew = !this.visitedRooms.has(idx);
             this.visitedRooms.add(idx);
 
-            if(idx !==0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            if(idx !== 0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            const roomType = _getRoomTypeForUpgrade(idx);
+            if (roomType === "normal") {
                 await this._waitForUpgradeChoice(scene);
             }
+        }
 
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
                 (room.worldX + room.cols / 2) * 4, 2, (room.worldZ + room.rows / 2) * 4,

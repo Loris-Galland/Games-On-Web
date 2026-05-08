@@ -6,6 +6,8 @@ import { BossEnemy }        from "../Enemies/BossEnemy";
 import { EnemyParticles }   from "../Enemies/EnemyParticles";
 import { resetSlotCounter } from "../Enemies/BaseEnemy";
 import { WeaponShopRoom, ChallengeRoom, ForgeRoom } from "./SpecialRooms";
+import { BossEnemy2 } from "../Enemies/BossEnemy2";
+import { BossEnemy3 } from "../Enemies/BossEnemy3";
 
 /**
  * WaveManager — Cycle 3×(4 normales + 1 boss + 1 spéciale)
@@ -50,6 +52,7 @@ const BASE_WAVE_COMPOSITIONS = {
 // Généré dynamiquement pour les 3 cycles
 function getRoomType(roomIdx) {
     if (roomIdx === 0) return "spawn";
+    if (roomIdx === 1) return "boss";
 
     // Cycles : chaque cycle = 6 salles (4 normales + 1 boss + 1 spéciale)
     // Cycle 1 : salles 1-6
@@ -122,7 +125,7 @@ export class WaveManager {
                 break;
             case "boss":
                 this._spawnDoors(entryPos, exitPos, entryRot, exitRot);
-                this._startBossRoom(roomCenter, cycle);
+                this._startBossRoom(roomCenter, 3);
                 break;
             case "shop":
                 this._handleShopRoom(roomCenter);
@@ -212,16 +215,23 @@ export class WaveManager {
     _startBossRoom(center, cycle) {
         this.isWaveActive = true;
         const cycleLabel  = ["I", "II", "III"][cycle - 1] ?? cycle;
-        this.hud?.showWaveMessage?.(`ARCHON-${cycle} DÉTECTÉ — PRÉPAREZ-VOUS`);
-
-        // Difficulté boss selon cycle : hp + vitesse croissants
-        const hpMultiplier    = 1.0 + (cycle - 1) * 0.5;   // ×1.0 / ×1.5 / ×2.0
+        const bossNames   = ["ARCHON", "NEXUS", "VOIDBRINGER"];
+        const bossName    = bossNames[cycle - 1] ?? `BOSS-${cycle}`;
+        this.hud?.showWaveMessage?.(`${bossName} DÉTECTÉ — PRÉPAREZ-VOUS`);
+ 
+        // Difficulté selon cycle
+        const hpMultiplier    = 1.0 + (cycle - 1) * 0.5;
         const speedMultiplier = 1.0 + (cycle - 1) * 0.25;
-
+ 
         const bossPos = new BABYLON.Vector3(center?.x ?? 0, 1.5, center?.z ?? 0);
-
+ 
+        // Sélection de la classe de boss selon le cycle
+        const BossClass = cycle === 2 ? BossEnemy2
+                        : cycle === 3 ? BossEnemy3
+                        :               BossEnemy;   // cycle 1 = boss original
+ 
         setTimeout(() => {
-            this._boss = new BossEnemy(
+            this._boss = new BossClass(
                 this.scene, bossPos, this.player, this._navManager,
                 (type, pos) => {
                     const e = this._createEnemy(type, pos, 1.2 * speedMultiplier);
@@ -231,32 +241,31 @@ export class WaveManager {
                     }
                 },
             );
-
-            // Appliquer les modificateurs de cycle
-            this._boss.maxHealth     = Math.round(20 * hpMultiplier);
+ 
+            // Modificateurs de cycle
+            this._boss.maxHealth     = Math.round(this._boss.maxHealth * hpMultiplier);
             this._boss.currentHealth = this._boss.maxHealth;
-            this._boss.speed         = 2.5 * speedMultiplier;
-
-            // Phase 3 activée directement en cycle 3
-            if (cycle >= 3) {
-                this._boss.phase = 3;
+            if (this._boss.speed !== undefined) this._boss.speed = 2.5 * speedMultiplier;
+ 
+            // Phase 3 directement en cycle 3
+            if (cycle >= 3 && this._boss.speed !== undefined) {
                 this._boss.speed = 4.0;
             }
-
+ 
             this.hud?.showBossBar?.(this._boss.maxHealth);
-
+ 
             this._boss.onDamage = (current, max) => {
                 this.hud?.updateBossBar?.(current, max);
             };
-
+ 
             this._boss.onPhase = (phase) => {
-                this.hud?.showWaveMessage?.(`ARCHON-${cycle} — PHASE ${phase}`);
+                this.hud?.showWaveMessage?.(`${bossName}-${cycleLabel} — PHASE ${phase}`);
                 this.scoreManager?.onBossPhase?.(phase);
             };
-
+ 
             this._boss.onDeath = () => {
                 this.hud?.hideBossBar?.();
-                this.hud?.showWaveMessage?.(`ARCHON-${cycleLabel} NEUTRALISÉ`);
+                this.hud?.showWaveMessage?.(`${bossName} NEUTRALISÉ`);
                 this.scoreManager?.onBossKill?.();
                 this.scoreManager?.onRoomClear?.();
                 this.isWaveActive = false;
@@ -264,8 +273,8 @@ export class WaveManager {
                 this._clearedRooms.add(this._currentRoomIdx);
                 setTimeout(() => this._openDoors(), 2000);
             };
-
-            this.hud?.showWaveMessage?.(`ARCHON-${cycleLabel} EST LÀ !`);
+ 
+            this.hud?.showWaveMessage?.(`${bossName} EST LÀ !`);
         }, 3000);
     }
 

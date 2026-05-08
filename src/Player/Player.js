@@ -15,26 +15,21 @@ export class Player {
         this.isDead    = false;
 
         this.getStatsCallback = null;
-        this.onEnemyKilled    = null; // hook pour lifesteal etc.
+        this.onEnemyKilled    = null;
 
         // ── Caméra ────────────────────────────────────────────────────────────
-        this.camera = new BABYLON.UniversalCamera(
-            "playerCam",
-            new BABYLON.Vector3(0, 1.5, 0),
-            this.scene,
-        );
+        this.camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(0, 1.5, 0), this.scene);
         this.camera.attachControl(this.canvas, true);
-        this.camera.checkCollisions = true;
-        this.camera.applyGravity    = true;
-        this.camera.ellipsoid       = new BABYLON.Vector3(0.25, 1.5, 0.25);
-        this.camera.ellipsoidOffset = new BABYLON.Vector3(0, 1.5, 0);
-        this.camera.slopLimit       = 90;
-        this.camera.stepOffset      = 0.4;
-        this.camera.minZ            = 0.1;
-        this.camera.speed           = this.speed;
+        this.camera.checkCollisions    = true;
+        this.camera.applyGravity       = true;
+        this.camera.ellipsoid          = new BABYLON.Vector3(0.25, 1.5, 0.25);
+        this.camera.ellipsoidOffset    = new BABYLON.Vector3(0, 1.5, 0);
+        this.camera.slopLimit          = 90;
+        this.camera.stepOffset         = 0.4;
+        this.camera.minZ               = 0.1;
+        this.camera.speed              = this.speed;
         this.camera.angularSensibility = 5000;
-        this.camera.layerMask       = 0x0FFFFFFF;
-
+        this.camera.layerMask          = 0x0FFFFFFF;
         this.camera.keysUp    = [90, 87];
         this.camera.keysDown  = [83];
         this.camera.keysLeft  = [81, 65];
@@ -55,14 +50,18 @@ export class Player {
 
         this.currentTilt = 0;
         this.bobTimer    = 0;
-        this.jumpForce   = 0;
 
-        // ── États des capacités (activées par upgrades) ───────────────────────
+        // ── Saut : on gère nous-mêmes la vélocité verticale ──────────────────
+        // applyGravity reste true pour que la caméra colle au sol normalement.
+        // On injecte la vélocité via camera._localDirection.y chaque frame.
+        this._jumpVelocity = 0;           // vitesse verticale courante (unités/frame)
+        this._JUMP_INIT    = 0.22;        // impulsion initiale
+        this._GRAVITY      = 0.012;       // gravité par frame
+
+        // ── États capacités ───────────────────────────────────────────────────
         this._dashEnabled    = false;
         this._dashCooldown   = 0;
         this._DASH_CD        = 1500;
-        this._DASH_FORCE     = 18;
-        this._DASH_DUR       = 120;
         this._isDashing      = false;
 
         this._blinkEnabled   = false;
@@ -86,9 +85,11 @@ export class Player {
         this._empCooldown  = 0;
         this._EMP_CD       = 10000;
 
-        this._lastStandReady = false;
+        // Vignette berserk (bords écran uniquement)
+        this._berserkVignette = this._createVignette(
+            "radial-gradient(ellipse at center, transparent 50%, rgba(180,0,0,0.6) 100%)"
+        );
 
-        // Référence au GamepadManager (injectée depuis main.js après construction)
         this.gamepad = null;
 
         this.scene.registerBeforeRender(() => {
@@ -100,6 +101,7 @@ export class Player {
             this._updateWeaponRecoilRecovery();
             this._updateCooldowns(dt);
             this._updateStomp();
+            this._updateAbilityHUD();
         });
     }
 
@@ -113,33 +115,44 @@ export class Player {
         setTimeout(() => { this._gameOverScreen.show(stats); }, 600);
     }
 
-    // ── Inputs clavier ────────────────────────────────────────────────────────
+    // ── Inputs ────────────────────────────────────────────────────────────────
 
     _initInputs() {
+        // window.addEventListener pour pouvoir faire preventDefault sur Space/Shift/Tab
+        window.addEventListener("keydown", (e) => {
+            if (this.isDead) return;
+
+            if (["Space", "ShiftLeft", "ShiftRight", "Tab"].includes(e.code)) {
+                e.preventDefault();
+            }
+
+            const key = e.key.toLowerCase();
+            this.inputMap[key] = true;
+
+            switch (e.code) {
+                case "Space":      this._jump();    break;
+                case "ShiftLeft":
+                case "ShiftRight": this._tryDash(); break;
+            }
+            switch (key) {
+                case "f": this._tryShield();  break;
+                case "g": this._tryEMP();     break;
+                case "q": if (this._berserkEnabled) this._tryBerserk(); break;
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            this.inputMap[e.key.toLowerCase()] = false;
+        });
+
+        // Observable Babylon pour la compatibilité WeaponManager
         this.scene.onKeyboardObservable.add((kbInfo) => {
             if (this.isDead) return;
-            const key  = kbInfo.event.key.toLowerCase();
-            const code = kbInfo.event.code;
-
+            const key = kbInfo.event.key.toLowerCase();
             if (kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN) {
                 this.inputMap[key] = true;
-
-                if (code === "Space")      this._jump();
-                if (code === "ShiftLeft" || code === "ShiftRight") this._tryDash();
-                if (key === "f")           this._tryShield();
-                if (key === "q" && !this.inputMap["_q_handled"]) {
-                    // 'q' est aussi la touche de déplacement gauche (AZERTY)
-                    // On active berserk seulement si le berserk est débloqué
-                    if (this._berserkEnabled) {
-                        this.inputMap["_q_handled"] = true;
-                        this._tryBerserk();
-                    }
-                }
-                if (key === "g")           this._tryEMP();
-
             } else {
                 this.inputMap[key] = false;
-                if (key === "q") this.inputMap["_q_handled"] = false;
             }
         });
 
@@ -147,166 +160,303 @@ export class Player {
         this.scene.onPointerObservable.add((pointerInfo) => {
             if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERDOWN) return;
             if (pointerInfo.event.button !== 2) return;
-            this._tryBlink();
+            if (this._blinkEnabled) this._tryBlink();
         });
     }
 
     // ── Cooldowns ─────────────────────────────────────────────────────────────
 
     _updateCooldowns(dt) {
-        if (this._dashCooldown   > 0) this._dashCooldown   = Math.max(0, this._dashCooldown   - dt);
-        if (this._blinkCooldown  > 0) this._blinkCooldown  = Math.max(0, this._blinkCooldown  - dt);
-        if (this._shieldCooldown > 0) this._shieldCooldown = Math.max(0, this._shieldCooldown - dt);
-        if (this._empCooldown    > 0) this._empCooldown    = Math.max(0, this._empCooldown    - dt);
-        if (this._berserkCooldown> 0) this._berserkCooldown= Math.max(0, this._berserkCooldown- dt);
+        if (this._dashCooldown    > 0) this._dashCooldown    = Math.max(0, this._dashCooldown    - dt);
+        if (this._blinkCooldown   > 0) this._blinkCooldown   = Math.max(0, this._blinkCooldown   - dt);
+        if (this._shieldCooldown  > 0) this._shieldCooldown  = Math.max(0, this._shieldCooldown  - dt);
+        if (this._empCooldown     > 0) this._empCooldown     = Math.max(0, this._empCooldown     - dt);
+        if (this._berserkCooldown > 0) this._berserkCooldown = Math.max(0, this._berserkCooldown - dt);
+    }
+
+    _updateAbilityHUD() {
+        if (!this.hud?.updateAbilityCooldowns) return;
+        this.hud.updateAbilityCooldowns({
+            dash:    { enabled: this._dashEnabled,    cd: this._dashCooldown,    max: this._DASH_CD,    key: "SHIFT" },
+            blink:   { enabled: this._blinkEnabled,   cd: this._blinkCooldown,   max: this._BLINK_CD,   key: "CLIC D" },
+            shield:  { enabled: this._shieldEnabled,  cd: this._shieldCooldown,  max: this._SHIELD_CD,  key: "F",    active: this._shieldActive },
+            berserk: { enabled: this._berserkEnabled, cd: this._berserkCooldown, max: this._BERSERK_CD, key: "Q",    active: this._berserkActive },
+            emp:     { enabled: this._empEnabled,     cd: this._empCooldown,     max: this._EMP_CD,     key: "G" },
+        });
+    }
+
+    // ── SAUT ─────────────────────────────────────────────────────────────────
+    // On détecte le sol avec un raycast, puis on gère la vélocité verticale
+    // manuellement via moveWithCollisions — ce qui respecte les collisions.
+
+    _isOnGround() {
+        const ray = new BABYLON.Ray(this.camera.position, new BABYLON.Vector3(0, -1, 0), 1.2);
+        const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "weapon");
+        return hit.hit;
+    }
+
+    _jump() {
+        if (this._jumpVelocity > 0) return;  // déjà en l'air
+        if (!this._isOnGround()) return;       // pas au sol
+        this._jumpVelocity = this._JUMP_INIT;
+    }
+
+    _updateJump() {
+        if (this._jumpVelocity === 0) return;
+
+        // Appliquer la vélocité verticale via moveWithCollisions
+        const displacement = new BABYLON.Vector3(0, this._jumpVelocity, 0);
+        this.camera.moveWithCollisions(displacement);
+
+        // Gravité
+        this._jumpVelocity -= this._GRAVITY;
+
+        // On s'arrête dès qu'on retouche le sol et qu'on descend
+        if (this._jumpVelocity < 0 && this._isOnGround()) {
+            this._jumpVelocity = 0;
+        }
     }
 
     // ── DASH ─────────────────────────────────────────────────────────────────
+    // On utilise moveWithCollisions par petits pas pour respecter les murs.
 
     _tryDash() {
-        if (!this._dashEnabled)       return;
-        if (this._dashCooldown > 0)   return;
-        if (this._isDashing)          return;
+        if (!this._dashEnabled)     return;
+        if (this._dashCooldown > 0) return;
+        if (this._isDashing)        return;
 
         this._dashCooldown = this._DASH_CD;
         this._isDashing    = true;
 
-        // Direction du dash = direction de mouvement clavier, sinon forward
         const forward = this.camera.getForwardRay().direction.normalize();
-        const right   = BABYLON.Vector3.Cross(forward, BABYLON.Vector3.Up()).normalize();
+        // On aplatit forward sur le plan horizontal pour éviter de monter/descendre
+        const flatForward = new BABYLON.Vector3(forward.x, 0, forward.z).normalize();
+        const right       = BABYLON.Vector3.Cross(flatForward, BABYLON.Vector3.Up()).normalize();
 
         let dir = BABYLON.Vector3.Zero();
-        if (this.inputMap["z"] || this.inputMap["w"]) dir = dir.add(forward);
-        if (this.inputMap["s"])                        dir = dir.subtract(forward);
+        if (this.inputMap["z"] || this.inputMap["w"]) dir = dir.add(flatForward);
+        if (this.inputMap["s"])                        dir = dir.subtract(flatForward);
         if (this.inputMap["q"] || this.inputMap["a"]) dir = dir.subtract(right);
         if (this.inputMap["d"])                        dir = dir.add(right);
-
-        if (dir.length() < 0.01) dir = forward; // fallback: dash en avant
+        if (dir.length() < 0.01) dir = flatForward;
         dir = dir.normalize();
 
-        // Flash visuel blanc
-        this._screenFlash("rgba(255,255,255,0.25)", 150);
+        // FX visuel
+        this._dashWeaponFX(dir);
+        this._spawnDashTrail();
 
-        // Impulsion par steps sur _DASH_DUR ms
-        const steps    = 8;
-        const stepDur  = this._DASH_DUR / steps;
-        const impulse  = dir.scale(this._DASH_FORCE / steps);
+        // Distance totale du dash : 4 unités en 120ms → 10 steps de 0.4u
+        const totalDist = 4;
+        const steps     = 12;
+        const stepDur   = 120 / steps;
+        const stepDist  = totalDist / steps;
+        const stepVec   = dir.scale(stepDist);
 
         let step = 0;
-        const interval = setInterval(() => {
+        const iv = setInterval(() => {
             if (step >= steps || this.isDead) {
-                clearInterval(interval);
+                clearInterval(iv);
                 this._isDashing = false;
                 return;
             }
-            this.camera.cameraDirection.addInPlace(impulse);
+            // moveWithCollisions respecte les murs et le sol
+            this.camera.moveWithCollisions(stepVec);
             step++;
         }, stepDur);
-
-        this.hud?.showWaveMessage?.("DASH");
     }
 
-    // ── BLINK (téléportation sur ennemi) ─────────────────────────────────────
+    _dashWeaponFX(dir) {
+        if (!this.weapon) return;
+        this.weapon.position.x = this.weaponOriginalPos.x - dir.x * 0.25;
+        this.weapon.position.z = this.weaponOriginalPos.z - 0.2;
+    }
+
+    _spawnDashTrail() {
+        const tex = "https://assets.babylonjs.com/textures/flare.png";
+        const emitter = BABYLON.MeshBuilder.CreateBox("_dashEmitter", { size: 0.01 }, this.scene);
+        emitter.parent     = this.camera;
+        emitter.position   = new BABYLON.Vector3(0, 0, -0.5);
+        emitter.isVisible  = false;
+        emitter.isPickable = false;
+
+        const ps = new BABYLON.ParticleSystem("dashTrail", 40, this.scene);
+        ps.particleTexture = new BABYLON.Texture(tex, this.scene);
+        ps.emitter         = emitter;
+        ps.minEmitBox      = new BABYLON.Vector3(-0.15, -0.15, -0.15);
+        ps.maxEmitBox      = new BABYLON.Vector3( 0.15,  0.15,  0.15);
+        ps.color1          = new BABYLON.Color4(0, 1, 1, 0.8);
+        ps.color2          = new BABYLON.Color4(0, 0.5, 1, 0.4);
+        ps.colorDead       = new BABYLON.Color4(0, 0, 0, 0);
+        ps.minSize = 0.05; ps.maxSize     = 0.18;
+        ps.minLifeTime = 0.1; ps.maxLifeTime = 0.3;
+        ps.emitRate        = 100;
+        ps.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        ps.direction1      = new BABYLON.Vector3(-1, -1, -2);
+        ps.direction2      = new BABYLON.Vector3( 1,  1, -4);
+        ps.minEmitPower = 1; ps.maxEmitPower = 3;
+        ps.start();
+
+        setTimeout(() => {
+            ps.stop();
+            emitter.parent = null;
+            setTimeout(() => { ps.dispose(); emitter.dispose(); }, 400);
+        }, 120);
+    }
+
+    // ── BLINK ────────────────────────────────────────────────────────────────
 
     _tryBlink() {
-        if (!this._blinkEnabled)      return;
-        if (this._blinkCooldown > 0)  return;
+        if (!this._blinkEnabled)     return;
+        if (this._blinkCooldown > 0) return;
 
-        // Raycast depuis la caméra vers l'avant, portée 30m
         const forward = this.camera.getForwardRay().direction.normalize();
         const ray     = new BABYLON.Ray(this.camera.globalPosition, forward, 30);
-        const hit     = this.scene.pickWithRay(ray, (m) => {
-            return m.isPickable && (
-                m.name === "enemyBody"      ||
-                m.name === "enemyBodyHeavy" ||
-                m.name === "enemyBodyScout" ||
-                m.name === "weakPoint"      ||
-                m._isBossBody
-            );
-        });
+        const hit     = this.scene.pickWithRay(ray, (m) =>
+            m.isPickable && (
+                m.name === "enemyBody" || m.name === "enemyBodyHeavy" ||
+                m.name === "enemyBodyScout" || m.name === "weakPoint" || m._isBossBody
+            )
+        );
 
         if (!hit.hit || !hit.pickedMesh) {
             this.hud?.showWaveMessage?.("BLINK — AUCUNE CIBLE");
             return;
         }
 
-        // TP à 1.8m devant l'ennemi (côté joueur)
-        const enemyPos   = hit.pickedMesh.getAbsolutePosition();
-        const toEnemy    = enemyPos.subtract(this.camera.globalPosition).normalize();
-        const blinkPos   = enemyPos.subtract(toEnemy.scale(1.8));
-        blinkPos.y       = this.camera.globalPosition.y;
+        this._spawnBlinkFX(this.camera.globalPosition.clone());
 
-        this.camera.position.copyFrom(blinkPos);
+        const enemyPos = hit.pickedMesh.getAbsolutePosition();
+        const toEnemy  = enemyPos.subtract(this.camera.globalPosition).normalize();
+        const dest     = enemyPos.subtract(toEnemy.scale(1.8));
+        dest.y         = this.camera.globalPosition.y;
+        this.camera.position.copyFrom(dest);
+
+        this._spawnBlinkFX(dest);
+        if (this.weapon) this.weapon.position.z = this.weaponOriginalPos.z - 0.25;
+
         this._blinkCooldown = this._BLINK_CD;
-
-        // Flash violet
-        this._screenFlash("rgba(180,0,255,0.35)", 200);
         this.hud?.showWaveMessage?.("BLINK");
     }
 
-    // ── STOMP (shockwave à l'atterrissage) ───────────────────────────────────
+    _spawnBlinkFX(pos) {
+        const tex     = "https://assets.babylonjs.com/textures/flare.png";
+        const emitter = BABYLON.MeshBuilder.CreateBox("_blinkEmitter", { size: 0.01 }, this.scene);
+        emitter.position   = pos.clone();
+        emitter.isVisible  = false;
+        emitter.isPickable = false;
+
+        const ps = new BABYLON.ParticleSystem("blinkFX", 60, this.scene);
+        ps.particleTexture = new BABYLON.Texture(tex, this.scene);
+        ps.emitter         = emitter;
+        ps.color1          = new BABYLON.Color4(0.8, 0, 1, 1);
+        ps.color2          = new BABYLON.Color4(0.3, 0, 0.8, 0.5);
+        ps.colorDead       = new BABYLON.Color4(0, 0, 0, 0);
+        ps.minSize = 0.1; ps.maxSize     = 0.5;
+        ps.minLifeTime = 0.2; ps.maxLifeTime = 0.6;
+        ps.emitRate        = 0;
+        ps.manualEmitCount = 50;
+        ps.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        ps.direction1      = new BABYLON.Vector3(-3, -3, -3);
+        ps.direction2      = new BABYLON.Vector3( 3,  3,  3);
+        ps.minEmitPower = 2; ps.maxEmitPower = 6;
+        ps.start();
+        setTimeout(() => { ps.stop(); setTimeout(() => { ps.dispose(); emitter.dispose(); }, 700); }, 100);
+    }
+
+    // ── STOMP ────────────────────────────────────────────────────────────────
 
     _updateStomp() {
         if (!this._stompEnabled) return;
-
-        // Détecter si on est en l'air
-        const ray = new BABYLON.Ray(this.camera.position, new BABYLON.Vector3(0, -1, 0), 1.15);
-        const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "weapon");
-        const onGround = hit.hit;
-
+        const onGround = this._isOnGround();
         if (!onGround) {
             this._wasInAir = true;
-        } else if (this._wasInAir && onGround) {
-            // Vient d'atterrir
+        } else if (this._wasInAir) {
             this._wasInAir = false;
-            if (this.jumpForce <= 0) this._triggerStomp();
+            this._triggerStomp();
         }
     }
 
     _triggerStomp() {
-        const pos    = this.camera.globalPosition;
+        const pos    = this.camera.globalPosition.clone();
+        pos.y        = 0;
         const radius = 4;
 
-        // Repousser les ennemis proches
         this.scene.meshes.forEach(m => {
-            if (!m.isPickable) return;
-            if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name)) return;
-            const dist = BABYLON.Vector3.Distance(m.getAbsolutePosition(), pos);
-            if (dist < radius) {
-                const dir = m.getAbsolutePosition().subtract(pos).normalize();
-                // Impulsion directe sur la position (les ennemis utilisent moveWithCollisions via crowd)
-                m.position.addInPlace(dir.scale(3));
+            if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name) || m.isDisposed()) return;
+            const ePos = m.getAbsolutePosition();
+            if (BABYLON.Vector3.Distance(ePos, pos) < radius) {
+                m.position.addInPlace(ePos.subtract(pos).normalize().scale(3));
                 m._takeDamage?.(1);
             }
         });
 
-        // Flash jaune + message
-        this._screenFlash("rgba(255,200,0,0.3)", 200);
+        const mat  = new BABYLON.StandardMaterial("_stompMat", this.scene);
+        mat.emissiveColor = new BABYLON.Color3(0, 1, 1);
+        mat.alpha         = 0.6;
+        mat.wireframe     = true;
+        const ring = BABYLON.MeshBuilder.CreateTorus("_stompRing", { diameter: 0.2, thickness: 0.1, tessellation: 32 }, this.scene);
+        ring.position   = new BABYLON.Vector3(pos.x, 0.05, pos.z);
+        ring.material   = mat;
+        ring.isPickable = false;
+
+        let t = 0;
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
+            t += this.scene.getEngine().getDeltaTime() / 1000;
+            ring.scaling.set(1 + t * 10, 1, 1 + t * 10);
+            mat.alpha = Math.max(0, 0.6 - t * 1.2);
+            if (t > 0.5) {
+                this.scene.onBeforeRenderObservable.remove(obs);
+                ring.dispose(); mat.dispose();
+            }
+        });
+
         this.hud?.showWaveMessage?.("ATTERRISSAGE LOURD");
     }
 
     // ── BOUCLIER ─────────────────────────────────────────────────────────────
 
     _tryShield() {
-        if (!this._shieldEnabled)      return;
-        if (this._shieldCooldown > 0)  return;
-        if (this._shieldActive)        return;
+        if (!this._shieldEnabled || this._shieldCooldown > 0 || this._shieldActive) return;
 
         this._shieldActive   = true;
         this._shieldCooldown = this._SHIELD_CD;
 
-        // Bloquer les dégâts pendant 2s
-        const origTakeDmg = this.health.takeDamage?.bind(this.health);
-        this.health.takeDamage = () => {}; // absorbe tout
+        const mat = new BABYLON.StandardMaterial("_shieldMat", this.scene);
+        mat.diffuseColor    = new BABYLON.Color3(0, 0.5, 1);
+        mat.emissiveColor   = new BABYLON.Color3(0, 0.2, 0.6);
+        mat.alpha           = 0.22;
+        mat.backFaceCulling = false;
 
-        // Overlay bleu
-        const overlay = this._screenOverlay("rgba(0,120,255,0.25)", 2000);
+        const sphere = BABYLON.MeshBuilder.CreateSphere("_shieldSphere", { diameter: 2.6, segments: 10 }, this.scene);
+        sphere.parent     = this.camera;
+        sphere.position   = BABYLON.Vector3.Zero();
+        sphere.material   = mat;
+        sphere.isPickable = false;
+        sphere.layerMask  = 0x0FFFFFFF;
+
+        let t = 0;
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
+            t += this.scene.getEngine().getDeltaTime() / 1000;
+            mat.alpha = 0.15 + Math.sin(t * 5) * 0.07;
+        });
+
+        const origTakeDmg = this.health.takeDamage?.bind(this.health);
+        this.health.takeDamage = () => {};
         this.hud?.showWaveMessage?.("BOUCLIER ACTIF — 2s");
 
         setTimeout(() => {
             if (origTakeDmg) this.health.takeDamage = origTakeDmg;
             this._shieldActive = false;
-            overlay?.remove();
+            this.scene.onBeforeRenderObservable.remove(obs);
+            let fade = 0;
+            const fo = this.scene.onBeforeRenderObservable.add(() => {
+                fade += 0.05;
+                mat.alpha = Math.max(0, 0.22 - fade);
+                if (fade >= 0.22) {
+                    this.scene.onBeforeRenderObservable.remove(fo);
+                    sphere.dispose(); mat.dispose();
+                }
+            });
             this.hud?.showWaveMessage?.("BOUCLIER DÉSACTIVÉ");
         }, 2000);
     }
@@ -314,26 +464,23 @@ export class Player {
     // ── BERSERK ───────────────────────────────────────────────────────────────
 
     _tryBerserk() {
-        if (!this._berserkEnabled)      return;
-        if (this._berserkCooldown > 0)  return;
-        if (this._berserkActive)        return;
+        if (!this._berserkEnabled || this._berserkCooldown > 0 || this._berserkActive) return;
 
         this._berserkActive   = true;
         this._berserkCooldown = this._BERSERK_CD;
 
-        // Buff : dégâts ×2, vitesse +30%, invincibilité
-        const prevSpeed  = this.speed;
+        const prevSpeed   = this.speed;
         const prevDmgMult = this.shootController?.damageMultiplier ?? 1;
-
-        this.speed *= 1.30;
+        this.speed       *= 1.30;
         this.camera.speed = this.speed;
         if (this.shootController) this.shootController.damageMultiplier = prevDmgMult * 2;
 
         const origTakeDmg = this.health.takeDamage?.bind(this.health);
         this.health.takeDamage = () => {};
 
-        // Overlay rouge pulsé
-        const overlay = this._screenOverlay("rgba(255,0,0,0.15)", 10000);
+        this._berserkVignette.style.opacity = "1";
+        if (this.weapon?.material) this.weapon.material.emissiveColor = new BABYLON.Color3(0.8, 0, 0);
+
         this.hud?.showWaveMessage?.("⚡ MODE BERSERK — 10s");
 
         setTimeout(() => {
@@ -342,7 +489,8 @@ export class Player {
             if (this.shootController) this.shootController.damageMultiplier = prevDmgMult;
             if (origTakeDmg) this.health.takeDamage = origTakeDmg;
             this._berserkActive = false;
-            overlay?.remove();
+            this._berserkVignette.style.opacity = "0";
+            if (this.weapon?.material) this.weapon.material.emissiveColor = new BABYLON.Color3(0, 0, 0);
             this.hud?.showWaveMessage?.("BERSERK TERMINÉ");
         }, 10000);
     }
@@ -350,76 +498,147 @@ export class Player {
     // ── EMP ───────────────────────────────────────────────────────────────────
 
     _tryEMP() {
-        if (!this._empEnabled)      return;
-        if (this._empCooldown > 0)  return;
-
+        if (!this._empEnabled || this._empCooldown > 0) return;
         this._empCooldown = this._EMP_CD;
-        const pos    = this.camera.globalPosition;
-        const radius = 4;
 
-        let affected = 0;
+        const forward = this.camera.getForwardRay().direction.normalize();
+        const from    = this.camera.globalPosition.add(forward.scale(0.5));
+        const target  = this.camera.globalPosition.add(forward.scale(6));
+        target.y      = 0.05;
+
+        this._throwEMPGrenade(from, target);
+        this.hud?.showWaveMessage?.("GRENADE EMP LANCÉE");
+    }
+
+    _throwEMPGrenade(from, target) {
+        const mat = new BABYLON.StandardMaterial("_empBallMat", this.scene);
+        mat.emissiveColor   = new BABYLON.Color3(0, 1, 1);
+        mat.disableLighting = true;
+
+        const ball = BABYLON.MeshBuilder.CreateSphere("_empBall", { diameter: 0.22 }, this.scene);
+        ball.material   = mat;
+        ball.position   = from.clone();
+        ball.isPickable = false;
+
+        const travelTime = 0.35;
+        let elapsed = 0;
+
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
+            elapsed += this.scene.getEngine().getDeltaTime() / 1000;
+            const t = Math.min(elapsed / travelTime, 1);
+            ball.position.x = from.x + (target.x - from.x) * t;
+            ball.position.z = from.z + (target.z - from.z) * t;
+            ball.position.y = from.y + (target.y - from.y) * t + Math.sin(t * Math.PI) * 2.5;
+            ball.rotation.y += 0.25;
+            if (t >= 1) {
+                this.scene.onBeforeRenderObservable.remove(obs);
+                ball.dispose(); mat.dispose();
+                this._explodeEMP(target.clone());
+            }
+        });
+    }
+
+    _explodeEMP(pos) {
+        const radius   = 4;
+        const duration = 3;
+
+        const zoneMat = new BABYLON.StandardMaterial("_empZone", this.scene);
+        zoneMat.emissiveColor   = new BABYLON.Color3(0, 0.6, 0.9);
+        zoneMat.diffuseColor    = new BABYLON.Color3(0, 0.4, 0.7);
+        zoneMat.alpha           = 0.3;
+        zoneMat.backFaceCulling = false;
+
+        const zone = BABYLON.MeshBuilder.CreateDisc("_empDisc", { radius, tessellation: 48 }, this.scene);
+        zone.position   = new BABYLON.Vector3(pos.x, 0.05, pos.z);
+        zone.rotation.x = Math.PI / 2;
+        zone.material   = zoneMat;
+        zone.isPickable = false;
+
+        const ringMat = new BABYLON.StandardMaterial("_empRing", this.scene);
+        ringMat.emissiveColor = new BABYLON.Color3(0, 1, 1);
+        ringMat.alpha = 0.85;
+
+        const ring = BABYLON.MeshBuilder.CreateTorus("_empTorus", { diameter: radius * 2, thickness: 0.08, tessellation: 48 }, this.scene);
+        ring.position   = new BABYLON.Vector3(pos.x, 0.08, pos.z);
+        ring.rotation.x = Math.PI / 2;
+        ring.material   = ringMat;
+        ring.isPickable = false;
+
+        const tex     = "https://assets.babylonjs.com/textures/flare.png";
+        const emitter = BABYLON.MeshBuilder.CreateBox("_empEmitter", { size: 0.01 }, this.scene);
+        emitter.position   = new BABYLON.Vector3(pos.x, 0.2, pos.z);
+        emitter.isVisible  = false;
+        emitter.isPickable = false;
+
+        const ps = new BABYLON.ParticleSystem("empPS", 50, this.scene);
+        ps.particleTexture = new BABYLON.Texture(tex, this.scene);
+        ps.emitter         = emitter;
+        ps.minEmitBox      = new BABYLON.Vector3(-radius * 0.75, 0, -radius * 0.75);
+        ps.maxEmitBox      = new BABYLON.Vector3( radius * 0.75, 0,  radius * 0.75);
+        ps.color1          = new BABYLON.Color4(0, 1, 1, 0.7);
+        ps.color2          = new BABYLON.Color4(0, 0.5, 1, 0.3);
+        ps.colorDead       = new BABYLON.Color4(0, 0, 0, 0);
+        ps.minSize = 0.04; ps.maxSize     = 0.18;
+        ps.minLifeTime = 0.5; ps.maxLifeTime = 1.5;
+        ps.emitRate        = 25;
+        ps.direction1      = new BABYLON.Vector3(-0.1, 1, -0.1);
+        ps.direction2      = new BABYLON.Vector3( 0.1, 3,  0.1);
+        ps.minEmitPower = 0.3; ps.maxEmitPower = 1.2;
+        ps.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+        ps.start();
+
+        const affectedAgents = [];
         this.scene.meshes.forEach(m => {
-            if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name)) return;
-            const dist = BABYLON.Vector3.Distance(m.getAbsolutePosition(), pos);
-            if (dist < radius) {
-                affected++;
-                // Ralentir l'ennemi via son agent crowd
+            if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name) || m.isDisposed()) return;
+            if (BABYLON.Vector3.Distance(m.getAbsolutePosition(), pos) < radius) {
                 const agent = m._crowdAgent;
                 if (agent != null && this._navManager) {
-                    const origSpeed = m._origSpeed ?? 1;
+                    const origSpeed = m._origSpeed ?? 3;
                     m._origSpeed = origSpeed;
-                    this._navManager.crowd?.agentUpdateParameters?.(agent, { maxSpeed: origSpeed * 0.15 });
-                    setTimeout(() => {
-                        this._navManager.crowd?.agentUpdateParameters?.(agent, { maxSpeed: origSpeed });
-                    }, 3000);
+                    try {
+                        this._navManager.crowd?.agentUpdateParameters?.(agent, { maxSpeed: origSpeed * 0.15 });
+                        affectedAgents.push({ agent, origSpeed, mesh: m });
+                    } catch (_) {}
                 }
             }
         });
 
-        this._screenFlash("rgba(0,200,255,0.4)", 300);
-        this.hud?.showWaveMessage?.(`GRENADE EMP — ${affected} ennemi(s) ralenti(s)`);
+        let elapsed = 0;
+        const obs = this.scene.onBeforeRenderObservable.add(() => {
+            elapsed += this.scene.getEngine().getDeltaTime() / 1000;
+            zoneMat.alpha = 0.2 + Math.sin(elapsed * 4) * 0.1;
+            ringMat.alpha = 0.6 + Math.sin(elapsed * 6) * 0.25;
+
+            if (elapsed >= duration) {
+                this.scene.onBeforeRenderObservable.remove(obs);
+                affectedAgents.forEach(({ agent, origSpeed, mesh }) => {
+                    if (!mesh.isDisposed() && this._navManager) {
+                        try { this._navManager.crowd?.agentUpdateParameters?.(agent, { maxSpeed: origSpeed }); } catch (_) {}
+                    }
+                });
+                let fade = 0;
+                const fo = this.scene.onBeforeRenderObservable.add(() => {
+                    fade += 0.04;
+                    zoneMat.alpha = Math.max(0, 0.3  - fade);
+                    ringMat.alpha = Math.max(0, 0.85 - fade * 3);
+                    if (fade >= 1) {
+                        this.scene.onBeforeRenderObservable.remove(fo);
+                        ps.stop();
+                        setTimeout(() => { ps.dispose(); emitter.dispose(); zone.dispose(); ring.dispose(); zoneMat.dispose(); ringMat.dispose(); }, 500);
+                    }
+                });
+                this.hud?.showWaveMessage?.("EMP TERMINÉ");
+            }
+        });
     }
 
-    // ── Helpers visuels ───────────────────────────────────────────────────────
+    // ── Vignette ──────────────────────────────────────────────────────────────
 
-    _screenFlash(color, duration) {
+    _createVignette(gradient) {
         const el = document.createElement("div");
-        el.style.cssText = `position:fixed;inset:0;background:${color};pointer-events:none;z-index:9998;transition:opacity ${duration}ms`;
-        document.body.appendChild(el);
-        requestAnimationFrame(() => { el.style.opacity = "0"; });
-        setTimeout(() => el.remove(), duration + 50);
-        return el;
-    }
-
-    _screenOverlay(color, duration) {
-        const el = document.createElement("div");
-        el.style.cssText = `position:fixed;inset:0;background:${color};pointer-events:none;z-index:9997;`;
+        el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9996;background:${gradient};opacity:0;transition:opacity 0.4s ease;`;
         document.body.appendChild(el);
         return el;
-    }
-
-    // ── Saut ──────────────────────────────────────────────────────────────────
-
-    _jump() {
-        if (this.jumpForce > 0) return;
-        const ray = new BABYLON.Ray(
-            this.camera.position,
-            new BABYLON.Vector3(0, -1, 0),
-            1.15,
-        );
-        const hit = this.scene.pickWithRay(
-            ray,
-            (mesh) => mesh.checkCollisions && mesh.name !== "weapon",
-        );
-        if (hit.hit) this.jumpForce = 0.4;
-    }
-
-    _updateJump() {
-        if (this.jumpForce > 0) {
-            this.camera.cameraDirection.y += this.jumpForce;
-            this.jumpForce -= 0.02;
-            if (this.jumpForce <= 0) this.jumpForce = 0;
-        }
     }
 
     // ── Arme ─────────────────────────────────────────────────────────────────
@@ -428,17 +647,13 @@ export class Player {
         const weaponMat = new BABYLON.StandardMaterial("weaponMat", this.scene);
         weaponMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.3);
 
-        this.weapon = BABYLON.MeshBuilder.CreateBox(
-            "weapon",
-            { width: 0.15, height: 0.2, depth: 0.6 },
-            this.scene,
-        );
-        this.weapon.material         = weaponMat;
-        this.weapon.parent           = this.camera;
-        this.weaponOriginalPos       = new BABYLON.Vector3(0.4, -0.4, 1);
-        this.weapon.position         = this.weaponOriginalPos.clone();
-        this.weaponMinZ              = 0.6;
-        this.weapon.layerMask        = 0x10000000;
+        this.weapon = BABYLON.MeshBuilder.CreateBox("weapon", { width: 0.15, height: 0.2, depth: 0.6 }, this.scene);
+        this.weapon.material      = weaponMat;
+        this.weapon.parent        = this.camera;
+        this.weaponOriginalPos    = new BABYLON.Vector3(0.4, -0.4, 1);
+        this.weapon.position      = this.weaponOriginalPos.clone();
+        this.weaponMinZ           = 0.6;
+        this.weapon.layerMask     = 0x10000000;
 
         this._weaponCamera = new BABYLON.FreeCamera("weaponCam", BABYLON.Vector3.Zero(), this.scene);
         this._weaponCamera.parent    = this.camera;
@@ -457,25 +672,18 @@ export class Player {
 
     applyWeaponRecoil(amount) {
         if (!this.weapon) return;
-        const newZ = this.weapon.position.z - amount;
-        this.weapon.position.z = Math.max(newZ, this.weaponMinZ);
+        this.weapon.position.z = Math.max(this.weapon.position.z - amount, this.weaponMinZ);
     }
 
     _updateWeaponRecoilRecovery() {
         if (!this.weapon) return;
         if (this.weapon.position.z < this.weaponOriginalPos.z) {
-            this.weapon.position.z = BABYLON.Scalar.Lerp(
-                this.weapon.position.z,
-                this.weaponOriginalPos.z,
-                0.15,
-            );
+            this.weapon.position.z = BABYLON.Scalar.Lerp(this.weapon.position.z, this.weaponOriginalPos.z, 0.15);
             if (Math.abs(this.weapon.position.z - this.weaponOriginalPos.z) < 0.001) {
                 this.weapon.position.z = this.weaponOriginalPos.z;
             }
         }
     }
-
-    // ── Tilt caméra ───────────────────────────────────────────────────────────
 
     _updateCameraTilt() {
         let targetTilt = 0;
@@ -484,8 +692,6 @@ export class Player {
         this.currentTilt = BABYLON.Scalar.Lerp(this.currentTilt, targetTilt, 0.1);
         this.camera.rotation.z = this.currentTilt;
     }
-
-    // ── Bobbing arme ─────────────────────────────────────────────────────────
 
     _updateWeaponBobbing() {
         const isMovingKb =

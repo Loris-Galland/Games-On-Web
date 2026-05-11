@@ -273,8 +273,7 @@ export class ProceduralMap {
                 // Direction vers la salle suivante
                 const dx = secondTile.x - firstTile.x;
                 const dz = secondTile.z - firstTile.z;
-                const rotY = dx !== 0 ? (dx > 0 ? -Math.PI / 2 : Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
-
+                const rotY = dx !== 0 ? (dx > 0 ? Math.PI / 2 : Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
                 const arrowMat = new BABYLON.StandardMaterial(`arrowMat_${roomIdx}`, this.scene);
                 arrowMat.emissiveColor   = new BABYLON.Color3(0, 1, 0.6);
                 arrowMat.disableLighting = true;

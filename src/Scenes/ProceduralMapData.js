@@ -276,6 +276,14 @@ export const QUAD_PATTERNS = {
         ],
     },
 
+    // ── ARENA : salle de boss, aucun prop ────────────────────────────────────
+    arena: {
+        NW: [],
+        NE: [],
+        SW: [],
+        SE: [],
+    },
+
     // Fallback pour les types inconnus
     default: {
         NW: [ [ { a: "End_Table.glb", ox: 0.5, oz: 0.5 } ] ],
@@ -347,6 +355,9 @@ export const LAYOUTS = {
             { a: "Railing_Flat.glb",           ox: 0.25, oz: 0.75, rot: R0 },
             { a: "Railing_Flat.glb",           ox: 0.75, oz: 0.75, rot: R0 },
         ], hasFloor2: true,  rampCorner: "NE" }],
+
+    // ── ARENA : salle de boss, vide, pas d'étage 2 ───────────────────────────
+    arena:    [{ floor2: [], hasFloor2: false, rampCorner: "NW" }],
 
     default:  [{ floor2: [], hasFloor2: false, rampCorner: "NW" }],
 };

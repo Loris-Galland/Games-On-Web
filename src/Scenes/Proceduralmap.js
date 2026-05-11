@@ -100,7 +100,11 @@ export class ProceduralMap {
         for (let i = 0; i < this.roomCount; i++) {
             const prev = this.rooms[this.rooms.length - 1];
             const dir  = dirs[i % dirs.length];
-            const tpl  = ROOM_TYPES[i % ROOM_TYPES.length];
+            const posInCycle = (i % 5) + 1;          // 1..5
+            const isBossRoom = (posInCycle === 4);    // 4e salle de chaque cycle = boss
+            const tpl = isBossRoom
+                ? { type: "arena", cols: 16, rows: 16, color: "grey" }
+                : ROOM_TYPES[i % ROOM_TYPES.length];
             let wx, wz;
             if      (dir.dx ===  1) { wx = prev.worldX + prev.cols + CORRIDOR_LEN; wz = prev.worldZ + Math.floor((prev.rows - tpl.rows) / 2); }
             else if (dir.dx === -1) { wx = prev.worldX - tpl.cols  - CORRIDOR_LEN; wz = prev.worldZ + Math.floor((prev.rows - tpl.rows) / 2); }

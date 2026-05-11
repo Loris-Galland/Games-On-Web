@@ -6,6 +6,10 @@ import { BossEnemy }        from "../Enemies/BossEnemy";
 import { EnemyParticles }   from "../Enemies/EnemyParticles";
 import { resetSlotCounter } from "../Enemies/BaseEnemy";
 import { WeaponShopRoom, ChallengeRoom, ForgeRoom } from "./SpecialRooms";
+import { BossEnemy2 } from "../Enemies/BossEnemy2";
+import { BossEnemy3 } from "../Enemies/BossEnemy3";
+import { SpiderEnemy } from "../Enemies/SpiderEnemy";
+import { DroneEnemy }  from "../Enemies/DroneEnemy";
 
 /**
  * WaveManager — Cycle 3×(4 normales + 1 boss + 1 spéciale)
@@ -40,10 +44,18 @@ const SPAWN_WARNING_DELAY = 1800;
 
 // Compositions par numéro de vague (1 à 3 par salle)
 // Les salles de cycle 2 et 3 utilisent des multiplicateurs de difficulté
-const BASE_WAVE_COMPOSITIONS = {
+// Cycle 1 — pas de spider/drone
+const WAVE_COMPOSITIONS_C1 = {
     1: [ { type: "standard", count: 6,  speedMult: 1.0 } ],
     2: [ { type: "standard", count: 8,  speedMult: 1.0 }, { type: "scout", count: 3, speedMult: 1.0 } ],
     3: [ { type: "standard", count: 8,  speedMult: 1.1 }, { type: "heavy", count: 3, speedMult: 1.0 } ],
+};
+
+// Cycle 2+ — spider et drone introduits
+const WAVE_COMPOSITIONS_C2 = {
+    1: [ { type: "standard", count: 5,  speedMult: 1.0 }, { type: "drone",  count: 2, speedMult: 1.0 } ],
+    2: [ { type: "standard", count: 6,  speedMult: 1.0 }, { type: "scout",  count: 2, speedMult: 1.0 }, { type: "spider", count: 2, speedMult: 1.0 } ],
+    3: [ { type: "heavy",    count: 2,  speedMult: 1.0 }, { type: "drone",  count: 3, speedMult: 1.0 }, { type: "spider", count: 2, speedMult: 1.0 } ],
 };
 
 // Classifiction par roomIdx → type de salle
@@ -144,6 +156,7 @@ export class WaveManager {
         this.isWaveActive = false;
         this._prevHealth  = this.player.health?.currentHealth ?? 10;
         this._diffMult    = 1.0 + (cycle - 1) * 0.35; // cycle 2 → ×1.35, cycle 3 → ×1.70
+        this._currentCycle = cycle
         this._launchNextWave();
     }
 
@@ -167,14 +180,15 @@ export class WaveManager {
         this.hud?.updateWave?.(this.currentWave);
         this.hud?.showWaveMessage?.(`VAGUE ${this.currentWave} / ${WAVES_PER_ROOM}`);
 
-        const composition = BASE_WAVE_COMPOSITIONS[this.currentWave] ?? BASE_WAVE_COMPOSITIONS[1];
+        const compositions = (this._currentCycle ?? 1) >= 2 ? WAVE_COMPOSITIONS_C2 : WAVE_COMPOSITIONS_C1;
+        const composition  = compositions[this.currentWave] ?? compositions[1];
         const diff        = this._diffMult ?? 1.0;
         const center      = this._roomCenter ?? this.player.camera.position;
         const total       = composition.reduce((a, g) => a + g.count, 0);
         let   globalIdx   = 0;
 
         for (const group of composition) {
-            const scaledCount = Math.round(group.count * diff);
+        const scaledCount = Math.round(group.count * diff);
             for (let i = 0; i < scaledCount; i++) {
                 const angle    = (globalIdx / Math.max(total, 1)) * Math.PI * 2 + Math.random() * 0.4;
                 const radius   = 8 + Math.random() * 14;
@@ -212,16 +226,23 @@ export class WaveManager {
     _startBossRoom(center, cycle) {
         this.isWaveActive = true;
         const cycleLabel  = ["I", "II", "III"][cycle - 1] ?? cycle;
-        this.hud?.showWaveMessage?.(`ARCHON-${cycle} DÉTECTÉ — PRÉPAREZ-VOUS`);
-
-        // Difficulté boss selon cycle : hp + vitesse croissants
-        const hpMultiplier    = 1.0 + (cycle - 1) * 0.5;   // ×1.0 / ×1.5 / ×2.0
+        const bossNames   = ["ARCHON", "NEXUS", "VOIDBRINGER"];
+        const bossName    = bossNames[cycle - 1] ?? `BOSS-${cycle}`;
+        this.hud?.showWaveMessage?.(`${bossName} DÉTECTÉ — PRÉPAREZ-VOUS`);
+ 
+        // Difficulté selon cycle
+        const hpMultiplier    = 1.0 + (cycle - 1) * 0.5;
         const speedMultiplier = 1.0 + (cycle - 1) * 0.25;
-
+ 
         const bossPos = new BABYLON.Vector3(center?.x ?? 0, 1.5, center?.z ?? 0);
-
+ 
+        // Sélection de la classe de boss selon le cycle
+        const BossClass = cycle === 2 ? BossEnemy2
+                        : cycle === 3 ? BossEnemy3
+                        :               BossEnemy;   // cycle 1 = boss original
+ 
         setTimeout(() => {
-            this._boss = new BossEnemy(
+            this._boss = new BossClass(
                 this.scene, bossPos, this.player, this._navManager,
                 (type, pos) => {
                     const e = this._createEnemy(type, pos, 1.2 * speedMultiplier);
@@ -231,32 +252,31 @@ export class WaveManager {
                     }
                 },
             );
-
-            // Appliquer les modificateurs de cycle
-            this._boss.maxHealth     = Math.round(20 * hpMultiplier);
+ 
+            // Modificateurs de cycle
+            this._boss.maxHealth     = Math.round(this._boss.maxHealth * hpMultiplier);
             this._boss.currentHealth = this._boss.maxHealth;
-            this._boss.speed         = 2.5 * speedMultiplier;
-
-            // Phase 3 activée directement en cycle 3
-            if (cycle >= 3) {
-                this._boss.phase = 3;
+            if (this._boss.speed !== undefined) this._boss.speed = 2.5 * speedMultiplier;
+ 
+            // Phase 3 directement en cycle 3
+            if (cycle >= 3 && this._boss.speed !== undefined) {
                 this._boss.speed = 4.0;
             }
-
+ 
             this.hud?.showBossBar?.(this._boss.maxHealth);
-
+ 
             this._boss.onDamage = (current, max) => {
                 this.hud?.updateBossBar?.(current, max);
             };
-
+ 
             this._boss.onPhase = (phase) => {
-                this.hud?.showWaveMessage?.(`ARCHON-${cycle} — PHASE ${phase}`);
+                this.hud?.showWaveMessage?.(`${bossName}-${cycleLabel} — PHASE ${phase}`);
                 this.scoreManager?.onBossPhase?.(phase);
             };
-
+ 
             this._boss.onDeath = () => {
                 this.hud?.hideBossBar?.();
-                this.hud?.showWaveMessage?.(`ARCHON-${cycleLabel} NEUTRALISÉ`);
+                this.hud?.showWaveMessage?.(`${bossName} NEUTRALISÉ`);
                 this.scoreManager?.onBossKill?.();
                 this.scoreManager?.onRoomClear?.();
                 this.isWaveActive = false;
@@ -264,8 +284,8 @@ export class WaveManager {
                 this._clearedRooms.add(this._currentRoomIdx);
                 setTimeout(() => this._openDoors(), 2000);
             };
-
-            this.hud?.showWaveMessage?.(`ARCHON-${cycleLabel} EST LÀ !`);
+ 
+            this.hud?.showWaveMessage?.(`${bossName} EST LÀ !`);
         }, 3000);
     }
 
@@ -450,6 +470,8 @@ export class WaveManager {
         switch (type) {
             case "heavy":    return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
             case "scout":    return new ScoutEnemy(this.scene, spawnPos, this.player, 4 * speedMult, this._navManager);
+            case "spider":  return new SpiderEnemy(this.scene, spawnPos, this.player);
+            case "drone":   return new DroneEnemy(this.scene, spawnPos, this.player);
             default:         return new StandardEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
         }
     }
@@ -527,5 +549,46 @@ export class WaveManager {
             try { if (!door.isDisposed()) door.dispose(); } catch(_){}
         });
         this._doors = [];
+    }
+
+    _getWallSpawnPoints(center, count) {
+        const points = [];
+        const directions = [
+            new BABYLON.Vector3( 1, 0,  0),
+            new BABYLON.Vector3(-1, 0,  0),
+            new BABYLON.Vector3( 0, 0,  1),
+            new BABYLON.Vector3( 0, 0, -1),
+            new BABYLON.Vector3( 0, 1,  0), // plafond
+        ];
+
+        for (const dir of directions) {
+            const heights = [2, 3, 4, 5];
+            for (const h of heights) {
+                const from = new BABYLON.Vector3(center.x, h, center.z);
+                const ray  = new BABYLON.Ray(from, dir, 30);
+                const hit  = this.scene.pickWithRay(ray, m =>
+                    m.checkCollisions &&
+                    !m.name.startsWith("door") &&
+                    !m.name.startsWith("spider") &&
+                    !m.name.startsWith("fRDC") &&  // ← exclure sol salle
+                    !m.name.startsWith("cF_")      // ← exclure sol couloir
+                );
+                if (!hit.hit || hit.distance <= 2) continue;
+
+                const hitNormal = hit.getNormal(true);
+                if (!hitNormal) continue;
+                // Exclure tout ce qui pointe vers le haut (sol) ou vers le bas (plafond sauf si dir=up)
+                if (hitNormal.y > 0.5 && dir.y < 0.5) continue; // sol
+                if (hitNormal.y < -0.5) continue; // dessous de quelque chose
+
+                points.push(hit.pickedPoint.add(dir.negate().scale(0.4)));
+            }
+        }
+
+        for (let i = points.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [points[i], points[j]] = [points[j], points[i]];
+        }
+        return points.slice(0, count);
     }
 }

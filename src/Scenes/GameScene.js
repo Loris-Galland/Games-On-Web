@@ -8,7 +8,21 @@ import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
 import { UpgradeManager }  from "../Systems/UpgradeManager";
 import { MinimapManager } from '../Systems/MinimapManager';
+import { KeybindingsMenu } from "../UI/KeybindingsMenu";
+import { IntroSequence } from "../UI/IntroSequence";
 
+
+function _getRoomTypeForUpgrade(roomIdx) {
+    if (roomIdx === 0) return "spawn";
+    const cycleLen   = 5;
+    const posInCycle = ((roomIdx - 1) % cycleLen) + 1; // 1..5
+    const cycle      = Math.ceil(roomIdx / cycleLen);
+    if (posInCycle <= 3) return "normal";
+    if (posInCycle === 4) return "boss";
+    if (cycle === 1) return "shop";
+    if (cycle === 2) return "forge";
+    return "challenge";
+}
 
 export class GameScene {
     constructor(canvasId) {
@@ -182,9 +196,12 @@ export class GameScene {
             const isNew = !this.visitedRooms.has(idx);
             this.visitedRooms.add(idx);
 
-            if(idx !==0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            if(idx !== 0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            const roomType = _getRoomTypeForUpgrade(idx);
+            if (roomType === "normal") {
                 await this._waitForUpgradeChoice(scene);
             }
+        }
 
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
                 (room.worldX + room.cols / 2) * 4, 2, (room.worldZ + room.rows / 2) * 4,
@@ -258,12 +275,14 @@ export class GameScene {
         await this.map.generate();
 
         this.player = new Player(scene, canvas);
+        this.player.keybindings = KeybindingsMenu.DEFAULT_KB_BINDINGS.map(a => ({ ...a, keys: [...a.keys] }));
         this.player.camera.position = new BABYLON.Vector3(
             this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );
 
         // ── UpgradeManager (nécessite this.player) ────────────────────────
         this.upgradeManager = new UpgradeManager(this.player);
+        this._setupTabKey();
 
         // ── Stats pour le Game Over ───────────────────────────────────────
         this.player.getStatsCallback = () => ({
@@ -330,22 +349,48 @@ export class GameScene {
     }
 
     _waitForUpgradeChoice(scene) {
-        this.isInUpgrade = true;
-        this.map._paused = true;
-        document.exitPointerLock();
+    this.isInUpgrade = true;
+    this.map._paused = true;
+    document.exitPointerLock();
 
-        const randomCards = this.upgradeManager.getRandomUpgrades(3);
+    return new Promise(resolve => {
+        const doShow = (upgrades) => {
+            this.player.hud.showUpgradeScreen(
+                upgrades,
+                (choix) => {
+                    this.upgradeManager.applyUpgrade(choix); // ← mémorise + applique
+                    scene.getEngine().enterPointerlock();
+                    this.map._paused = false;
+                    this.isInUpgrade = false;
+                    resolve();
+                },
+                800,
+                () => this.scoreManager?.totalScore ?? 0,
+                () => {
+                    const score = this.scoreManager?.totalScore ?? 0;
+                    if (score < 800) return false;
+                    this.scoreManager.totalScore -= 800;
+                    this.player.hud.updateScore?.(this.scoreManager.totalScore);
+                    document.getElementById("upgrade-overlay")?.remove();
+                    doShow(this.upgradeManager.getRandomUpgrades(3));
+                    return true;
+                },
+            );
+        };
 
-        return new Promise(resolve => {
-            this.player.hud.showUpgradeScreen(randomCards, (choix) => {
-                choix.apply(this.player);
-                scene.getEngine().enterPointerlock();
+        doShow(this.upgradeManager.getRandomUpgrades(3));
+    });
+}
 
-                this.map._paused = false;
-                this.isInUpgrade = false;
+_setupTabKey() {
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Tab" && !this.isInUpgrade && !this.isPaused) {
+            e.preventDefault();
+            const stats    = this.upgradeManager?.getPlayerStats() ?? {};
+            const acquired = this.upgradeManager?.acquiredUpgrades  ?? [];
+            this.player?.hud?.toggleStatsPanel(stats, acquired);
+        }
+    });
+}
 
-                resolve();
-            });
-        });
-    }
 }

@@ -492,6 +492,7 @@ export class KeybindingsMenu {
             this._snapshot = null;
             this._stopViz();
             this._stopAll(panel);
+            this.onBindingsChanged?.();
             onBack();
         };
         panel.querySelector("#kbBack").onclick = () => {

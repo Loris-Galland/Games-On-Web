@@ -7,6 +7,9 @@ import { KeybindingsMenu } from './UI/KeybindingsMenu.js';
 import { GamepadManager }  from './Systems/GamepadManager.js';
 import { ScoreManager }    from './Systems/ScoreManager.js';
 import { WeaponManager }   from './Systems/WeaponManager.js';
+import { DebugPanel } from './UI/DebugPanel';
+import { IntroSequence } from './UI/IntroSequence.js';
+
 
 window.addEventListener('DOMContentLoaded', () => {
     const game = new GameScene('renderCanvas');
@@ -40,17 +43,25 @@ window.addEventListener('DOMContentLoaded', () => {
         const sharedGfxMenu = new GraphicsMenu(game.lightingManager);
         const sharedKbMenu  = new KeybindingsMenu(game.player, onPauseKeyChange, gamepad);
 
+        sharedKbMenu.onBindingsChanged = () => {
+        if (game.player) game.player.keybindings = sharedKbMenu.getBindings();
+    };
+
         // ── Menus ─────────────────────────────────────────────────────────────
         const mainMenu = new MainMenu(
             () => {
-                game.engine.enterPointerlock();
-                gamepad.setMenuMode(false);
+                // Lancer l'intro, puis démarrer le jeu une fois terminée
+                const intro = new IntroSequence();
+                intro.play(() => {
+                    game.engine.enterPointerlock();
+                    gamepad.setMenuMode(false);
+                });
             },
             game.player,
             sharedGfxMenu,
             sharedKbMenu,
         );
-
+        
         const pauseMenu = new PauseMenu(
             () => {
                 game.isPaused = false;
@@ -104,6 +115,13 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }, 300);
 
+        const debugPanel = new DebugPanel(
+            game.player,
+            game.upgradeManager,
+            game.waveManager,
+            scoreManager
+        );
+
         // ── Crosshair DOM ─────────────────────────────────────────────────────
         const crosshair = document.createElement("div");
         crosshair.id = "crosshair";
@@ -135,7 +153,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 : evt.key === 'Escape'        ? 'escape'
                 : evt.key.toLowerCase();
 
-            if (pressed !== pauseKey) return;
+            if (pressed !== pauseKey && pressed !== 'escape') return;
             if (document.querySelector('.kb-listening')) return;
             if (mainMenu.overlay && mainMenu.overlay.style.display !== 'none') return;
             togglePause();

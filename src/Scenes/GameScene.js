@@ -8,6 +8,7 @@ import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
 import { UpgradeManager }  from "../Systems/UpgradeManager";
 import { MinimapManager } from '../Systems/MinimapManager';
+import { KeybindingsMenu } from "../UI/KeybindingsMenu";
 
 
 function _getRoomTypeForUpgrade(roomIdx) {
@@ -273,6 +274,7 @@ export class GameScene {
         await this.map.generate();
 
         this.player = new Player(scene, canvas);
+        this.player.keybindings = KeybindingsMenu.DEFAULT_KB_BINDINGS.map(a => ({ ...a, keys: [...a.keys] }));
         this.player.camera.position = new BABYLON.Vector3(
             this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );

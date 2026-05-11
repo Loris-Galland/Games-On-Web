@@ -8,6 +8,8 @@ import { resetSlotCounter } from "../Enemies/BaseEnemy";
 import { WeaponShopRoom, ChallengeRoom, ForgeRoom } from "./SpecialRooms";
 import { BossEnemy2 } from "../Enemies/BossEnemy2";
 import { BossEnemy3 } from "../Enemies/BossEnemy3";
+import { SpiderEnemy } from "../Enemies/SpiderEnemy";
+import { DroneEnemy }  from "../Enemies/DroneEnemy";
 
 /**
  * WaveManager — Cycle 3×(4 normales + 1 boss + 1 spéciale)
@@ -42,10 +44,18 @@ const SPAWN_WARNING_DELAY = 1800;
 
 // Compositions par numéro de vague (1 à 3 par salle)
 // Les salles de cycle 2 et 3 utilisent des multiplicateurs de difficulté
-const BASE_WAVE_COMPOSITIONS = {
+// Cycle 1 — pas de spider/drone
+const WAVE_COMPOSITIONS_C1 = {
     1: [ { type: "standard", count: 6,  speedMult: 1.0 } ],
     2: [ { type: "standard", count: 8,  speedMult: 1.0 }, { type: "scout", count: 3, speedMult: 1.0 } ],
     3: [ { type: "standard", count: 8,  speedMult: 1.1 }, { type: "heavy", count: 3, speedMult: 1.0 } ],
+};
+
+// Cycle 2+ — spider et drone introduits
+const WAVE_COMPOSITIONS_C2 = {
+    1: [ { type: "standard", count: 5,  speedMult: 1.0 }, { type: "drone",  count: 2, speedMult: 1.0 } ],
+    2: [ { type: "standard", count: 6,  speedMult: 1.0 }, { type: "scout",  count: 2, speedMult: 1.0 }, { type: "spider", count: 2, speedMult: 1.0 } ],
+    3: [ { type: "heavy",    count: 2,  speedMult: 1.0 }, { type: "drone",  count: 3, speedMult: 1.0 }, { type: "spider", count: 2, speedMult: 1.0 } ],
 };
 
 // Classifiction par roomIdx → type de salle
@@ -146,6 +156,7 @@ export class WaveManager {
         this.isWaveActive = false;
         this._prevHealth  = this.player.health?.currentHealth ?? 10;
         this._diffMult    = 1.0 + (cycle - 1) * 0.35; // cycle 2 → ×1.35, cycle 3 → ×1.70
+        this._currentCycle = cycle
         this._launchNextWave();
     }
 
@@ -169,14 +180,15 @@ export class WaveManager {
         this.hud?.updateWave?.(this.currentWave);
         this.hud?.showWaveMessage?.(`VAGUE ${this.currentWave} / ${WAVES_PER_ROOM}`);
 
-        const composition = BASE_WAVE_COMPOSITIONS[this.currentWave] ?? BASE_WAVE_COMPOSITIONS[1];
+        const compositions = (this._currentCycle ?? 1) >= 2 ? WAVE_COMPOSITIONS_C2 : WAVE_COMPOSITIONS_C1;
+        const composition  = compositions[this.currentWave] ?? compositions[1];
         const diff        = this._diffMult ?? 1.0;
         const center      = this._roomCenter ?? this.player.camera.position;
         const total       = composition.reduce((a, g) => a + g.count, 0);
         let   globalIdx   = 0;
 
         for (const group of composition) {
-            const scaledCount = Math.round(group.count * diff);
+        const scaledCount = Math.round(group.count * diff);
             for (let i = 0; i < scaledCount; i++) {
                 const angle    = (globalIdx / Math.max(total, 1)) * Math.PI * 2 + Math.random() * 0.4;
                 const radius   = 8 + Math.random() * 14;
@@ -458,6 +470,8 @@ export class WaveManager {
         switch (type) {
             case "heavy":    return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
             case "scout":    return new ScoutEnemy(this.scene, spawnPos, this.player, 4 * speedMult, this._navManager);
+            case "spider":  return new SpiderEnemy(this.scene, spawnPos, this.player);
+            case "drone":   return new DroneEnemy(this.scene, spawnPos, this.player);
             default:         return new StandardEnemy(this.scene, spawnPos, this.player, 3 * speedMult, this._navManager);
         }
     }
@@ -535,5 +549,46 @@ export class WaveManager {
             try { if (!door.isDisposed()) door.dispose(); } catch(_){}
         });
         this._doors = [];
+    }
+
+    _getWallSpawnPoints(center, count) {
+        const points = [];
+        const directions = [
+            new BABYLON.Vector3( 1, 0,  0),
+            new BABYLON.Vector3(-1, 0,  0),
+            new BABYLON.Vector3( 0, 0,  1),
+            new BABYLON.Vector3( 0, 0, -1),
+            new BABYLON.Vector3( 0, 1,  0), // plafond
+        ];
+
+        for (const dir of directions) {
+            const heights = [2, 3, 4, 5];
+            for (const h of heights) {
+                const from = new BABYLON.Vector3(center.x, h, center.z);
+                const ray  = new BABYLON.Ray(from, dir, 30);
+                const hit  = this.scene.pickWithRay(ray, m =>
+                    m.checkCollisions &&
+                    !m.name.startsWith("door") &&
+                    !m.name.startsWith("spider") &&
+                    !m.name.startsWith("fRDC") &&  // ← exclure sol salle
+                    !m.name.startsWith("cF_")      // ← exclure sol couloir
+                );
+                if (!hit.hit || hit.distance <= 2) continue;
+
+                const hitNormal = hit.getNormal(true);
+                if (!hitNormal) continue;
+                // Exclure tout ce qui pointe vers le haut (sol) ou vers le bas (plafond sauf si dir=up)
+                if (hitNormal.y > 0.5 && dir.y < 0.5) continue; // sol
+                if (hitNormal.y < -0.5) continue; // dessous de quelque chose
+
+                points.push(hit.pickedPoint.add(dir.negate().scale(0.4)));
+            }
+        }
+
+        for (let i = points.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [points[i], points[j]] = [points[j], points[i]];
+        }
+        return points.slice(0, count);
     }
 }

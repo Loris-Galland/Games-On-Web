@@ -11,6 +11,7 @@ export class Player {
 
         this.speed     = 0.3;
         this.inputMap  = {};
+        this.keybindings = null;
         this.maxHealth = 10;
         this.isDead    = false;
 
@@ -50,6 +51,9 @@ export class Player {
 
         this.currentTilt = 0;
         this.bobTimer    = 0;
+        this._baseFov   = 1.0;   
+        this._currentFov = 1.0;
+        this.camera.fov  = this._baseFov;
 
         // ── Saut : on gère nous-mêmes la vélocité verticale ──────────────────
         // applyGravity reste true pour que la caméra colle au sol normalement.
@@ -63,6 +67,10 @@ export class Player {
         this._dashCooldown   = 0;
         this._DASH_CD        = 1500;
         this._isDashing      = false;
+        this._dashDir       = null;
+        this._dashRemaining = 0;
+        this._DASH_DIST     = 4;          
+        this._DASH_SPEED    = 0.6;
 
         this._blinkEnabled   = false;
         this._blinkCooldown  = 0;
@@ -98,6 +106,7 @@ export class Player {
             this._updateCameraTilt();
             this._updateWeaponBobbing();
             this._updateJump();
+            this._updateDash(); 
             this._updateWeaponRecoilRecovery();
             this._updateCooldowns(dt);
             this._updateStomp();
@@ -130,6 +139,8 @@ export class Player {
             const key = e.key.toLowerCase();
             this.inputMap[key] = true;
 
+            if (e.code === "KeyD") this.inputMap["d"] = true;
+
             switch (e.code) {
                 case "Space":      this._jump();    break;
                 case "ShiftLeft":
@@ -143,8 +154,10 @@ export class Player {
         });
 
         window.addEventListener("keyup", (e) => {
-            this.inputMap[e.key.toLowerCase()] = false;
-        });
+        const key = e.key.toLowerCase();
+        this.inputMap[key] = false;
+        if (e.code === "KeyD") this.inputMap["d"] = false; 
+    });
 
         // Observable Babylon pour la compatibilité WeaponManager
         this.scene.onKeyboardObservable.add((kbInfo) => {
@@ -166,8 +179,8 @@ export class Player {
     }
 
     _installMouseSmoothing() {
-    const MAX_Y = 80;   // au-delà = spike, on clamp
-    const MAX_X = 200;
+    const MAX_Y = 25;   
+    const MAX_X = 50;   
     this.canvas.addEventListener("pointermove", (e) => {
         if (document.pointerLockElement !== this.canvas) return;
         const my = e.movementY, mx = e.movementX;
@@ -180,7 +193,7 @@ export class Player {
                 clientX: e.clientX, clientY: e.clientY,
             }));
         }
-    }, true); // capture=true → intercepte AVANT Babylon
+    }, true);
 }
 
     // ── Cooldowns ─────────────────────────────────────────────────────────────
@@ -223,65 +236,68 @@ export class Player {
     _updateJump() {
         if (this._jumpVelocity === 0) return;
 
-        // Appliquer la vélocité verticale via moveWithCollisions
-        const displacement = new BABYLON.Vector3(0, this._jumpVelocity, 0);
-        this.camera.moveWithCollisions(displacement);
-
-        // Gravité
+        this.camera.cameraDirection.y += this._jumpVelocity;
         this._jumpVelocity -= this._GRAVITY;
 
-        // On s'arrête dès qu'on retouche le sol et qu'on descend
         if (this._jumpVelocity < 0 && this._isOnGround()) {
             this._jumpVelocity = 0;
         }
     }
 
     // ── DASH ─────────────────────────────────────────────────────────────────
-    // On utilise moveWithCollisions par petits pas pour respecter les murs.
+
+    _isAction(actionId) {
+        if (!this.keybindings) {
+            const defaults = {
+                moveForward: ["z", "w"],
+                moveBack:    ["s"],
+                moveLeft:    ["q", "a"],
+                moveRight:   ["d"],
+            };
+            return (defaults[actionId] ?? []).some(k => this.inputMap[k]);
+        }
+        const binding = this.keybindings.find(b => b.id === actionId);
+        return (binding?.keys ?? []).some(k => this.inputMap[k]);
+    }
 
     _tryDash() {
         if (!this._dashEnabled)     return;
         if (this._dashCooldown > 0) return;
         if (this._isDashing)        return;
 
-        this._dashCooldown = this._DASH_CD;
-        this._isDashing    = true;
-
-        const forward = this.camera.getForwardRay().direction.normalize();
-        // On aplatit forward sur le plan horizontal pour éviter de monter/descendre
+        const forward     = this.camera.getForwardRay().direction.normalize();
         const flatForward = new BABYLON.Vector3(forward.x, 0, forward.z).normalize();
-        const right       = BABYLON.Vector3.Cross(flatForward, BABYLON.Vector3.Up()).normalize();
+        const right       = new BABYLON.Vector3(flatForward.z, 0, -flatForward.x);
 
         let dir = BABYLON.Vector3.Zero();
-        if (this.inputMap["z"] || this.inputMap["w"]) dir = dir.add(flatForward);
-        if (this.inputMap["s"])                        dir = dir.subtract(flatForward);
-        if (this.inputMap["q"] || this.inputMap["a"]) dir = dir.subtract(right);
-        if (this.inputMap["d"])                        dir = dir.add(right);
-        if (dir.length() < 0.01) dir = flatForward;
-        dir = dir.normalize();
+        if (this._isAction("moveForward")) dir = dir.add(flatForward);
+        if (this._isAction("moveBack"))    dir = dir.subtract(flatForward);
+        if (this._isAction("moveLeft"))    dir = dir.subtract(right);
+        if (this._isAction("moveRight"))   dir = dir.add(right);
+        if (dir.length() < 0.01)          dir = flatForward;
 
-        // FX visuel
-        this._dashWeaponFX(dir);
+        this._dashDir       = dir.normalize();
+        this._dashRemaining = this._DASH_DIST;
+        this._isDashing     = true;
+        this._dashCooldown  = this._DASH_CD;
+
+        this._dashWeaponFX(this._dashDir);
         this._spawnDashTrail();
+    }
 
-        // Distance totale du dash : 4 unités en 120ms → 10 steps de 0.4u
-        const totalDist = 4;
-        const steps     = 12;
-        const stepDur   = 120 / steps;
-        const stepDist  = totalDist / steps;
-        const stepVec   = dir.scale(stepDist);
+    _updateDash() {
+        if (!this._isDashing) return;
 
-        let step = 0;
-        const iv = setInterval(() => {
-            if (step >= steps || this.isDead) {
-                clearInterval(iv);
-                this._isDashing = false;
-                return;
-            }
-            // moveWithCollisions respecte les murs et le sol
-            this.camera.moveWithCollisions(stepVec);
-            step++;
-        }, stepDur);
+        const step = Math.min(this._DASH_SPEED, this._dashRemaining);
+        
+        this.camera.cameraDirection.addInPlace(this._dashDir.scale(step));
+        this._dashRemaining -= step;
+
+        if (this._dashRemaining <= 0) {
+            this._isDashing     = false;
+            this._dashDir       = null;
+            this._dashRemaining = 0;
+        }
     }
 
     _dashWeaponFX(dir) {
@@ -705,27 +721,35 @@ export class Player {
     }
 
     _updateCameraTilt() {
-        let targetTilt = 0;
-        if (this.inputMap["q"] || this.inputMap["a"]) targetTilt =  0.05;
-        else if (this.inputMap["d"])                  targetTilt = -0.05;
-        this.currentTilt = BABYLON.Scalar.Lerp(this.currentTilt, targetTilt, 0.1);
+        this.currentTilt = BABYLON.Scalar.Lerp(this.currentTilt, 0, 0.18);
         this.camera.rotation.z = this.currentTilt;
     }
 
     _updateWeaponBobbing() {
-        const isMovingKb =
-            this.inputMap["z"] || this.inputMap["w"] || this.inputMap["s"] ||
-            this.inputMap["q"] || this.inputMap["a"] || this.inputMap["d"];
-        const isMoving = isMovingKb || this.inputMap["_gp_move"];
+        const goLeft       = this.inputMap["q"] || this.inputMap["a"];
+        const goRight      = this.inputMap["d"];
+        const strafeNeutral = goLeft && goRight;
+
+        const goingForward = this.inputMap["z"] || this.inputMap["w"];
+        const isMovingKb   =
+            goingForward || this.inputMap["s"] ||
+            (!strafeNeutral && (goLeft || goRight));
+        const isMoving = (isMovingKb || this.inputMap["_gp_move"]) && !strafeNeutral;
 
         if (isMoving) {
-            this.bobTimer += 0.2;
-            this.weapon.position.y = this.weaponOriginalPos.y + Math.sin(this.bobTimer) * 0.04;
-            this.weapon.position.x = this.weaponOriginalPos.x + Math.cos(this.bobTimer * 0.5) * 0.04;
+            this.bobTimer += 0.18;
+            this.weapon.position.y = this.weaponOriginalPos.y + Math.sin(this.bobTimer) * 0.025;
+            // X uniquement si on avance/recule, pas en strafe pur
+            const xBob = goingForward || this.inputMap["s"] ? Math.cos(this.bobTimer * 0.5) * 0.018 : 0;
+            this.weapon.position.x = BABYLON.Scalar.Lerp(this.weapon.position.x, this.weaponOriginalPos.x + xBob, 0.15);
         } else {
-            this.weapon.position.x = BABYLON.Scalar.Lerp(this.weapon.position.x, this.weaponOriginalPos.x, 0.1);
-            this.weapon.position.y = BABYLON.Scalar.Lerp(this.weapon.position.y, this.weaponOriginalPos.y, 0.1);
-            this.bobTimer = 0;
+            this.weapon.position.x = BABYLON.Scalar.Lerp(this.weapon.position.x, this.weaponOriginalPos.x, 0.12);
+            this.weapon.position.y = BABYLON.Scalar.Lerp(this.weapon.position.y, this.weaponOriginalPos.y, 0.12);
+            this.bobTimer = BABYLON.Scalar.Lerp(this.bobTimer, 0, 0.15);
         }
+
+        const targetFov = (isMoving && goingForward) ? this._baseFov + 0.07 : this._baseFov;
+        this._currentFov = BABYLON.Scalar.Lerp(this._currentFov, targetFov, 0.06);
+        this.camera.fov  = this._currentFov;
     }
 }

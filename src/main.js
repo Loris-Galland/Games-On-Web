@@ -42,6 +42,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const sharedGfxMenu = new GraphicsMenu(game.lightingManager);
         const sharedKbMenu  = new KeybindingsMenu(game.player, onPauseKeyChange, gamepad);
 
+        sharedKbMenu.onBindingsChanged = () => {
+        if (game.player) game.player.keybindings = sharedKbMenu.getBindings();
+    };
+
         // ── Menus ─────────────────────────────────────────────────────────────
         const mainMenu = new MainMenu(
             () => {

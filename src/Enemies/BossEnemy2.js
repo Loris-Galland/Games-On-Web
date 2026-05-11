@@ -386,8 +386,8 @@ export class BossEnemy2 {
             if (bullet.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
             const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
             const p = this.player.camera.globalPosition;
-            const dx = bullet.position.x-p.x, dy = bullet.position.y-(p.y-1), dz = bullet.position.z-p.z;
-            if (Math.sqrt(dx*dx+dy*dy+dz*dz) < 0.6 && !this.player.isDead) {
+            const dx = bullet.position.x-p.x, dy = bullet.position.y-p.y, dz = bullet.position.z-p.z;
+            if (Math.sqrt(dx*dx+dy*dy+dz*dz) < 1.2 && !this.player.isDead) {
                 this.player.health?.takeDamage(1);
                 this.scene.onBeforeRenderObservable.remove(obs); bullet.dispose(); return;
             }
@@ -430,7 +430,7 @@ export class BossEnemy2 {
                 const lx = Math.cos(this._laserAngle), lz = Math.sin(this._laserAngle);
                 const dx = p.x - pos.x, dz = p.z - pos.z;
                 const proj = dx*lx + dz*lz, perp = Math.abs(dx*(-lz) + dz*lx);
-                if (proj >= -0.5 && proj <= this._LASER_LEN && perp < 0.85 && Math.abs(p.y - pos.y) < 2.5)
+                if (proj >= -0.5 && proj <= this._LASER_LEN && perp < 0.85)
                     this.player.health?.takeDamage(1);
                 this._laserDamTmr = 0.4;
             }

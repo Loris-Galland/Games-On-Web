@@ -9,6 +9,7 @@ import "@babylonjs/inspector";
 import { UpgradeManager }  from "../Systems/UpgradeManager";
 import { MinimapManager } from '../Systems/MinimapManager';
 import { KeybindingsMenu } from "../UI/KeybindingsMenu";
+import { IntroSequence } from "../UI/IntroSequence";
 
 
 function _getRoomTypeForUpgrade(roomIdx) {

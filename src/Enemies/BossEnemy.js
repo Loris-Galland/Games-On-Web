@@ -106,7 +106,7 @@ export class BossEnemy {
         }, this.scene);
         this.body.position        = new BABYLON.Vector3(position.x, position.y + 2.4, position.z);
         this.body.material        = mat;
-        this.body.checkCollisions = false;
+        this.body.checkCollisions = true;
         this.body.isPickable      = false; // le weakpoint prend les hits
         this.body.ellipsoid       = new BABYLON.Vector3(1.6, 2.4, 1.6);
         this.body._isBossBody     = true;
@@ -488,8 +488,7 @@ export class BossEnemy {
         if (dist > 1.0) {
             const speed = 6.0;
             const dir   = toTarget.normalize();
-            this.body.position.x += dir.x * speed * dt;
-            this.body.position.z += dir.z * speed * dt;
+            this.body.moveWithCollisions(new BABYLON.Vector3(dir.x * speed * dt, 0, dir.z * speed * dt));
         }
         this.body.position.y = this._groundY + Math.sin(this._t * 4) * 0.12;
 

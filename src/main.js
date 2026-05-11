@@ -8,6 +8,7 @@ import { GamepadManager }  from './Systems/GamepadManager.js';
 import { ScoreManager }    from './Systems/ScoreManager.js';
 import { WeaponManager }   from './Systems/WeaponManager.js';
 import { DebugPanel } from './UI/DebugPanel';
+import { IntroSequence } from './UI/IntroSequence.js';
 
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -49,14 +50,18 @@ window.addEventListener('DOMContentLoaded', () => {
         // ── Menus ─────────────────────────────────────────────────────────────
         const mainMenu = new MainMenu(
             () => {
-                game.engine.enterPointerlock();
-                gamepad.setMenuMode(false);
+                // Lancer l'intro, puis démarrer le jeu une fois terminée
+                const intro = new IntroSequence();
+                intro.play(() => {
+                    game.engine.enterPointerlock();
+                    gamepad.setMenuMode(false);
+                });
             },
             game.player,
             sharedGfxMenu,
             sharedKbMenu,
         );
-
+        
         const pauseMenu = new PauseMenu(
             () => {
                 game.isPaused = false;

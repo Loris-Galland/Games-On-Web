@@ -9,12 +9,19 @@ import { ScoreManager }    from './Systems/ScoreManager.js';
 import { WeaponManager }   from './Systems/WeaponManager.js';
 import { DebugPanel } from './UI/DebugPanel';
 import { IntroSequence } from './UI/IntroSequence.js';
+import { SoundManager } from './Systems/SoundManager.js';
+import * as BABYLON from "@babylonjs/core";
 
 
 window.addEventListener('DOMContentLoaded', () => {
     const game = new GameScene('renderCanvas');
 
-    game._init().then(() => {
+    game._init().then(async () => {
+
+        // ── SoundManager ──────────────────────────────────────────────────────────
+        const soundManager = new SoundManager;
+        soundManager.init(); // sans await
+        game.soundManager = soundManager;
 
         // ── Touche pause clavier ──────────────────────────────────────────────
         let pauseKey = 'enter';
@@ -50,8 +57,7 @@ window.addEventListener('DOMContentLoaded', () => {
         // ── Menus ─────────────────────────────────────────────────────────────
         const mainMenu = new MainMenu(
             () => {
-                // Lancer l'intro, puis démarrer le jeu une fois terminée
-                const intro = new IntroSequence();
+                const intro = new IntroSequence(soundManager);
                 intro.play(() => {
                     game.engine.enterPointerlock();
                     gamepad.setMenuMode(false);
@@ -60,6 +66,7 @@ window.addEventListener('DOMContentLoaded', () => {
             game.player,
             sharedGfxMenu,
             sharedKbMenu,
+            soundManager,
         );
         
         const pauseMenu = new PauseMenu(
@@ -72,6 +79,7 @@ window.addEventListener('DOMContentLoaded', () => {
             game.player,
             sharedGfxMenu,
             sharedKbMenu,
+            soundManager,
         );
 
         gamepad.setMenuMode(true, mainMenu.overlay);
@@ -104,6 +112,7 @@ window.addEventListener('DOMContentLoaded', () => {
             if (!game.waveManager) return;
             game.waveManager.scoreManager  = scoreManager;
             game.waveManager.weaponManager = weaponManager;
+            game.waveManager.soundManager  = soundManager;
         };
         injectManagers();
         // Au cas où le WaveManager n'est pas encore prêt

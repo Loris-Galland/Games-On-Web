@@ -67,6 +67,10 @@ export class PlayerShoot {
         const isLastBullet = this.lastBulletBonus && this.daggerAmmo.current === 0;
         const dmgMult      = (this.damageMultiplier ?? 1) * (isLastBullet ? 3 : 1);
 
+        const shootSfx = new Audio("sounds/sfx/shoot.wav");
+        shootSfx.volume = 0.5;
+        shootSfx.play().catch(() => {});
+
         EnemyParticles.muzzleFlash(this.scene, this.player.weapon);
         this._fireProjectile(spawnPos, direction, dmgMult);
 

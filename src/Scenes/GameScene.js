@@ -42,6 +42,8 @@ export class GameScene {
         this.isInUpgrade = false;
         this.isPaused = false;
 
+        this.soundManager = null;
+
         this.visitedRooms = new Set();
     }
 
@@ -306,12 +308,15 @@ export class GameScene {
         _wm._launchNextWave = () => {
             origLaunch();
             if (_lm) _lm.setCombatMode(_wm.isWaveActive);
+            if (!_wm._boss) this.soundManager?.playMusic("ambient"); 
         };
+
         const origClear = _wm._clearEnemies.bind(_wm);
         _wm._clearEnemies = () => {
             origClear();
             if (_lm) _lm.setCombatMode(false);
         };
+
         const origOpen = _wm._openDoors.bind(_wm);
         _wm._openDoors = () => {
             origOpen();

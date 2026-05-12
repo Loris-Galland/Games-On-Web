@@ -281,11 +281,13 @@ export class WaveManager {
                 this.scoreManager?.onRoomClear?.();
                 this.isWaveActive = false;
                 this._boss = null;
+                this.soundManager?.playMusic("ambient");
                 this._clearedRooms.add(this._currentRoomIdx);
                 setTimeout(() => this._openDoors(), 2000);
             };
  
             this.hud?.showWaveMessage?.(`${bossName} EST LÀ !`);
+            this.soundManager?.playMusic("boss");
         }, 3000);
     }
 

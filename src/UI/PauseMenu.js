@@ -12,13 +12,14 @@ export class PauseMenu {
      * @param {GraphicsMenu}    sharedGfxMenu   instance partagée
      * @param {KeybindingsMenu} sharedKbMenu    instance partagée
      */
-    constructor(onResumeCallback, onQuitCallback, playerRef = null, sharedGfxMenu = null, sharedKbMenu = null) {
+    constructor(onResumeCallback, onQuitCallback, playerRef = null, sharedGfxMenu = null, sharedKbMenu = null, soundManager = null) {
         this.onResume  = onResumeCallback;
         this.onQuit    = onQuitCallback;
         this.player    = playerRef;
         this._gfxMenu  = sharedGfxMenu;
         this._kbMenu   = sharedKbMenu;
         this.lm        = sharedGfxMenu?.lm ?? null;
+        this._sm = soundManager;
         this._createMenu();
     }
 
@@ -47,6 +48,10 @@ export class PauseMenu {
         const quitBtn = document.createElement("button");
         quitBtn.className = "menu-btn exit-btn"; quitBtn.innerText = "RETOUR À L'ACCUEIL";
         quitBtn.onclick = () => { if (this.onQuit) this.onQuit(); };
+
+        this._addBtnSound(resumeBtn);
+        this._addBtnSound(settingsBtn);
+        this._addBtnSound(quitBtn, true);
 
         this.buttonsContainer.appendChild(resumeBtn);
         this.buttonsContainer.appendChild(settingsBtn);
@@ -87,7 +92,9 @@ export class PauseMenu {
         const currentSens = this.player?.camera?.angularSensibility ?? 5000;
         this._addSliderGroup(this.settingsPanel, "SENSIBILITÉ SOURIS", 1000, 10000, currentSens,
             (v) => { if (this.player?.camera) this.player.camera.angularSensibility = v; });
-        this._addSliderGroup(this.settingsPanel, "VOLUME MASTER", 0, 100, 100, () => {});
+        this._addSliderGroup(this.settingsPanel, "VOLUME MASTER", 0, 100, 100, (v) => {
+            this._sm?.setMasterVolume(v / 100);
+        });
 
         const sep = document.createElement("div");
         sep.style.cssText = "border-top:1px solid rgba(0,255,204,0.1);margin:18px 0 14px;";
@@ -111,9 +118,25 @@ export class PauseMenu {
         const backBtn = document.createElement("button");
         backBtn.className = "menu-btn"; backBtn.innerText = "← RETOUR";
         backBtn.onclick = () => this._showMain();
+        this._addBtnSound(gfxBtn);
+        this._addBtnSound(kbBtn);
+        this._addBtnSound(backBtn, true);
         this.settingsPanel.appendChild(backBtn);
 
         this.overlay.appendChild(this.settingsPanel);
+    }
+
+    _addBtnSound(btn, isBack = false) {
+        btn.addEventListener("mouseenter", () => {
+            const sfx = new Audio("sounds/sfx/ui_hover.wav");
+            sfx.volume = 0.2;
+            sfx.play().catch(() => {});
+        });
+        btn.addEventListener("click", () => {
+            const sfx = new Audio(isBack ? "sounds/sfx/ui_back.wav" : "sounds/sfx/ui_click.wav");
+            sfx.volume = 0.3;
+            sfx.play().catch(() => {});
+        });
     }
 
     _addSliderGroup(container, label, min, max, value, onChange) {

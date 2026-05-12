@@ -33,6 +33,7 @@ export class PlasmaShotgun {
         this._reloadTimer   = null;
 
         // Apparence
+        this._shootSfx = new Audio("sounds/sfx/gunshot.wav");
         this._buildMesh();
     }
 
@@ -75,6 +76,10 @@ export class PlasmaShotgun {
 
         this.lastFireTime = now;
         this.currentAmmo--;
+
+        const sfx = this._shootSfx.cloneNode ? this._shootSfx.cloneNode() : new Audio("sounds/sfx/gunshot.wav");
+        sfx.volume = 0.1;
+        sfx.play().catch(() => {});
 
         const forward = this.player.camera.getForwardRay().direction.normalize();
         const spawnPos = this.player.camera.globalPosition.add(forward.scale(1.8));

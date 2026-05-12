@@ -331,12 +331,16 @@ function _buildSceneGlitch() {
 // ── Classe principale ─────────────────────────────────────────────────────────
 
 export class IntroSequence {
-    constructor() {
+    constructor(soundManager = null) {
         this._overlay    = null;
         this._stepIdx    = 0;
         this._onComplete = null;
         this._typeTimer  = null;
         this._canAdvance = false;
+        this._sm = soundManager;
+        this._typingSfx = new Audio("sounds/sfx/typewriter.wav");
+        this._typingSfx.loop   = true;
+        this._typingSfx.volume = 0.4;
     }
 
     // ── API publique ──────────────────────────────────────────────────────────
@@ -640,6 +644,9 @@ export class IntroSequence {
         if (!el) return;
         let idx = 0;
 
+        this._typingSfx.currentTime = 0;
+        this._typingSfx.play().catch(() => {});
+
         // Curseur clignotant
         const cursor = document.createElement("span");
         cursor.style.cssText = `
@@ -661,6 +668,8 @@ export class IntroSequence {
                 this._typeTimer = setTimeout(tick, speed);
             } else {
                 cursor.remove();
+                this._typingSfx.pause(); 
+                this._typingSfx.currentTime = 0;
                 onDone?.();
             }
         };
@@ -671,6 +680,8 @@ export class IntroSequence {
             if (idx < text.length) {
                 clearTimeout(this._typeTimer);
                 cursor.remove();
+                this._typingSfx.pause(); 
+                this._typingSfx.currentTime = 0;
                 el.textContent = text;
                 onDone?.();
             }

@@ -9,6 +9,23 @@ export class Player {
         this.scene  = scene;
         this.canvas = canvas;
 
+        // Sons gameplay
+        this._footstepSfx        = new Audio("sounds/sfx/footstep.wav");
+        this._footstepSfx.loop   = true;
+        this._footstepSfx.volume = 0.3;
+        this._isPlayingFootstep  = false;
+        this._footstepUnlocked   = false;
+
+        const unlock = () => {
+        this._footstepSfx.play().then(() => {
+            this._footstepSfx.pause();
+            this._footstepSfx.currentTime = 0;
+            this._footstepUnlocked = true;
+        }).catch(() => {});
+    };
+    window.addEventListener("click",   unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+
         this.speed     = 0.3;
         this.inputMap  = {};
         this.keybindings = null;
@@ -283,6 +300,9 @@ export class Player {
 
         this._dashWeaponFX(this._dashDir);
         this._spawnDashTrail();
+        const dashSfx = new Audio("sounds/sfx/dash.wav");
+        dashSfx.volume = 0.5;
+        dashSfx.play().catch(() => {});
     }
 
     _updateDash() {
@@ -737,12 +757,23 @@ export class Player {
         const isMoving = (isMovingKb || this.inputMap["_gp_move"]) && !strafeNeutral;
 
         if (isMoving) {
+            if (!this._isPlayingFootstep && this._footstepUnlocked) {
+                this._footstepSfx.play().catch(() => {});
+                this._isPlayingFootstep = true;
+            }
+
             this.bobTimer += 0.18;
             this.weapon.position.y = this.weaponOriginalPos.y + Math.sin(this.bobTimer) * 0.025;
             // X uniquement si on avance/recule, pas en strafe pur
             const xBob = goingForward || this.inputMap["s"] ? Math.cos(this.bobTimer * 0.5) * 0.018 : 0;
             this.weapon.position.x = BABYLON.Scalar.Lerp(this.weapon.position.x, this.weaponOriginalPos.x + xBob, 0.15);
         } else {
+            if (this._isPlayingFootstep) {
+                this._footstepSfx.pause();
+                this._footstepSfx.currentTime = 0;
+                this._isPlayingFootstep = false;
+            }
+            
             this.weapon.position.x = BABYLON.Scalar.Lerp(this.weapon.position.x, this.weaponOriginalPos.x, 0.12);
             this.weapon.position.y = BABYLON.Scalar.Lerp(this.weapon.position.y, this.weaponOriginalPos.y, 0.12);
             this.bobTimer = BABYLON.Scalar.Lerp(this.bobTimer, 0, 0.15);

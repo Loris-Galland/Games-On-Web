@@ -70,31 +70,25 @@ export class WeaponManager {
             }
         });
 
-        // Molette souris
-        this.scene.onPointerObservable?.add((info) => {
-            if (info.type === BABYLON.PointerEventTypes?.POINTERWHEEL) {
-                const delta = info.event.deltaY > 0 ? 1 : -1;
-                this._scrollSwitch(delta);
-            }
-        });
+                // Clic droit → zoom sniper
+        this.scene.onPointerObservable.add((info) => {
+            if (info.type !== BABYLON.PointerEventTypes.POINTERDOWN) return;
+            const evt = info.event;
+            if (evt.type !== "mousedown" && evt.type !== "pointerdown") return;
+            if (Math.abs(evt.movementX ?? 0) > 10 || Math.abs(evt.movementY ?? 0) > 10) return;
 
-        // Clic droit → zoom sniper
-        this.scene.onPointerDown = (evt) => {
             if (!this.scene.getEngine().isPointerLock) {
                 this.scene.getEngine().enterPointerlock();
                 return;
             }
-            // Tir arme secondaire — clic gauche
             if (evt.button === 0 && this._activeSlot > 0) {
                 this.fire();
                 return;
             }
-            // Tir dagger — clic gauche, slot 0 géré par PlayerShoot via _enabled
-            // Zoom sniper — clic droit
             if (evt.button === 2 && this._activeWeapon instanceof QuantumSniper) {
                 this._activeWeapon.toggleZoom();
             }
-        };
+        });
     }
 
     _scrollSwitch(delta) {

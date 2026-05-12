@@ -191,11 +191,11 @@ export class PlayerHUD {
     this.waveText = document.createElement("div");
     this.waveText.id = "wave-hud";
     this.waveText.style.cssText = `
-      position:fixed;top:110px;left:36px;
+      position:fixed;top:110px;left:20px;
       font-family:'Courier New',monospace;font-size:13px;letter-spacing:3px;
       color:#00ffcc;text-shadow:0 0 10px #00ffcc;text-transform:uppercase;
       pointer-events:none;z-index:40;transition:opacity 0.4s;opacity:0;
-      max-width:340px;white-space:normal;line-height:1.5;
+      max-width:min(340px,calc(100vw - 40px));white-space:normal;line-height:1.5;
       background:rgba(0,10,20,0.7);padding:8px 14px;
       border-left:2px solid rgba(0,255,204,0.5);border-radius:0 2px 2px 0;`;
     document.body.appendChild(this.waveText);

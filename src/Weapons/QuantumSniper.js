@@ -34,6 +34,9 @@ export class QuantumSniper {
         this._laserMesh    = null;
         this._laserObs     = null;
 
+        this._shootSfx = new Audio("sounds/sfx/sniper.wav");
+        this._shootSfx.volume = 0.1;
+
         this._buildMesh();
     }
 
@@ -129,6 +132,9 @@ export class QuantumSniper {
 
         this.lastFireTime = now;
         this.currentAmmo--;
+
+        this._shootSfx.currentTime = 0;
+        this._shootSfx.play().catch(() => {});
 
         const cam     = this.player.camera;
         const forward = cam.getForwardRay().direction.normalize();

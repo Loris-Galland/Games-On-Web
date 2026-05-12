@@ -53,22 +53,27 @@ export class DebugPanel {
     _buildActions() {
         const c = this._panel.querySelector("#dbg-actions");
         [
-            { label: "💀 Tuer tous les ennemis", color: "#ff4444", fn: () => this._killAll() },
-            { label: "❤️  Soin complet",          color: "#ff88aa", fn: () => this.player.health.heal(100) },
-            { label: "⚡ +2000 points",           color: "#ffcc00", fn: () => {
+            { label: "Tuer tous les ennemis", color: "#ff4444", fn: () => this._killAll() },
+            { label: "Soin complet",          color: "#ff88aa", fn: () => this.player.health.heal(100) },
+            { label: "+2000 points",           color: "#ffcc00", fn: () => {
                 if (this.scoreManager) {
                     this.scoreManager.totalScore += 2000;
                     this.player.hud?.updateScore?.(this.scoreManager.totalScore);
                 }
             }},
-            { label: "🔫 Recharger munitions",    color: "#aa88ff", fn: () => {
+            { label: "Recharger munitions",    color: "#aa88ff", fn: () => {
                 const sc = this.player.shootController;
                 if (sc?.daggerAmmo) {
                     sc.daggerAmmo.current = sc.daggerAmmo.max;
                     this.player.hud.updateAmmo(sc.daggerAmmo.current, sc.daggerAmmo.max);
                 }
             }},
-            { label: "🎁 Tous les upgrades",      color: "#00ffcc", fn: () => this._giveAll() },
+            { label: "Donner toutes les armes", color: "#ff8800", fn: () => {
+                this.waveManager.weaponManager?.give("shotgun");
+                this.waveManager.weaponManager?.give("sniper");
+                this.waveManager.weaponManager?.give("rocket");
+            }},
+            { label: "Tous les upgrades",      color: "#00ffcc", fn: () => this._giveAll() },
         ].forEach(({ label, color, fn }) => c.appendChild(this._btn(label, color, fn)));
     }
 

@@ -14,17 +14,17 @@ export class Player {
         this._footstepSfx.loop   = true;
         this._footstepSfx.volume = 0.3;
         this._isPlayingFootstep  = false;
+        this._footstepUnlocked   = false;
 
         const unlock = () => {
-            this._footstepSfx.play().then(() => {
-                this._footstepSfx.pause();
-                this._footstepSfx.currentTime = 0;
-            }).catch(() => {});
-            window.removeEventListener("click", unlock);
-            window.removeEventListener("keydown", unlock);
-        };
-        window.addEventListener("click", unlock);
-        window.addEventListener("keydown", unlock);
+        this._footstepSfx.play().then(() => {
+            this._footstepSfx.pause();
+            this._footstepSfx.currentTime = 0;
+            this._footstepUnlocked = true;
+        }).catch(() => {});
+    };
+    window.addEventListener("click",   unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
 
         this.speed     = 0.3;
         this.inputMap  = {};
@@ -757,7 +757,7 @@ export class Player {
         const isMoving = (isMovingKb || this.inputMap["_gp_move"]) && !strafeNeutral;
 
         if (isMoving) {
-            if (!this._isPlayingFootstep) {
+            if (!this._isPlayingFootstep && this._footstepUnlocked) {
                 this._footstepSfx.play().catch(() => {});
                 this._isPlayingFootstep = true;
             }

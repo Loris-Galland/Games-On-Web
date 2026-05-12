@@ -426,6 +426,9 @@ export class WaveManager {
     // ── Scoring ───────────────────────────────────────────────────────────────
 
     _handleKill(type, isWeakpoint) {
+        const sfx = new Audio("sounds/sfx/enemy_death.wav");
+        sfx.volume = 0.3;
+        sfx.play().catch(() => {});
         this.scoreManager?.onKill?.(type, { weakpoint: isWeakpoint });
     }
 

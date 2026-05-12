@@ -14,6 +14,9 @@ export class PlayerShoot {
         this.multishotEnabled = false;
         this._enabled         = true;
 
+        this._shootSfx = new Audio("sounds/sfx/shoot.wav");
+        this._shootSfx.volume = 0.1;
+
         // ── Flags upgrades ────────────────────────────────────────────────────
         this.damageMultiplier = 1;
         this.lastBulletBonus  = false;
@@ -44,7 +47,7 @@ export class PlayerShoot {
             if (evt.button !== 0) return;
 
             if (evt.type !== "mousedown" && evt.type !== "pointerdown") return;
-            if (Math.abs(evt.movementX ?? 0) > 2 || Math.abs(evt.movementY ?? 0) > 2) return;
+            if (Math.abs(evt.movementX ?? 0) > 10 || Math.abs(evt.movementY ?? 0) > 10) return;
 
             const now = Date.now();
             if (now - this.lastFireTime < this.fireRateMs) return;
@@ -67,9 +70,8 @@ export class PlayerShoot {
         const isLastBullet = this.lastBulletBonus && this.daggerAmmo.current === 0;
         const dmgMult      = (this.damageMultiplier ?? 1) * (isLastBullet ? 3 : 1);
 
-        const shootSfx = new Audio("sounds/sfx/shoot.wav");
-        shootSfx.volume = 0.5;
-        shootSfx.play().catch(() => {});
+        this._shootSfx.currentTime = 0;
+        this._shootSfx.play().catch(() => {});
 
         EnemyParticles.muzzleFlash(this.scene, this.player.weapon);
         this._fireProjectile(spawnPos, direction, dmgMult);

@@ -16,11 +16,11 @@ export class SoundManager {
         this._currentMusic    = null;
         this._currentMusicKey = null;
         this._masterVolume    = 1.0;
-        this._musicVolume     = 0.4;
+        this._musicVolume     = 0.2;
 
         // Pistes audio natives
         this._musicTracks = {
-            ambient: new Audio("sounds/music/music_ambient.mp3"),
+            ambient: new Audio("sounds/music/music_ambiant.mp3"),
             boss:    new Audio("sounds/music/music_boss.mp3"),
         };
 

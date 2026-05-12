@@ -303,20 +303,20 @@ export class GameScene {
         // Monkey-patch APRÈS instanciation pour capturer les bonnes références
         const _wm = this.waveManager;
         const _lm = this.lightingManager;
-
+ 
         const origLaunch = _wm._launchNextWave.bind(_wm);
         _wm._launchNextWave = () => {
             origLaunch();
             if (_lm) _lm.setCombatMode(_wm.isWaveActive);
-            if (!_wm._boss) this.soundManager?.playMusic("ambient"); 
+            if (!_wm._boss) _wm.soundManager?.playMusic("ambient");
         };
-
+ 
         const origClear = _wm._clearEnemies.bind(_wm);
         _wm._clearEnemies = () => {
             origClear();
             if (_lm) _lm.setCombatMode(false);
         };
-
+ 
         const origOpen = _wm._openDoors.bind(_wm);
         _wm._openDoors = () => {
             origOpen();

@@ -24,6 +24,10 @@ export class EnemyParticles {
         emitter.isVisible  = false;
         emitter.isPickable = false;
 
+        const sfx = new Audio("sounds/sfx/enemy_spawn.wav");
+        sfx.volume = 0.1;
+        sfx.play().catch(() => {});
+
         // Texture partagée
         const tex = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", scene);
 

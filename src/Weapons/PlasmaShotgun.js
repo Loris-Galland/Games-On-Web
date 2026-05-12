@@ -78,7 +78,7 @@ export class PlasmaShotgun {
         this.currentAmmo--;
 
         const sfx = this._shootSfx.cloneNode ? this._shootSfx.cloneNode() : new Audio("sounds/sfx/gunshot.wav");
-        sfx.volume = 0.6;
+        sfx.volume = 0.1;
         sfx.play().catch(() => {});
 
         const forward = this.player.camera.getForwardRay().direction.normalize();

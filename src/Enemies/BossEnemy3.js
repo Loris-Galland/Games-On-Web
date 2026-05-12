@@ -324,7 +324,10 @@ export class BossEnemy3 {
             EnemyParticles.death(this.scene, this.body.position.add(off), new BABYLON.Color3(1,0.2,0)); n++;
         }, 200);
         if (this.weakPoint && !this.weakPoint.isDisposed()) this.weakPoint.dispose();
-        setTimeout(() => { if (!this.body?.isDisposed()) this.body.dispose(); if (this.onDeath) this.onDeath(); }, 1500);
+        setTimeout(() => {
+            if (this.body && !this.body.isDisposed()) this.body.dispose();
+            if (this.onDeath) this.onDeath();
+        }, 1500);
     }
 
     dispose() {

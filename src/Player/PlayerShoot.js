@@ -43,6 +43,9 @@ export class PlayerShoot {
             if (!this._enabled) return;
             if (evt.button !== 0) return;
 
+            if (evt.type !== "mousedown" && evt.type !== "pointerdown") return;
+            if (Math.abs(evt.movementX ?? 0) > 2 || Math.abs(evt.movementY ?? 0) > 2) return;
+
             const now = Date.now();
             if (now - this.lastFireTime < this.fireRateMs) return;
 

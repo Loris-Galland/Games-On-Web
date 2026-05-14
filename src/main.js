@@ -51,8 +51,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const sharedKbMenu  = new KeybindingsMenu(game.player, onPauseKeyChange, gamepad);
 
         sharedKbMenu.onBindingsChanged = () => {
-        if (game.player) game.player.keybindings = sharedKbMenu.getBindings();
-    };
+            if (game.player) game.player.keybindings = sharedKbMenu.getBindings();
+        };
 
         // ── Menus ─────────────────────────────────────────────────────────────
         const mainMenu = new MainMenu(
@@ -60,6 +60,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 const intro = new IntroSequence(soundManager);
                 intro.play(() => {
                     game.engine.enterPointerlock();
+                    game.player.hud._createControlsHint();
                     gamepad.setMenuMode(false);
                 });
             },

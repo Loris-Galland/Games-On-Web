@@ -362,7 +362,7 @@ export class MinimapManager {
         const tileX = cam.globalPosition.x / T;
         const tileZ = cam.globalPosition.z / T;
         const p     = this._tc(tileX, tileZ, proj);
-        const yaw   = cam.rotation.y;
+        const yaw   = -cam.rotation.y;
 
         ctx.save();
         ctx.translate(p.x, p.y);

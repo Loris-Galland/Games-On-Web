@@ -166,7 +166,7 @@ export class Player {
             switch (key) {
                 case "f": this._tryShield();  break;
                 case "g": this._tryEMP();     break;
-                case "q": if (this._berserkEnabled) this._tryBerserk(); break;
+                case "m": if (this._berserkEnabled) this._tryBerserk(); break;
             }
         });
 

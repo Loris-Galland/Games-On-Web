@@ -140,7 +140,9 @@ export class DebugPanel {
             try { if (e.body && !e.body.isDisposed()) e.body.dispose(); } catch (_) {}
         });
         if (this.waveManager._boss) {
-            try { this.waveManager._boss.dispose?.(); } catch (_) {}
+            const boss = this.waveManager._boss;
+            try { boss.onDeath?.(); } catch (_) {}
+            try { boss.dispose?.(); } catch (_) {}
             this.waveManager._boss = null;
         }
         this.player.hud?.showWaveMessage?.("DEBUG: ennemis éliminés");

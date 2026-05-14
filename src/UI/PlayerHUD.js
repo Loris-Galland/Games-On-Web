@@ -128,9 +128,6 @@ export class PlayerHUD {
           @keyframes exit-pulse{0%,100%{opacity:0.6;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
       </style>`;
     document.body.appendChild(this._exitIndicator);
-
-    // ── Rappel des contrôles ──────────────────────────────────────────────
-    this._createControlsHint();
   }
 
   _createControlsHint() {
@@ -148,11 +145,10 @@ export class PlayerHUD {
       <div style="margin-bottom:5px;color:rgba(0,255,204,0.35);font-size:9px;letter-spacing:3px;">CONTRÔLES</div>
       <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
         <span><b style="color:#00ffcc">Z/W A/Q S D</b> Déplacement</span>
-        <span><b style="color:#00ffcc">ESPACE</b> Saut</span>
+        <!--<span><b style="color:#00ffcc">ESPACE</b> Saut</span>-->
         <span><b style="color:#00ffcc">CLIC G</b> Tirer</span>
         <span><b style="color:#00ffcc">1-4 / MOLETTE</b> Changer d'arme</span>
-        <span><b style="color:#00ffcc">SHIFT</b> Dash</span>
-        <span><b style="color:#00ffcc">ÉCHAP</b> Pause</span>
+        <span><b style="color:#00ffcc">ENTRÉE</b> Pause</span>
       </div>`;
     document.body.appendChild(hint);
     setTimeout(() => { hint.style.opacity = "0"; }, 8000);
@@ -270,7 +266,7 @@ export class PlayerHUD {
       { id: "blink",   label: "BLINK",   key: "CLIC D" },
       { id: "shield",  label: "BOUCLIER",key: "F"      },
       { id: "emp",     label: "EMP",     key: "G"      },
-      { id: "berserk", label: "BERSERK", key: "Q"      },
+      { id: "berserk", label: "BERSERK", key: "M"      },
     ];
 
     abilities.forEach(({ id, label, key }) => {

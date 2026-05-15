@@ -227,8 +227,9 @@ La performance en jeux qui reste fluide peu importe le niveau graphique choisit.
 
 ### Les galères physiques
 
-**Restrictions de l'IUT : ** Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
-**Distance : ** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
+**Restrictions de l'IUT :** Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
+
+**Distance :** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
 
 ### Décisions de conception
 

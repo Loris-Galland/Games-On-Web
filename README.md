@@ -4,9 +4,17 @@
 
 ---
 
+## Équipe du projet
+
+Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applications : conception, développement, et validation_ : 
+* GALLAND Loris
+* MAYER Pierre
+
+---
+
 ## 🎮 Jouer en ligne
 
-**[▶ Jouer sur \[URL à compléter\]](https://votre-url-hebergement.com)**
+**[▶ Jouer sur \[URL à venir\]](https://url-itch.io)**
 
 > Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS — jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.
 
@@ -14,8 +22,8 @@
 
 ## 🎥 Vidéos
 
-- **[Présentation du jeu et trailer](https://youtube.com/votre-lien)** — aperçu du gameplay, des mécaniques, de l'histoire
-- **[Présentation de l'équipe & making-of](https://youtube.com/votre-lien-2)** *(optionnel)*
+- **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** — aperçu du gameplay, des mécaniques, de l'histoire
+- **[Présentation de l'équipe & making-of à venir](https://youtube.com/votre-lien-2)** *(optionnel)*
 
 ---
 
@@ -207,13 +215,20 @@ Le système d'ennemis avec slots directionnels est probablement la chose qui nou
 
 La cinématique d'intro entièrement en HTML/CSS/SVG était un pari risqué (pourquoi ne pas faire du Babylon ?), mais ça nous a permis de livrer quelque chose de vraiment propre et léger, sans dépendance supplémentaire.
 
-### Les galères
+La performance en jeux qui reste fluide peu importe le niveau graphique choisit.
+
+### Les galères techniques
 
 **Le navmesh RecastJS** a été notre plus grande source de douleur. Le plugin Babylon.js s'attend à des meshes avec leurs vertices en world space, mais les modèles GLB chargés via `SceneLoader` ont leurs vertices en local space — ce qui donnait des navmeshes complètement décalés. La solution (baker manuellement les world matrices dans des meshes temporaires avant de passer à Recast) a pris plusieurs jours à déboguer.
 
 **Le clipping de l'arme dans les murs** est un classique du FPS qui semble simple mais ne l'est pas. Notre solution finale — une deuxième caméra `_weaponCamera` dédiée sur un layer mask `0x10000000` avec son propre `minZ` très court — fonctionne proprement mais a nécessité de comprendre en profondeur le système de rendu multi-caméras de Babylon.
 
 **La gestion mémoire entre salles** : au début, chaque transition laissait des meshes fantômes dans la scène. Il a fallu implémenter un dispose systématique des matériaux procéduraux (sans toucher aux matériaux des GLB instanciés), ce qui demande de distinguer les meshes "procéduraux" (nommés avec des préfixes spécifiques) des meshes "assets". La convention de nommage dans le code en est la trace directe.
+
+### Les galères physiques
+
+**Restrictions de l'IUT : ** Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
+**Distance : ** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
 
 ### Décisions de conception
 

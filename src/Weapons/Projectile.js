@@ -66,8 +66,15 @@ export class Projectile {
         const meshTouché = hitResult.pickedMesh;
 
         if (meshTouché.name === "weakPoint") {
-            // Pas de particules d'impact sur les weakpoints — l'explosion de mort suffit
-            if (meshTouché.parent) meshTouché.parent.dispose();
+            if (meshTouché.parent?._isBossBody) {
+                // Boss : appelle takeDamage au lieu de dispose direct
+                meshTouché.parent._takeDamage(1);
+            } else if (meshTouché.parent) {
+                // Ennemi standard : dispose le body
+                meshTouché.parent.dispose();
+            } else {
+                console.warn(`[Projectile.onHit] weakPoint has no parent!`);
+            }
 
         } else if (
             meshTouché.name === "enemyBody"      ||

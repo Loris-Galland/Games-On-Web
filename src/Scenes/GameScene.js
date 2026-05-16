@@ -7,6 +7,22 @@ import { LightingManager } from "../Systems/LightingManager";
 import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
 import { UpgradeManager }  from "../Systems/UpgradeManager";
+import { MinimapManager } from '../Systems/MinimapManager';
+import { KeybindingsMenu } from "../UI/KeybindingsMenu";
+import { IntroSequence } from "../UI/IntroSequence";
+
+
+function _getRoomTypeForUpgrade(roomIdx) {
+    if (roomIdx === 0) return "spawn";
+    const cycleLen   = 5;
+    const posInCycle = ((roomIdx - 1) % cycleLen) + 1; // 1..5
+    const cycle      = Math.ceil(roomIdx / cycleLen);
+    if (posInCycle <= 3) return "normal";
+    if (posInCycle === 4) return "boss";
+    if (cycle === 1) return "shop";
+    if (cycle === 2) return "forge";
+    return "challenge";
+}
 
 export class GameScene {
     constructor(canvasId) {
@@ -19,10 +35,14 @@ export class GameScene {
         });
         this.engine.setHardwareScalingLevel(2);
         this._loadingScreen = null;
-        this.upgradeManager = new UpgradeManager(this.player);
+        // upgradeManager est instancié après la création du player dans _generateMap
+        this.upgradeManager = null;
+        this.minimap = null;
 
         this.isInUpgrade = false;
         this.isPaused = false;
+
+        this.soundManager = null;
 
         this.visitedRooms = new Set();
     }
@@ -35,6 +55,7 @@ export class GameScene {
             if (this.player)         this.player.hud.updateFps(this.engine);
             if (this.navManager)     this.navManager.update(this.engine.getDeltaTime() / 1000);
             if (this.lightingManager) this.lightingManager.update(this.engine.getDeltaTime() / 1000);
+            if (this.minimap) this.minimap.update();
         });
         window.addEventListener("resize", () => this.engine.resize());
     }
@@ -162,7 +183,7 @@ export class GameScene {
 
         this.map = new ProceduralMap(scene, {
             seed,
-            roomCount: 6,
+            roomCount: 18,
             assetBase: "assets/models/",
         });
 
@@ -177,9 +198,12 @@ export class GameScene {
             const isNew = !this.visitedRooms.has(idx);
             this.visitedRooms.add(idx);
 
-            if(idx !==0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            if(idx !== 0 && idx !== 1 && spawnInfo.comingBack !== true && isNew){
+            const roomType = _getRoomTypeForUpgrade(idx);
+            if (roomType === "normal") {
                 await this._waitForUpgradeChoice(scene);
             }
+        }
 
             this.player.camera.position = spawnPos ?? new BABYLON.Vector3(
                 (room.worldX + room.cols / 2) * 4, 2, (room.worldZ + room.rows / 2) * 4,
@@ -191,6 +215,7 @@ export class GameScene {
 
             // ── Mise à jour lumières pour la nouvelle salle ───────────────
             this.lightingManager.setRoom(room);
+            if (this.minimap) this.minimap.onRoomEnter(idx);
 
             // ── Notifier le WaveManager ───────────────────────────────────
             if (this.waveManager && idx !== 0) {
@@ -252,44 +277,50 @@ export class GameScene {
         await this.map.generate();
 
         this.player = new Player(scene, canvas);
+        this.player.keybindings = KeybindingsMenu.DEFAULT_KB_BINDINGS.map(a => ({ ...a, keys: [...a.keys] }));
         this.player.camera.position = new BABYLON.Vector3(
             this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );
 
+        // ── UpgradeManager (nécessite this.player) ────────────────────────
+        this.upgradeManager = new UpgradeManager(this.player);
+        this._setupTabKey();
+
         // ── Stats pour le Game Over ───────────────────────────────────────
-        // Injecte un callback dans Player pour récupérer les stats au moment de la mort
         this.player.getStatsCallback = () => ({
             wavesCleared: this.waveManager ? this.waveManager.currentWave : 0,
             roomsCleared: this.waveManager ? this.waveManager._clearedRooms.size : 0,
         });
 
         // ── Pipeline post-process sur la caméra joueur ────────────────────
-        // (la pipeline est déjà créée dans LightingManager.init(),
-        //  on l'attache à la vraie caméra une fois qu'elle existe)
         if (this.lightingManager._pipeline) {
             this.lightingManager._pipeline.addCamera(this.player.camera);
         }
 
-        // ── WaveManager avec hook mode combat ─────────────────────────────
+        // ── WaveManager ───────────────────────────────────────────────────
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);
 
-        // Monkey-patch pour synchroniser les lumières combat
-        const origLaunch = this.waveManager._launchNextWave.bind(this.waveManager);
-        this.waveManager._launchNextWave = () => {
+        // Monkey-patch APRÈS instanciation pour capturer les bonnes références
+        const _wm = this.waveManager;
+        const _lm = this.lightingManager;
+ 
+        const origLaunch = _wm._launchNextWave.bind(_wm);
+        _wm._launchNextWave = () => {
             origLaunch();
-            const active = this.waveManager.currentWave <= 5 && this.waveManager.isWaveActive;
-            this.lightingManager.setCombatMode(active);
+            if (_lm) _lm.setCombatMode(_wm.isWaveActive);
+            if (!_wm._boss) _wm.soundManager?.playMusic("ambient");
         };
-        const origClear = this.waveManager._clearEnemies.bind(this.waveManager);
-        this.waveManager._clearEnemies = () => {
+ 
+        const origClear = _wm._clearEnemies.bind(_wm);
+        _wm._clearEnemies = () => {
             origClear();
-            this.lightingManager.setCombatMode(false);
+            if (_lm) _lm.setCombatMode(false);
         };
-        // Désactive le mode combat quand les portes s'ouvrent
-        const origOpen = this.waveManager._openDoors.bind(this.waveManager);
-        this.waveManager._openDoors = () => {
+ 
+        const origOpen = _wm._openDoors.bind(_wm);
+        _wm._openDoors = () => {
             origOpen();
-            this.lightingManager.setCombatMode(false);
+            if (_lm) _lm.setCombatMode(false);
         };
 
         // ── Navigation ────────────────────────────────────────────────────
@@ -311,27 +342,60 @@ export class GameScene {
 
         this._finishLoading();
 
+        /*scene.debugLayer.show({
+            embedMode: true, // s'affiche dans la page
+        })*/
+
+
         // Lumières de la salle de spawn (room 0)
         this.lightingManager.setRoom(this.map.rooms[0]);
+        this.minimap = new MinimapManager(this.map, this.player, this.waveManager);
+        this.minimap.onRoomEnter(0);
     }
 
     _waitForUpgradeChoice(scene) {
-        this.isInUpgrade = true;
-        this.map._paused = true;
-        document.exitPointerLock();
+    this.isInUpgrade = true;
+    this.map._paused = true;
+    document.exitPointerLock();
 
-        const randomCards = this.upgradeManager.getRandomUpgrades(3);
+    return new Promise(resolve => {
+        const doShow = (upgrades) => {
+            this.player.hud.showUpgradeScreen(
+                upgrades,
+                (choix) => {
+                    this.upgradeManager.applyUpgrade(choix); // ← mémorise + applique
+                    scene.getEngine().enterPointerlock();
+                    this.map._paused = false;
+                    this.isInUpgrade = false;
+                    resolve();
+                },
+                800,
+                () => this.scoreManager?.totalScore ?? 0,
+                () => {
+                    const score = this.scoreManager?.totalScore ?? 0;
+                    if (score < 800) return false;
+                    this.scoreManager.totalScore -= 800;
+                    this.player.hud.updateScore?.(this.scoreManager.totalScore);
+                    document.getElementById("upgrade-overlay")?.remove();
+                    doShow(this.upgradeManager.getRandomUpgrades(3));
+                    return true;
+                },
+            );
+        };
 
-        return new Promise(resolve => {
-            this.player.hud.showUpgradeScreen(randomCards, (choix) => {
-                choix.apply(this.player);
-                scene.getEngine().enterPointerlock();
+        doShow(this.upgradeManager.getRandomUpgrades(3));
+    });
+}
 
-                this.map._paused = false;
-                this.isInUpgrade = false;
+_setupTabKey() {
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Tab" && !this.isInUpgrade && !this.isPaused) {
+            e.preventDefault();
+            const stats    = this.upgradeManager?.getPlayerStats() ?? {};
+            const acquired = this.upgradeManager?.acquiredUpgrades  ?? [];
+            this.player?.hud?.toggleStatsPanel(stats, acquired);
+        }
+    });
+}
 
-                resolve();
-            });
-        });
-    }
 }

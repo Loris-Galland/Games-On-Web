@@ -100,7 +100,11 @@ export class ProceduralMap {
         for (let i = 0; i < this.roomCount; i++) {
             const prev = this.rooms[this.rooms.length - 1];
             const dir  = dirs[i % dirs.length];
-            const tpl  = ROOM_TYPES[i % ROOM_TYPES.length];
+            const posInCycle = (i % 5) + 1;          // 1..5
+            const isBossRoom = (posInCycle === 4);    // 4e salle de chaque cycle = boss
+            const tpl = isBossRoom
+                ? { type: "arena", cols: 16, rows: 16, color: "grey" }
+                : ROOM_TYPES[i % ROOM_TYPES.length];
             let wx, wz;
             if      (dir.dx ===  1) { wx = prev.worldX + prev.cols + CORRIDOR_LEN; wz = prev.worldZ + Math.floor((prev.rows - tpl.rows) / 2); }
             else if (dir.dx === -1) { wx = prev.worldX - tpl.cols  - CORRIDOR_LEN; wz = prev.worldZ + Math.floor((prev.rows - tpl.rows) / 2); }
@@ -136,23 +140,31 @@ export class ProceduralMap {
         const cIn  = idx > 0                     ? this.corridors[idx - 1] : null;
         const cOut = idx < this.corridors.length  ? this.corridors[idx]    : null;
 
-        let roomNode;
-        if (this._builtRooms.has(idx)) {
-            roomNode = this._builtRooms.get(idx);
-        } else {
-            roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
-            roomNode.parent = this._root;
-            await this._buildRoom(room, cIn, cOut, roomNode);
-            this._builtRooms.set(idx, roomNode);
+        // Dispose la salle précédente complètement (meshes + matériaux)
+        if (this._activeNode && this._activeNode !== this._root) {
+            this._activeNode.getChildMeshes(false).forEach(m => {
+                // Ne dispose le matériau QUE sur les meshes procéduraux (pas les GLB)
+                const isProcedural = m.name.match(/^(fRDC_|wN_|wS_|wE_|wW_|wNH_|wSH_|wEH_|wWH_|w2|roof_|f2_)/);
+                if (isProcedural) m.material?.dispose();
+                m.dispose(false, false); // false, false = ne pas disposer matériaux ni textures enfants
+            });
+            this._activeNode.dispose();
+            this._activeNode = null;
+            // Retirer du cache pour forcer la reconstruction
+            this._builtRooms.delete(this._activeIdx);
         }
 
-        if (this._activeNode && this._activeNode !== roomNode) this._activeNode.setEnabled(false);
-        roomNode.setEnabled(true);
+        // Toujours reconstruire (la salle n'est plus en mémoire)
+        const roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
+        roomNode.parent = this._root;
+        await this._buildRoom(room, cIn, cOut, roomNode);
+        this._builtRooms.set(idx, roomNode);  // stocke temporairement pour la session
+
         this._activeNode = roomNode;
         this._activeIdx  = idx;
 
-        await this._buildCorridorDisplay(idx);
         await this._buildCorridorInDisplay(idx);
+        await this._buildCorridorDisplay(idx);
 
         const comingBack = comingFromIdx !== null && comingFromIdx > idx;
         const spawnEntry = this._calcEntrySpawn(room, cIn);
@@ -177,7 +189,9 @@ export class ProceduralMap {
             this._corridorNode.dispose();
             this._corridorNode = null;
         }
-        if (roomIdx >= this.corridors.length) return;
+        if (roomIdx >= this.corridors.length) {
+            return;
+        }
         const corridor = this.corridors[roomIdx];
         const node = new BABYLON.TransformNode(`corrOut_${roomIdx}`, this.scene);
         node.parent = this._root;
@@ -187,7 +201,7 @@ export class ProceduralMap {
 
     async _buildCorridorInDisplay(roomIdx) {
         if (this._corridorInNode) {
-            this._corridorInNode.getChildMeshes().forEach(m => m.dispose());
+            this._corridorNode.getChildMeshes().forEach(m => m.dispose());
             this._corridorInNode.dispose();
             this._corridorInNode = null;
         }
@@ -249,6 +263,60 @@ export class ProceduralMap {
             trigger.isVisible = false; trigger.checkCollisions = false; trigger.isPickable = false; trigger.parent = node;
             trigger._toRoom   = isReturn ? roomIdx - 1 : roomIdx + 1;
             trigger._fromRoom = roomIdx;
+
+            // ── Flèche directionnelle au sol à l'entrée du couloir ───────────
+            if (!isReturn && tiles.length >= 1) {
+                const firstTile = tiles[0];
+                const secondTile = tiles[1] ?? tiles[0];
+                const fx = firstTile.x * T + T / 2;
+                const fz = firstTile.z * T + T / 2;
+                // Direction vers la salle suivante
+                const dx = secondTile.x - firstTile.x;
+                const dz = secondTile.z - firstTile.z;
+                const rotY = dx !== 0 ? (dx > 0 ? Math.PI / 2 : Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
+                const arrowMat = new BABYLON.StandardMaterial(`arrowMat_${roomIdx}`, this.scene);
+                arrowMat.emissiveColor   = new BABYLON.Color3(0, 1, 0.6);
+                arrowMat.disableLighting = true;
+                arrowMat.alpha           = 0.85;
+                arrowMat.backFaceCulling = false;
+
+                const arrowPlane = BABYLON.MeshBuilder.CreatePlane(`exitArrow_${roomIdx}`, { width: T * 0.7, height: T * 0.7 }, this.scene);
+                arrowPlane.position   = new BABYLON.Vector3(fx, 0.05, fz);
+                arrowPlane.rotation   = new BABYLON.Vector3(Math.PI / 2, rotY, 0);
+                arrowPlane.material   = arrowMat;
+                arrowPlane.isPickable = false;
+                arrowPlane.parent     = node;
+
+                // Texture dynamique avec flèche
+                const dynTex = new BABYLON.DynamicTexture(`arrowTex_${roomIdx}`, { width: 128, height: 128 }, this.scene, false);
+                const ctx = dynTex.getContext();
+                ctx.clearRect(0, 0, 128, 128);
+                ctx.fillStyle = "rgba(0,255,160,0.0)";
+                ctx.fillRect(0, 0, 128, 128);
+                ctx.fillStyle = "rgba(0,255,160,0.9)";
+                ctx.beginPath();
+                ctx.moveTo(64, 8);
+                ctx.lineTo(110, 90);
+                ctx.lineTo(80, 78);
+                ctx.lineTo(80, 120);
+                ctx.lineTo(48, 120);
+                ctx.lineTo(48, 78);
+                ctx.lineTo(18, 90);
+                ctx.closePath();
+                ctx.fill();
+                dynTex.update();
+                arrowMat.diffuseTexture   = dynTex;
+                arrowMat.emissiveTexture  = dynTex;
+                arrowMat.opacityTexture   = dynTex;
+
+                // Pulse d'opacité
+                let pulseT = 0;
+                const pulseObs = this.scene.onBeforeRenderObservable.add(() => {
+                    if (arrowPlane.isDisposed()) { this.scene.onBeforeRenderObservable.remove(pulseObs); return; }
+                    pulseT += this.scene.getEngine().getDeltaTime() / 1000;
+                    arrowMat.alpha = 0.5 + Math.sin(pulseT * 3) * 0.35;
+                });
+            }
         }
         await Promise.all(ps);
     }

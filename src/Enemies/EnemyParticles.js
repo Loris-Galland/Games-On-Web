@@ -24,6 +24,10 @@ export class EnemyParticles {
         emitter.isVisible  = false;
         emitter.isPickable = false;
 
+        const sfx = new Audio("sounds/sfx/enemy_spawn.wav");
+        sfx.volume = 0.1;
+        sfx.play().catch(() => {});
+
         // Texture partagée
         const tex = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", scene);
 
@@ -199,7 +203,6 @@ export class EnemyParticles {
             setTimeout(() => {
                 burst.dispose();
                 debris.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 900);
         }, 80);
@@ -259,7 +262,6 @@ export class EnemyParticles {
             emitter.parent = null;
             setTimeout(() => {
                 ps.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 200);
         }, 80);
@@ -314,7 +316,6 @@ export class EnemyParticles {
             ps.stop();
             setTimeout(() => {
                 ps.dispose();
-                tex.dispose();
                 emitter.dispose();
             }, 400);
         }, 60);

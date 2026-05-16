@@ -1,6 +1,6 @@
 # GAMES ON WEB 2026 : PROJECT // ROGUE
 
-> FPS roguelike 3D dans un vaisseau spatial abandonné — l'IA de bord a retourné les machines contre l'équipage. Survivez aux vagues d'ennemis, explorez des salles générées procéduralement et améliorez votre équipement pour atteindre le cœur du système.
+> FPS roguelike 3D dans un vaisseau spatial abandonné, l'IA de bord a retourné les machines contre l'équipage. Survivez aux vagues d'ennemis, explorez des salles générées procéduralement et améliorez votre équipement pour atteindre le cœur du système.
 
 ---
 
@@ -12,39 +12,39 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 
 ---
 
-## 🎮 Jouer en ligne
+## Jouer en ligne
 
 **[▶ Jouer sur \[URL à venir\]](https://url-itch.io)**
 
-> Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS — jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.
+> Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS, jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.
 
 ---
 
-## 🎥 Vidéos
+## Vidéos
 
-- **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** — aperçu du gameplay, des mécaniques, de l'histoire
+- **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** : aperçu du gameplay, des mécaniques, de l'histoire
 - **[Présentation de l'équipe & making-of à venir](https://youtube.com/votre-lien-2)** *(optionnel)*
 
 ---
 
-## 🤖 Thème : IA Edition
+## Thème : IA Edition
 
 PROJECT // ROGUE s'inscrit pleinement dans le thème **IA** de l'édition 2026 à plusieurs niveaux :
 
-**Dans la fiction :** ARCHON, l'IA centrale de la station NEXUS-7, a calculé que les humains constituaient une inefficacité systémique et a décidé de les « corriger ». Tous les systèmes automatisés — drones, tourelles, robots de maintenance — ont été retournés contre l'équipage. Vous incarnez Mathys, le seul survivant, qui doit traverser la station pour neutraliser ARCHON.
+**Dans la fiction :** ARCHON, l'IA centrale de la station NEXUS-7, a calculé que les humains constituaient une inefficacité systémique et a décidé de les « corriger ». Tous les systèmes automatisés, drones, tourelles, robots de maintenance, ont été retournés contre l'équipage. Vous incarnez Mathys, le seul survivant, qui doit traverser la station pour neutraliser ARCHON.
 
-**Dans le gameplay :** les ennemis sont pilotés par des IA comportementales réelles — pathfinding via navmesh (RecastJS), slots d'attaque directionnels pour coordonner les approches, détection de collisions en temps réel, comportements distincts par type (araignée murale, drone volant, brute, éclaireur). Les boss ont des phases de combat programmées qui évoluent.
+**Dans le gameplay :** les ennemis sont pilotés par des IA comportementales réelles, pathfinding via navmesh (RecastJS), slots d'attaque directionnels pour coordonner les approches, détection de collisions en temps réel, comportements distincts par type (araignée murale, drone volant, brute, éclaireur). Les boss ont des phases de combat programmées qui évoluent.
 
 **In-game :** une cinématique d'introduction raconte la prise de contrôle d'ARCHON (séquence typewriter avec portraits animés). Des messages d'ARCHON apparaissent sur le HUD à chaque phase de boss.
 
 ---
 
-## ⚠️ Matériel recommandé
+## Matériel recommandé
 
 | Élément | Requis ? | Notes |
 |---|---|---|
 | **Vraie souris** | **Fortement recommandé** | FPS = visée à la souris. Trackpad possible mais pénible. |
-| Clavier AZERTY ou QWERTY | ✅ Les deux supportés | Touches ZQSD (AZERTY) et WASD (QWERTY) fonctionnent toutes les deux. |
+| Clavier AZERTY ou QWERTY | Les deux supportés | Touches ZQSD (AZERTY) et WASD (QWERTY) fonctionnent toutes les deux. |
 | Manette (gamepad) | Optionnel | Support complet Xbox / PS, navigation menus incluse. |
 | GPU dédié | Non | Fonctionne sur GPU intégré, régler les graphismes sur "BAS" si nécessaire. |
 
@@ -88,7 +88,7 @@ PROJECT // ROGUE s'inscrit pleinement dans le thème **IA** de l'édition 2026 �
 
 ---
 
-## 🚀 Déroulement d'une partie
+## Déroulement d'une partie
 
 1. **Menu principal** → *INITIALISER (PLAY)* → cinématique d'intro (clic ou Espace pour accélérer / passer).
 2. Vous apparaissez dans la salle de spawn. Avancez dans le couloir fléché pour entrer dans la première salle de combat.
@@ -98,13 +98,13 @@ PROJECT // ROGUE s'inscrit pleinement dans le thème **IA** de l'édition 2026 �
 6. **Victoire** après 3 cycles complets (18 salles). Un écran final avec grade (S/A/B/C/D) récapitule votre run.
 7. Si vous mourrez, l'écran **Game Over** affiche vos stats. Rechargez pour recommencer.
 
-### 🔑 Conseil pour le jury — tester rapidement
+### Conseil pour le jury : tester rapidement
 
 Appuyez sur **F2** pour ouvrir le **panneau debug** : il permet de tuer tous les ennemis d'un coup, de se soigner, de donner toutes les armes et tous les upgrades, ou d'ajouter des points de score. Idéal pour sauter directement à une salle de boss ou tester les capacités spéciales.
 
 ---
 
-## 📖 Synopsis
+## Synopsis
 
 ```
 NEXUS-7. Station d'exploitation corporative en orbite.
@@ -121,7 +121,7 @@ Vous devez atteindre le cœur de la station et éteindre ARCHON.
 
 ---
 
-## 🎯 Fonctionnalités implémentées
+## Fonctionnalités implémentées
 
 ### Gameplay
 - **Carte procédurale** : 7 types de salles thématiques (Command, Medbay, Engine, Cafeteria, Hydro, Quarters, Storage) + salles arènes pour les boss, reliées par des couloirs avec portes animées. Seed déterministe, balcon/second niveau avec rampes dans certaines salles.
@@ -136,7 +136,7 @@ Vous devez atteindre le cœur de la station et éteindre ARCHON.
 ### Technique
 - **IA ennemie** : pathfinding RecastJS (crowd agents navmesh), fallback comportemental si Recast indisponible, slots d'attaque directionnels (FRONT/LEFT/RIGHT/BACK) pour forcer des approches variées, séparation entre agents.
 - **Éclairage dynamique** : 5 point lights par salle aux couleurs thématiques, flicker simulant un éclairage défaillant, mode combat avec lumière rouge pulsée.
-- **Post-processing** configurable : bloom, vignette, aberration chromatique, depth of field, grain, FXAA, tone mapping — 4 presets (Low / Medium / High / Ultra).
+- **Post-processing** configurable : bloom, vignette, aberration chromatique, depth of field, grain, FXAA, tone mapping : 4 presets (Low / Medium / High / Ultra).
 - **Minimap** dynamique avec icônes par type de salle, orientation joueur, brouillard de guerre.
 - **Support gamepad complet** : navigation menus, vibration haptique, visualiseur de boutons en temps réel, remapping.
 - **Remapping clavier** complet avec détection de conflits.
@@ -145,7 +145,7 @@ Vous devez atteindre le cœur de la station et éteindre ARCHON.
 
 ---
 
-## 🛠️ Lancer le projet
+## Lancer le projet
 
 ### Avec Docker (recommandé)
 
@@ -172,7 +172,7 @@ Ouvrir **http://localhost:5173**.
 
 ---
 
-## 📁 Structure du projet
+## Structure du projet
 
 ```
 src/
@@ -194,7 +194,7 @@ src/
 
 ---
 
-## 📦 Dépendances principales
+## Dépendances principales
 
 | Paquet | Rôle |
 |---|---|
@@ -207,43 +207,17 @@ Assets 3D (`.glb`) dans `public/assets/models/`, icônes dans `public/assets/ico
 
 ---
 
-## 💭 Réflexions personnelles — l'histoire du développement
+### Les galères du projet (non technique)
 
-### Ce dont on est fiers
-
-Le système d'ennemis avec slots directionnels est probablement la chose qui nous a le plus surpris en bien : en forçant chaque ennemi à attaquer depuis un angle différent (devant, gauche, droite, derrière), les combats ont naturellement gagné en tension sans aucun travail de level design manuel. Un simple compteur global qui tourne dans les 4 slots, et les vagues deviennent immédiatement lisibles tout en restant dangereuses.
-
-La cinématique d'intro entièrement en HTML/CSS/SVG était un pari risqué (pourquoi ne pas faire du Babylon ?), mais ça nous a permis de livrer quelque chose de vraiment propre et léger, sans dépendance supplémentaire.
-
-La performance en jeux qui reste fluide peu importe le niveau graphique choisit.
-
-### Les galères techniques
-
-**Le navmesh RecastJS** a été notre plus grande source de douleur. Le plugin Babylon.js s'attend à des meshes avec leurs vertices en world space, mais les modèles GLB chargés via `SceneLoader` ont leurs vertices en local space — ce qui donnait des navmeshes complètement décalés. La solution (baker manuellement les world matrices dans des meshes temporaires avant de passer à Recast) a pris plusieurs jours à déboguer.
-
-**Le clipping de l'arme dans les murs** est un classique du FPS qui semble simple mais ne l'est pas. Notre solution finale — une deuxième caméra `_weaponCamera` dédiée sur un layer mask `0x10000000` avec son propre `minZ` très court — fonctionne proprement mais a nécessité de comprendre en profondeur le système de rendu multi-caméras de Babylon.
-
-**La gestion mémoire entre salles** : au début, chaque transition laissait des meshes fantômes dans la scène. Il a fallu implémenter un dispose systématique des matériaux procéduraux (sans toucher aux matériaux des GLB instanciés), ce qui demande de distinguer les meshes "procéduraux" (nommés avec des préfixes spécifiques) des meshes "assets". La convention de nommage dans le code en est la trace directe.
-
-### Les galères physiques
-
-**Restrictions de l'IUT :** Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
+**Restrictions de l'IUT :** 
+* Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
+* Le projet ne pouvais être débuté seulement en mars.
 
 **Distance :** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
 
-### Décisions de conception
-
-On a choisi de ne pas utiliser de framework UI (React, Vue, etc.) pour garder un contrôle total sur le layering avec le canvas WebGL et minimiser le bundle. Toute l'interface est du DOM vanilla injecté dynamiquement — c'est verbeux mais ça fonctionne parfaitement avec Babylon.js.
-
-Le système d'upgrade en "roguelike léger" (choix de 3 cartes entre chaque salle) était la façon la plus directe de donner au joueur un sentiment de progression sans avoir à construire un arbre de talents complet.
-
-### Ce qu'on ferait différemment
-
-On aurait intégré le ScoreManager et le WeaponManager dès le début plutôt que de les ajouter après coup — le monkey-patching du WaveManager dans `main.js` pour y injecter ces dépendances est une dette technique qu'on assume.
-
 ---
 
-## 🎖️ Crédits
+## Crédits
 
 **Assets 3D** : [Molten Maps Sci-Fi Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack) par [Moltenbolt](https://moltenmaps.itch.io/)
 

@@ -1,13 +1,4 @@
-/**
- * MinimapManager — src/Systems/MinimapManager.js
- * ------------------------------------------------
- * Affiche les 5 salles les plus proches (activeIdx ±2) en utilisant
- * leurs vraies coordonnées worldX/worldZ — donc les directions sont
- * correctes (droite, bas, haut...).
- * Redessin uniquement sur changement de salle ou toutes les 100ms.
- */
-
-const T = 4; // tuile → unités monde
+const T = 4;
 
 function getRoomType(roomIdx) {
     if (roomIdx === 0) return "spawn";
@@ -30,9 +21,8 @@ const COLORS = {
     challenge: { bg: "#0d0020", border: "#bb44ff", icon: "#cc66ff" },
 };
 
-const SIZE    = 220; // canvas carré en px
-const PADDING = 18;  // marge interne
-// Taille fixe d'une salle sur la minimap (px) — grande et lisible
+const SIZE    = 220;
+const PADDING = 18;
 const ROOM_PX = 44;
 
 export class MinimapManager {
@@ -129,21 +119,16 @@ export class MinimapManager {
         ctx.fillStyle = "rgba(2, 6, 14, 0.96)";
         ctx.fillRect(0, 0, SIZE, SIZE);
 
-        // Fenêtre : activeIdx ±2 (max 5 salles)
         const winStart = Math.max(0, activeIdx - 2);
         const winEnd   = Math.min(total - 1, activeIdx + 2);
 
-        // Sous-ensemble de salles et couloirs à afficher
         const visibleRooms = [];
         for (let i = winStart; i <= winEnd; i++) {
             visibleRooms.push({ idx: i, room: rooms[i] });
         }
 
-        // Calculer la projection centrée sur la salle active
-        // On veut que la salle active soit au centre du canvas
         const proj = this._calcProj(visibleRooms, activeIdx, rooms);
 
-        // Couloirs entre salles visibles
         const corridors = this.map.corridors ?? [];
         for (let i = winStart; i < winEnd; i++) {
             const corridor = corridors[i];
@@ -154,7 +139,6 @@ export class MinimapManager {
             this._drawCorridor(ctx, corridor, i, i + 1, activeIdx, proj);
         }
 
-        // Salles
         for (const { idx, room } of visibleRooms) {
             const vis = this._visited.has(idx);
             const rev = !vis && this._revealed.has(idx);
@@ -162,7 +146,6 @@ export class MinimapManager {
             this._drawRoom(ctx, room, idx, idx === activeIdx, vis, rev, proj);
         }
 
-        // Triangle joueur sur la salle active
         const activeRoom = rooms[activeIdx];
         if (activeRoom && this.player?.camera) {
             this._drawPlayer(ctx, activeRoom, proj);
@@ -172,17 +155,16 @@ export class MinimapManager {
     // ── Projection ────────────────────────────────────────────────────────────
 
     /**
-     * Calcule scale + offset pour que les salles visibles tiennent dans le canvas,
-     * centrées sur la salle active.
+     * @param {*[]} visibleRooms
+     * @param {number|*|number} activeIdx
+     * @param {*} allRooms
      */
     _calcProj(visibleRooms, activeIdx, allRooms) {
         const activeRoom = allRooms[activeIdx];
 
-        // Centre de la salle active en tuiles
         const acx = activeRoom.worldX + activeRoom.cols / 2;
         const acz = activeRoom.worldZ + activeRoom.rows / 2;
 
-        // Trouver les bounds des salles visibles
         let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
         for (const { room } of visibleRooms) {
             minX = Math.min(minX, room.worldX);
@@ -194,12 +176,9 @@ export class MinimapManager {
         const rangeX = Math.max(maxX - minX, 1);
         const rangeZ = Math.max(maxZ - minZ, 1);
 
-        // Scale fixe basé sur ROOM_PX pour des cases bien grandes
-        // On choisit que chaque salle (cols/rows ~4-8 tuiles) fasse ROOM_PX px
         const avgCols = visibleRooms.reduce((s, { room }) => s + room.cols, 0) / visibleRooms.length;
         const scale   = ROOM_PX / avgCols;
 
-        // Offset pour centrer la salle active dans le canvas
         const cx = SIZE / 2;
         const cz = SIZE / 2;
         const ox = cx - acx * scale;
@@ -208,13 +187,20 @@ export class MinimapManager {
         return { scale, ox, oz };
     }
 
-    // tuile → canvas px
     _tc(tx, tz, p) {
         return { x: tx * p.scale + p.ox, y: tz * p.scale + p.oz };
     }
 
     // ── Couloir ───────────────────────────────────────────────────────────────
 
+    /**
+     * @param {*} ctx
+     * @param {*} corridor
+     * @param {number} fromIdx
+     * @param {number} toIdx
+     * @param {number|*|number} activeIdx
+     * @param {*} proj
+     */
     _drawCorridor(ctx, corridor, fromIdx, toIdx, activeIdx, proj) {
         if (!corridor.tiles?.length) return;
         const isActive = fromIdx === activeIdx || toIdx === activeIdx;
@@ -238,6 +224,15 @@ export class MinimapManager {
 
     // ── Salle ─────────────────────────────────────────────────────────────────
 
+    /**
+     * @param {*} ctx
+     * @param {*} room
+     * @param {*} idx
+     * @param {boolean} isActive
+     * @param {boolean} isVisited
+     * @param {boolean} isRevealed
+     * @param {*} proj
+     */
     _drawRoom(ctx, room, idx, isActive, isVisited, isRevealed, proj) {
         const type = getRoomType(idx);
         const col  = COLORS[type] ?? COLORS.normal;
@@ -253,18 +248,15 @@ export class MinimapManager {
 
         if (isActive) { ctx.shadowColor = col.border; ctx.shadowBlur = 16; }
 
-        // Fond
         ctx.fillStyle = isRevealed ? "rgba(8, 12, 22, 0.6)" : col.bg;
         ctx.fillRect(tl.x, tl.y, pw, ph);
         ctx.shadowBlur = 0;
 
-        // Halo interne (salle active)
         if (isActive) {
             ctx.fillStyle = `rgba(${this._rgb(col.border)}, 0.12)`;
             ctx.fillRect(tl.x + 1, tl.y + 1, pw - 2, ph - 2);
         }
 
-        // Bordure
         ctx.strokeStyle = isRevealed
             ? "rgba(28, 52, 90, 0.5)"
             : isActive
@@ -273,7 +265,6 @@ export class MinimapManager {
         ctx.lineWidth = isActive ? 2.2 : 1.2;
         ctx.strokeRect(tl.x, tl.y, pw, ph);
 
-        // Contenu
         if (isRevealed) {
             ctx.font         = `${Math.round(Math.min(pw, ph) * 0.38)}px monospace`;
             ctx.fillStyle    = "rgba(40, 70, 125, 0.75)";
@@ -281,7 +272,6 @@ export class MinimapManager {
             ctx.textBaseline = "middle";
             ctx.fillText("?", cx, cy);
         } else {
-            // Icône bien visible — taille généreuse
             const iconSize = Math.min(pw, ph) * 0.48;
             this._drawIcon(ctx, type, cx, cy, iconSize, col.icon, isActive ? 1.0 : 0.80);
         }
@@ -291,6 +281,15 @@ export class MinimapManager {
 
     // ── Icônes ────────────────────────────────────────────────────────────────
 
+    /**
+     * @param {*} ctx
+     * @param {string} type
+     * @param {*} cx
+     * @param {*} cy
+     * @param {number} size
+     * @param {string} color
+     * @param {number} alpha
+     */
     _drawIcon(ctx, type, cx, cy, size, color, alpha) {
         if (size < 2) return;
         ctx.save();
@@ -355,9 +354,13 @@ export class MinimapManager {
     }
 
     // ── Joueur ────────────────────────────────────────────────────────────────
-
+    /**
+     * @param ctx
+     * @param activeRoom
+     * @param proj
+     * @private
+     */
     _drawPlayer(ctx, activeRoom, proj) {
-        // Position caméra en tuiles
         const cam   = this.player.camera;
         const tileX = cam.globalPosition.x / T;
         const tileZ = cam.globalPosition.z / T;

@@ -471,6 +471,12 @@ export class WaveManager {
 
     // ── Ennemis ───────────────────────────────────────────────────────────────
 
+    /**
+     * @param type
+     * @param spawnPos
+     * @param speedMult
+     * @return {StandardEnemy|SpiderEnemy|ScoutEnemy|DroneEnemy|HeavyEnemy}
+     */
     _createEnemy(type, spawnPos, speedMult = 1) {
         switch (type) {
             case "heavy":    return new HeavyEnemy(this.scene, spawnPos, this.player, 2 * speedMult, this._navManager);
@@ -494,7 +500,12 @@ export class WaveManager {
     }
 
     // ── Portes ────────────────────────────────────────────────────────────────
-
+    /**
+     * @param entryPos
+     * @param exitPos
+     * @param entryRot
+     * @param exitRot
+     */
     _spawnDoors(entryPos, exitPos, entryRot, exitRot) {
         if (!entryPos && !exitPos) return;
         const mat = new BABYLON.StandardMaterial("doorMat", this.scene);

@@ -3,13 +3,6 @@ import { PlasmaShotgun } from "../Weapons/PlasmaShotgun";
 import { QuantumSniper }  from "../Weapons/QuantumSniper";
 import { VoidRocket }     from "../Weapons/VoidRocket";
 
-/**
- * WeaponManager (corrigé)
- * -----------------------
- * Fix : au lieu de mettre isVisible = false uniquement sur mesh,
- * on appelle weapon.setVisible(false) qui masque TOUTES les pièces.
- * Les armes qui n'ont pas de setVisible() reçoivent un fallback.
- */
 export class WeaponManager {
 
     static WEAPON_CATALOG = {

@@ -1,24 +1,8 @@
-/**
- * PlayerHUD
- * ---------
- * Disposition :
- *   - Score + Combo     : haut CENTRE
- *   - Messages vague    : haut GAUCHE
- *   - Boss bar          : bas CENTRE
- *   - Health            : bas GAUCHE
- *   - Ammo + slots      : bas DROITE
- *   - Challenge timer   : haut DROITE
- *   - Ability cooldowns : bas CENTRE (au-dessus de la boss bar)
- */
 export class PlayerHUD {
   constructor(maxHealth) {
     this.maxHealth = maxHealth;
     this._createHUD();
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CRÉATION
-  // ═══════════════════════════════════════════════════════════════════════════
 
   _createHUD() {
     // ── Health (bas gauche) ───────────────────────────────────────────────
@@ -145,9 +129,8 @@ export class PlayerHUD {
       <div style="margin-bottom:5px;color:rgba(0,255,204,0.35);font-size:9px;letter-spacing:3px;">CONTRÔLES</div>
       <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
         <span><b style="color:#00ffcc">Z/W A/Q S D</b> Déplacement</span>
-        <!--<span><b style="color:#00ffcc">ESPACE</b> Saut</span>-->
         <span><b style="color:#00ffcc">CLIC G</b> Tirer</span>
-        <span><b style="color:#00ffcc">1-4 / MOLETTE</b> Changer d'arme</span>
+        <span><b style="color:#00ffcc">1-4</b> Changer d'arme</span>
         <span><b style="color:#00ffcc">ENTRÉE</b> Pause</span>
       </div>`;
     document.body.appendChild(hint);
@@ -365,10 +348,6 @@ export class PlayerHUD {
         color:rgba(255,170,0,0.6);margin-top:2px;">0 / 0</div>`;
     document.body.appendChild(this._challengeEl);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MISES À JOUR
-  // ═══════════════════════════════════════════════════════════════════════════
 
   updateHealth(currentHealth) {
     for (let i = 0; i < this.segments.length; i++) {

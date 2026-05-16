@@ -1,16 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
 
-/**
- * LightingManager
- * ---------------
- * Gère l'ambiance lumineuse cyber + toute la pipeline graphique.
- *
- * API publique :
- *   lm.setGraphicsParam(key, value)
- *   lm.getGraphicsParams()
- *   lm.applyGraphicsPreset(name)   "ultra" | "high" | "medium" | "low"
- *   lm.getCurrentPreset()
- */
 export class LightingManager {
 
     static ROOM_PALETTES = {
@@ -104,7 +93,6 @@ export class LightingManager {
         const old = this.scene.getLightByName("light");
         if (old) old.dispose();
 
-        // Ambiance globale rehaussée — les grandes salles (16×16) en ont besoin
         this.ambient = new BABYLON.HemisphericLight("ambientCyber", new BABYLON.Vector3(0, 1, 0), this.scene);
         this.ambient.intensity   = 0.55;   // ↑ était 0.18 — les coins éloignés restaient noirs
         this.ambient.diffuse     = new BABYLON.Color3(0.5, 0.55, 0.65);
@@ -248,16 +236,13 @@ export class LightingManager {
         const cz      = (room.worldZ + room.rows / 2) * T;
         const ceilY   = 3.0;
 
-        // Les grandes salles (16×16) ont un spread plus grand → on augmente range et intensity en conséquence
         const spread   = Math.min(room.cols, room.rows) * T * 0.28;
-        // Facteur d'échelle : une salle 16×16 = 4× la surface d'une 8×8
         const sizeFactor = Math.sqrt((room.cols * room.rows) / 64);
 
         const keyColor    = new BABYLON.Color3(...palette.key);
         const fillColor   = new BABYLON.Color3(...palette.fill);
         const accentColor = new BABYLON.Color3(...palette.accent);
 
-        // 4 lumières en croix au plafond, intensité scalée avec la taille de la salle
         const baseIntensities = [2.2, 2.0, 1.6, 1.6];
         const offsets = [
             { x:  spread, z:  spread, color: keyColor  },
@@ -279,7 +264,6 @@ export class LightingManager {
             this._roomLights.push(light);
         }
 
-        // Lumière centrale basse (accent coloré au sol)
         const centerBase  = 0.8 * sizeFactor;
         const centerLight = new BABYLON.PointLight("roomLightCenter", new BABYLON.Vector3(cx, 0.8, cz), this.scene);
         centerLight.diffuse        = accentColor;

@@ -51,10 +51,7 @@ export const ROOM_TYPES = [
 ];
 
 // ── Patterns de props par type de salle et quadrant ──────────────────────────
-// Structure : QUAD_PATTERNS[roomType][quadrant] = tableau de patterns possibles
-// Chaque pattern est un tableau d'items { a, ox, oz, rot? }
-// ox/oz sont des fractions [0..1] dans l'espace du quadrant
-// rot absent → rotation aléatoire complète ; tableau → choix aléatoire parmi les valeurs
+
 export const QUAD_PATTERNS = {
 
     command: {
@@ -294,9 +291,7 @@ export const QUAD_PATTERNS = {
 };
 
 // ── Layouts niveau 2 par type de salle ────────────────────────────────────────
-// floor2    : liste de props à placer sur le balcon
-// hasFloor2 : si false, le balcon n'est pas construit (mais rampCorner reste réservé)
-// rampCorner: quadrant occupé par la rampe/balcon (skippé dans QUAD_PATTERNS)
+
 export const LAYOUTS = {
     command:  [{ floor2: [
             { a: "Briefing_Screen_Blue.glb",   ox: 0.2,  oz: 0.8,  rot: R0   },

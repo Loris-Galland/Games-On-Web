@@ -1,10 +1,3 @@
-/**
- * KeybindingsMenu
- * ---------------
- * Remapping clavier + manette.
- * L'onglet MANETTE affiche un panneau de détection visuel "appuyez sur un bouton"
- * qui détecte et affiche en temps réel la pression des boutons — comme dans les jeux AAA.
- */
 export class KeybindingsMenu {
 
     static DEFAULT_KB_BINDINGS = [
@@ -39,12 +32,10 @@ export class KeybindingsMenu {
         this._snapshot    = null;
         this._activeTab   = "keyboard";
 
-        // Écoute clavier
         this._listening    = null;
         this._keyHandler   = null;
         this._mouseHandler = null;
 
-        // Écoute manette
         this._gpListening  = null;
         this._gpPollId     = null;
         this._gpPrevStates = [];
@@ -102,7 +93,6 @@ export class KeybindingsMenu {
             </div>
         `;
 
-        // Onglets
         panel.querySelectorAll(".kb-tab").forEach(tab => {
             tab.addEventListener("click", () => {
                 this._stopAll(panel);
@@ -110,7 +100,6 @@ export class KeybindingsMenu {
                 tab.classList.add("active");
                 this._activeTab = tab.dataset.tab;
                 this._renderContent(panel);
-                // Notifier le GamepadManager de re-scanner les items
                 if (this.gamepadManager?._menuMode) this.gamepadManager._menuDirty = true;
             });
         });
@@ -197,7 +186,6 @@ export class KeybindingsMenu {
         const gp          = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g?.connected) : null;
         const isConnected = !!gp;
 
-        // ── Bannière statut ───────────────────────────────────────────────────
         const banner = document.createElement("div");
         banner.className = `kb-gp-banner ${isConnected ? "kb-gp-ok" : "kb-gp-nok"}`;
         banner.innerHTML = isConnected

@@ -17,7 +17,6 @@ export class PlayerShoot {
         this._shootSfx = new Audio("sounds/sfx/shoot.wav");
         this._shootSfx.volume = 0.1;
 
-        // ── Flags upgrades ────────────────────────────────────────────────────
         this.damageMultiplier = 1;
         this.lastBulletBonus  = false;
         this.piercing         = false;
@@ -87,6 +86,11 @@ export class PlayerShoot {
         if (this.player.weapon) this.player.applyWeaponRecoil(0.1);
     }
 
+    /**
+     * @param {BABYLON.Vector3} spawnPos
+     * @param {BABYLON.Vector3} direction
+     * @param {number} dmgMult
+     */
     _fireProjectile(spawnPos, direction, dmgMult = 1) {
         if (this.piercing) {
             this._firePiercingProjectile(spawnPos, direction, dmgMult);
@@ -97,10 +101,11 @@ export class PlayerShoot {
         }
     }
 
-    // ── Perforation ───────────────────────────────────────────────────────────
-    // Traverse jusqu'à 2 ennemis. Sur le body → dégâts via _takeDamage (pas de
-    // dispose direct, le WaveManager gère la mort). Sur le weakpoint → kill normal.
-
+    /**
+     * @param {BABYLON.Vector3} spawnPos
+     * @param {BABYLON.Vector3} direction
+     * @param {number} dmgMult
+     */
     _firePiercingProjectile(spawnPos, direction, dmgMult) {
         let currentOrigin = spawnPos.clone();
         let enemiesHit    = 0;
@@ -125,29 +130,24 @@ export class PlayerShoot {
             EnemyParticles.projectileImpact(this.scene, hitPoint, BABYLON.Vector3.Up());
 
             if (mesh.name === "weakPoint") {
-                // Weakpoint → kill via le système existant
                 if (mesh.parent?._isBossBody) {
                     mesh.parent._takeDamage?.(Math.ceil(dmgMult));
                 } else if (mesh.parent && !mesh.parent.isDisposed()) {
                     mesh.parent.dispose();
                 }
-                // Le weakpoint tue → on s'arrête, pas la peine de percer plus loin
                 return;
             } else {
-                // Body → dégâts via _takeDamage si disponible, sinon dispose
                 if (typeof mesh._takeDamage === "function") {
                     mesh._takeDamage(Math.ceil(dmgMult));
                 } else if (mesh.parent && typeof mesh.parent._takeDamage === "function") {
                     mesh.parent._takeDamage(Math.ceil(dmgMult));
                 } else {
-                    // Fallback : on dispose le body (ennemi sans système de HP custom)
                     if (!mesh.isDisposed()) mesh.dispose();
                 }
             }
 
             enemiesHit++;
 
-            // Continuer depuis juste après ce mesh
             if (hit.pickedPoint) {
                 currentOrigin = hit.pickedPoint.add(direction.scale(0.3));
                 doRaycast();
@@ -158,12 +158,15 @@ export class PlayerShoot {
         EnemyParticles.muzzleFlash(this.scene, this.player.weapon);
     }
 
-    // ── Explosif ──────────────────────────────────────────────────────────────
 
+    /**
+     * @param {BABYLON.Vector3} spawnPos
+     * @param {BABYLON.Vector3} direction
+     * @param {number} dmgMult
+     */
     _fireExplosiveProjectile(spawnPos, direction, dmgMult) {
         const proj = new Projectile(this.scene, spawnPos, direction, false);
 
-        // Patch update pour intercepter le hit et déclencher l'explosion
         const origUpdate = proj.update.bind(proj);
         proj.update = () => {
             const dt  = this.scene.getEngine().getDeltaTime() / 1000;
@@ -181,6 +184,11 @@ export class PlayerShoot {
         };
     }
 
+    /**
+     * @param {FlowGraphDataConnection<Vector3>|Vector3|FlowGraphDataConnection<Nullable<Vector3>>|BABYLON.Vector3} pos
+     * @param {number} radius
+     * @param {number} dmgMult
+     */
     _explodeAt(pos, radius, dmgMult) {
         EnemyParticles.projectileImpact(this.scene, pos, BABYLON.Vector3.Up());
 
@@ -200,8 +208,6 @@ export class PlayerShoot {
             }
         });
     }
-
-    // ── Callbacks ─────────────────────────────────────────────────────────────
 
     _onKill() {
         this.player.onEnemyKilled?.();

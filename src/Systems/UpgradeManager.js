@@ -1,4 +1,3 @@
-// Dictionnaire des icones par categorie
 const ICONS_BY_CATEGORY = {
     "HEALTH":   "/assets/icons/health_icon.png",
     "WEAPON":   "/assets/icons/weapon_icon.png",
@@ -6,26 +5,20 @@ const ICONS_BY_CATEGORY = {
     "SPECIAL":  "/assets/icons/weapon_icon.png",
 };
 
-// common peut tomber plusieurs fois, pondération haute
-// rare plus impactant, pondération moyenne
-// legendary 1 seul exemplaire par run, retiré après obtention
 export const RARITY = {
     COMMON:    { id: "common",    label: "COMMUN",     color: "#aaaaaa", glow: "rgba(170,170,170,0.3)" },
     RARE:      { id: "rare",      label: "RARE",       color: "#00ccff", glow: "rgba(0,200,255,0.4)"   },
     LEGENDARY: { id: "legendary", label: "LÉGENDAIRE", color: "#ffaa00", glow: "rgba(255,170,0,0.5)"   },
 };
 
-// Coût en points pour reroll (élevé intentionnellement)
 export const REROLL_COST = 800;
 
 export class UpgradeManager {
     constructor(player) {
         this.player = player;
 
-        // Upgrades obtenus pendant ce run (pour l'affichage Tab)
         this.acquiredUpgrades = [];
 
-        // Légendaires déjà pris (pour ne pas les redonner)
         this._usedLegendaries = new Set();
         this._acquiredIds     = new Set();
 
@@ -329,10 +322,6 @@ export class UpgradeManager {
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TIRAGE
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /**
      * Retourne `count` upgrades aléatoires.
      * - Les légendaires déjà pris sont exclus.
@@ -340,25 +329,21 @@ export class UpgradeManager {
      */
     getRandomUpgrades(count = 3) {
          const pool = this.availableUpgrades.filter(u => {
-            // Exclure TOUS les upgrades déjà acquis (toutes raretés)
             if (this._acquiredIds.has(u.id)) return false;
             return true;
         });
 
-        // Construction de la pool pondérée
         const weighted = [];
         pool.forEach(u => {
             const w = u.rarity === RARITY.LEGENDARY ? 1 : u.rarity === RARITY.RARE ? 3 : 6;
             for (let i = 0; i < w; i++) weighted.push(u);
         });
 
-        // Fisher-Yates shuffle
         for (let i = weighted.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [weighted[i], weighted[j]] = [weighted[j], weighted[i]];
         }
 
-        // Dédoublonnage
         const picked = [];
         const seen   = new Set();
         for (const u of weighted) {
@@ -384,9 +369,6 @@ export class UpgradeManager {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // STATS (utilisé par le panneau Tab)
-    // ═══════════════════════════════════════════════════════════════════════════
 
     getPlayerStats() {
         const p = this.player;

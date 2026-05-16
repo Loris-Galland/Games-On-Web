@@ -1,17 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "../Enemies/EnemyParticles";
 
-/**
- * PlasmaShotgun
- * -------------
- * Tir en rafale : 7 projectiles en éventail, rechargement lent.
- * Dégâts élevés à courte portée, dispersion aléatoire à longue portée.
- *
- * Usage :
- *   const gun = new PlasmaShotgun(player);
- *   gun.fire();
- *   gun.destroy();
- */
 export class PlasmaShotgun {
     /** @param {import('../Player/Player').Player} player */
     constructor(player) {
@@ -20,13 +9,13 @@ export class PlasmaShotgun {
 
         // Stats
         this.pellets        = 7;
-        this.spreadAngle    = 0.22;   // radians max dispersion
-        this.fireRate       = 700;    // ms entre chaque coup
+        this.spreadAngle    = 0.22;
+        this.fireRate       = 700;
         this.projectileSpeed = 28;
-        this.projectileLife  = 800;   // ms
+        this.projectileLife  = 800;
         this.ammoMax        = 2;
         this.currentAmmo    = 2;
-        this.reloadTime     = 2400;   // ms
+        this.reloadTime     = 2400;
 
         this.lastFireTime   = 0;
         this._reloading     = false;
@@ -86,11 +75,9 @@ export class PlasmaShotgun {
 
         EnemyParticles.muzzleFlash(this.scene, this.mesh);
 
-        // Kick caméra
         this.player.camera.rotation.x -= 0.025;
         this.player.applyWeaponRecoil?.(0.18);
 
-        // Spawn pellets
         for (let i = 0; i < this.pellets; i++) {
             const angleH = (Math.random() - 0.5) * this.spreadAngle;
             const angleV = (Math.random() - 0.5) * this.spreadAngle * 0.6;
@@ -104,7 +91,6 @@ export class PlasmaShotgun {
 
         if (this.currentAmmo <= 0) this._startReload();
 
-        // Notify HUD
         this.player.hud?.updateWeaponAmmo?.(this.currentAmmo, this.ammoMax, "PLASMA SHOTGUN", this._reloading);
 
         return true;

@@ -36,60 +36,54 @@ export class BossEnemy {
         this.maxHealth     = 20;
         this.currentHealth = 20;
         this._dead         = false;
-        this._dying        = false; // guard contre les appels multiples à _die()
+        this._dying        = false;
 
-        // ── État de phase ─────────────────────────────────────────────────────
-        // "transition" = fenêtre vulnérable entre phases (particules vertes)
-        // "phase1" / "phase2" / "phase3" = phases de combat (invincible)
-        this._stateLabel      = "transition"; // on commence par une courte intro
+        this._stateLabel      = "transition";
         this._invincible      = true;
-        this._phaseIndex      = 0;           // 0 = pas encore commencé
+        this._phaseIndex      = 0;
         this._transitionTimer = 0;
-        this._TRANSITION_DUR  = 5.0;         // secondes de vulnérabilité entre phases
+        this._TRANSITION_DUR  = 5.0;
 
-        // ── Timers internes ───────────────────────────────────────────────────
-        this._t             = 0; // timer local de phase
+
+        this._t             = 0;
         this._contactTimer  = 0;
         this._CONTACT_CD    = 1.0;
 
-        // Phase 1 — sauts
+
         this._jumpCount    = 0;
         this._MAX_JUMPS    = 5;
-        this._jumpState    = "idle";  // "idle" | "charging" | "jumping" | "landing"
+        this._jumpState    = "idle";
         this._jumpTimer    = 0;
-        this._jumpElapsed  = 0;      // compteur dédié à la durée du saut
+        this._jumpElapsed  = 0;
         this._jumpOrigin   = null;
         this._jumpTarget   = null;
 
-        // Phase 2 — laser
+
         this._laserCooldown  = 0;
         this._LASER_RATE     = 1.8;
         this._moveCooldown   = 0;
         this._moveTarget     = null;
 
-        // Phase 3 — vague unique de minions
         this._minionWaveSpawned = false;
         this._minionWaveDone    = false;
-        this._floatY            = 12; // hauteur de flotte
+        this._floatY            = 12;
         this._minionsSpawned = 0;
 
-        // ── Construction ──────────────────────────────────────────────────────
         EnemyParticles.spawnWarning(scene, position, new BABYLON.Color3(0.8, 0, 0), 2000);
         this._buildMesh(position);
         this._buildWeakPoint();
         this._buildAuraSystem();
 
-        // Petite intro : 3 sec d'invincibilité avant la phase 1
         this._introTimer  = 3.0;
         this._inIntro     = true;
 
         this._updateObs = scene.onBeforeRenderObservable.add(() => this._update());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTRUCTION
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     *
+     * @param {BABYLON.Vector3}position
+     */
     _buildMesh(position) {
         const uid = Math.random().toString(36).slice(2);
 
@@ -118,17 +112,17 @@ export class BossEnemy {
     _buildWeakPoint() {
         const uid = Math.random().toString(36).slice(2);
         const mat = new BABYLON.StandardMaterial(`bossWpMat_${uid}`, this.scene);
-        // Blanc brillant pour se démarquer du corps vert
+
         mat.emissiveColor   = new BABYLON.Color3(1, 1, 1);
         mat.diffuseColor    = new BABYLON.Color3(0.5, 1, 0.5);
         mat.disableLighting = true;
 
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 1.2 }, this.scene);
         this.weakPoint.material   = mat;
-        this.weakPoint.isPickable = false; // activé seulement en transition
+        this.weakPoint.isPickable = false;
         this.weakPoint.isVisible  = false;
         this.weakPoint.parent     = this.body;
-        // Devant le boss comme les ennemis standard (z+ = avant local)
+
         this.weakPoint.position   = new BABYLON.Vector3(0, 0.8, 1.9);
 
         this._wpPulseT = 0;
@@ -137,7 +131,6 @@ export class BossEnemy {
     _buildAuraSystem() {
         const tex = "https://assets.babylonjs.com/textures/flare.png";
 
-        // Aura de phase (couleur change selon la phase)
         this._phaseAura = new BABYLON.ParticleSystem("bossPhaseAura", 80, this.scene);
         this._phaseAura.particleTexture = new BABYLON.Texture(tex, this.scene);
         this._phaseAura.emitter         = this.body;
@@ -158,7 +151,6 @@ export class BossEnemy {
         this._setAuraColor(new BABYLON.Color4(0.8, 0, 0, 0.8)); // rouge par défaut
         this._phaseAura.start();
 
-        // Aura de transition (verte — très visible)
         this._transAura = new BABYLON.ParticleSystem("bossTransAura", 200, this.scene);
         this._transAura.particleTexture = new BABYLON.Texture(tex, this.scene);
         this._transAura.emitter         = this.body;
@@ -182,6 +174,9 @@ export class BossEnemy {
         this._transAura.stop(); // inactif au début
     }
 
+    /**
+     * @param {Color4} color4
+     */
     _setAuraColor(color4) {
         const c2 = color4.clone();
         c2.a *= 0.5;
@@ -190,9 +185,6 @@ export class BossEnemy {
         this._phaseAura.colorDead = new BABYLON.Color4(color4.r * 0.1, color4.g * 0.1, color4.b * 0.1, 0);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BOUCLE PRINCIPALE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _update() {
         if (this._dead || !this.player?.camera) return;
@@ -204,7 +196,6 @@ export class BossEnemy {
 
         this._t += dt;
 
-        // ── Intro ─────────────────────────────────────────────────────────────
         if (this._inIntro) {
             this._introTimer -= dt;
             if (this._introTimer <= 0) {
@@ -214,7 +205,6 @@ export class BossEnemy {
             return;
         }
 
-        // ── Contact damage (seulement en transition = non invincible) ─────────
         if (!this._invincible) {
             if (this._contactTimer > 0) this._contactTimer -= dt;
             const dx = pos.x - playerPos.x;
@@ -226,14 +216,12 @@ export class BossEnemy {
             }
         }
 
-        // ── Weakpoint pulse visuel ────────────────────────────────────────────
         if (!this._invincible && this.weakPoint && !this.weakPoint.isDisposed()) {
             this._wpPulseT += dt;
             const sc = 1 + Math.sin(this._wpPulseT * 6) * 0.25;
             this.weakPoint.scaling = new BABYLON.Vector3(sc, sc, sc);
         }
 
-        // ── Dispatch état ─────────────────────────────────────────────────────
         if (this._stateLabel === "transition") {
             this._updateTransition(dt, playerPos);
         } else if (this._stateLabel === "phase1") {
@@ -244,23 +232,21 @@ export class BossEnemy {
             this._updatePhase3(dt, pos, playerPos);
         }
 
-        // Regarde toujours vers le joueur (sauf en l'air phase 3)
         if (this._stateLabel !== "phase3") {
             this.body.lookAt(new BABYLON.Vector3(playerPos.x, pos.y, playerPos.z));
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSITION (vulnérable, particules vertes, weakpoint visible)
-    // ═══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * @param {number} nextPhase
+     */
     _enterTransition(nextPhase) {
         this._stateLabel      = "transition";
         this._invincible      = false;
         this._transitionTimer = this._TRANSITION_DUR;
         this._nextPhase       = nextPhase;
 
-        // Afficher le weakpoint
         if (this.weakPoint && !this.weakPoint.isDisposed()) {
             this.weakPoint.isVisible  = true;
             this.weakPoint.isPickable = true;
@@ -268,24 +254,24 @@ export class BossEnemy {
             console.warn(`[Boss._enterTransition] weakPoint is null or already disposed!`);
         }
 
-        // Particules vertes ON, phase OFF
         this._phaseAura.stop();
         this._transAura.start();
 
-        // Corps vert foncé (le weakpoint blanc se démarque bien)
         if (this.body.material) {
             this.body.material.emissiveColor = new BABYLON.Color3(0.0, 0.25, 0.05);
             this.body.material.diffuseColor  = new BABYLON.Color3(0.0, 0.2, 0.05);
         }
 
-        // Assurer que le boss est au sol
         this.body.position.y = this._groundY;
     }
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updateTransition(dt, playerPos) {
         this._transitionTimer -= dt;
 
-        // Légère oscillation sur place
         this.body.position.y = this._groundY + Math.sin(this._t * 3) * 0.15;
 
         if (this._transitionTimer <= 0) {
@@ -293,10 +279,9 @@ export class BossEnemy {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASES
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * @param {number} phaseNum
+     */
     _enterPhase(phaseNum) {
         this._stateLabel = `phase${phaseNum}`;
         this._phaseIndex = phaseNum;
@@ -343,11 +328,15 @@ export class BossEnemy {
         const labels = ["", "PHASE I — IMPACT", "PHASE II — RAFALE", "PHASE III — INVOCATION"];
     }
 
-    // ── PHASE 1 : Sauts ───────────────────────────────────────────────────────
 
+    /**
+     * @param {number} dt
+     * @param {*} pos
+     * @param {*} playerPos
+     */
     _updatePhase1(dt, pos, playerPos) {
         if (this._jumpState === "idle") {
-            // Immobile, attend
+
             this.body.position.y = this._groundY + Math.sin(this._t * 2) * 0.1;
             this._jumpTimer -= dt;
             if (this._jumpTimer <= 0) {
@@ -357,13 +346,13 @@ export class BossEnemy {
         }
 
         if (this._jumpState === "charging") {
-            // Légère compression avant le saut
+
             this._jumpTimer -= dt;
             const chargeProgress = Math.max(0, 1 - this._jumpTimer / 0.3);
             this.body.position.y = this._groundY - 0.5 * chargeProgress;
             if (this._jumpTimer <= 0) {
                 this._jumpState    = "jumping";
-                this._jumpElapsed  = 0; // compteur dédié au saut
+                this._jumpElapsed  = 0;
             }
             return;
         }
@@ -376,10 +365,9 @@ export class BossEnemy {
             const orig = this._jumpOrigin;
             const targ = this._jumpTarget;
 
-            // Interpolation XZ linéaire
             this.body.position.x = orig.x + (targ.x - orig.x) * t;
             this.body.position.z = orig.z + (targ.z - orig.z) * t;
-            // Arc Y parabolique (sin de 0 à PI)
+
             const arcH = 8.0;
             this.body.position.y = this._groundY + arcH * Math.sin(t * Math.PI);
 
@@ -408,6 +396,10 @@ export class BossEnemy {
         }
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _initiateJump(pos, playerPos) {
         this._jumpOrigin = pos.clone();
         const offset = new BABYLON.Vector3(
@@ -424,6 +416,9 @@ export class BossEnemy {
         this._jumpTimer = 0.3; // durée de la compression
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     */
     _onJumpLand(pos) {
         // Onde de choc à l'atterrissage
         this._spawnShockwave(new BABYLON.Vector3(pos.x, this._groundY - 2.0, pos.z));
@@ -440,6 +435,9 @@ export class BossEnemy {
         EnemyParticles.death(this.scene, new BABYLON.Vector3(pos.x, this._groundY, pos.z), new BABYLON.Color3(1, 0.1, 0));
     }
 
+    /**
+     * @param {BABYLON.Vector3} center
+     */
     _spawnShockwave(center) {
         const ring = BABYLON.MeshBuilder.CreateDisc("bossShockwave", { radius: 0.2, tessellation: 32 }, this.scene);
         ring.position    = center.clone();
@@ -463,16 +461,18 @@ export class BossEnemy {
         });
     }
 
-    // ── PHASE 2 : Lasers + déplacement aléatoire ──────────────────────────────
-
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase2(dt, pos, playerPos) {
-        // Déplacement aléatoire rapide (pas forcément vers le joueur)
+
         this._moveCooldown -= dt;
         if (this._moveCooldown <= 0 || !this._moveTarget) {
-            // Nouvelle cible aléatoire autour du centre de l'arène
             const angle  = Math.random() * Math.PI * 2;
             const radius = 5 + Math.random() * 9;
-            const center = playerPos; // se recentre autour du joueur
+            const center = playerPos;
             this._moveTarget = new BABYLON.Vector3(
                 center.x + Math.cos(angle) * radius,
                 this._groundY,
@@ -481,7 +481,6 @@ export class BossEnemy {
             this._moveCooldown = 1.5 + Math.random() * 1.5;
         }
 
-        // Mouvement vers la cible aléatoire
         const toTarget = this._moveTarget.subtract(pos);
         toTarget.y = 0;
         const dist = toTarget.length();
@@ -492,24 +491,25 @@ export class BossEnemy {
         }
         this.body.position.y = this._groundY + Math.sin(this._t * 4) * 0.12;
 
-        // Tir laser
         this._laserCooldown -= dt;
         if (this._laserCooldown <= 0) {
             this._fireLaser(pos, playerPos);
             this._laserCooldown = this._LASER_RATE;
         }
 
-        // Fin de phase 2 : après 12 sec
         if (this._t >= 12.0) {
             this._enterTransition(3);
         }
     }
 
+    /**
+     * @param {BABYLON.Vector3} from
+     * @param {BABYLON.Vector3} playerPos
+     */
     _fireLaser(from, playerPos) {
         const origin = new BABYLON.Vector3(from.x, from.y + 0.5, from.z);
         const dir    = playerPos.subtract(origin).normalize();
 
-        // Projectile visible et lent (esquivable)
         const bullet = BABYLON.MeshBuilder.CreateCylinder("bossBullet", {
             height: 0.7, diameter: 0.18, tessellation: 8,
         }, this.scene);
@@ -517,7 +517,6 @@ export class BossEnemy {
         bullet.isPickable = false;
         bullet.alwaysSelectAsActiveMesh = true;
 
-        // Orienter le cylindre dans la direction de tir
         bullet.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionRH(
             dir, BABYLON.Vector3.Up(),
         );
@@ -528,7 +527,6 @@ export class BossEnemy {
         mat.disableLighting = true;
         bullet.material     = mat;
 
-        // Trainée jaune
         const tex   = "https://assets.babylonjs.com/textures/flare.png";
         const trail = new BABYLON.ParticleSystem("bossBulletTrail", 20, this.scene);
         trail.particleTexture = new BABYLON.Texture(tex, this.scene);
@@ -563,7 +561,6 @@ export class BossEnemy {
 
             const dt = scene.getEngine().getDeltaTime() / 1000;
 
-            // Vérification collision joueur (distance à la caméra)
             const toCam = this.player.camera.globalPosition.subtract(bullet.position);
             if (toCam.length() < 1.0 && !this.player.isDead) {
                 this.player.health?.takeDamage(1);
@@ -573,7 +570,6 @@ export class BossEnemy {
                 return;
             }
 
-            // Collision décor via ray
             const ray = new BABYLON.Ray(bullet.position, dir, SPEED * dt * 1.5);
             const hit  = scene.pickWithRay(ray, m => m.checkCollisions && !m.name.startsWith("boss"));
             if (hit?.hit) {
@@ -586,7 +582,6 @@ export class BossEnemy {
 
             bullet.position.addInPlace(dir.scale(SPEED * dt));
 
-            // Durée de vie max
             if (Date.now() - spawnTime > 4000) {
                 trail.stop();
                 scene.onBeforeRenderObservable.remove(obs);
@@ -595,8 +590,11 @@ export class BossEnemy {
         });
     }
 
-    // ── PHASE 3 : Flotte + 1 vague de 5 minions ──────────────────────────────
-
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase3(dt, pos, playerPos) {
         // Flotte en l'air
         const targetY = this._groundY + this._floatY;
@@ -633,6 +631,9 @@ export class BossEnemy {
         }
     }
 
+    /**
+     * @param {BABYLON.Vector3} center
+     */
     _spawnMinionWave(center) {
         if (!this._onSummon) return;
 
@@ -657,10 +658,7 @@ export class BossEnemy {
         });
     }
 
-    // ── Transition finale (après phase 3) → repart en phase 1 en boucle ─────────
-
     _enterFinalTransition() {
-        // Redescend progressivement au sol via un observer dédié
         const descObs = this.scene.onBeforeRenderObservable.add(() => {
             if (this._dead || this.body.isDisposed()) { this.scene.onBeforeRenderObservable.remove(descObs); return; }
             const dt2 = this.scene.getEngine().getDeltaTime() / 1000;
@@ -670,15 +668,12 @@ export class BossEnemy {
                 this.scene.onBeforeRenderObservable.remove(descObs);
             }
         });
-
-        // Repart en phase 1 — le boss boucle jusqu'à la mort
         this._enterTransition(1);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DÉGÂTS
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * @param {number} amount
+     */
     takeDamage(amount) {
 
         if (this._dead || this._dying) {
@@ -693,7 +688,6 @@ export class BossEnemy {
 
         this.currentHealth = Math.max(0, this.currentHealth - amount);
 
-        // Flash blanc sur le corps
         if (this.body.material) {
             const orig = this.body.material.emissiveColor.clone();
             this.body.material.emissiveColor = new BABYLON.Color3(1, 1, 1);
@@ -715,10 +709,6 @@ export class BossEnemy {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MORT
-    // ═══════════════════════════════════════════════════════════════════════════
-
     _die() {
         if (this._dead) return;
         this._dead = true;
@@ -727,7 +717,6 @@ export class BossEnemy {
 
         const pos = this.body.position.clone();
 
-        // Cascade d'explosions
         for (let i = 0; i < 8; i++) {
             setTimeout(() => {
                 if (!this.scene) return;
@@ -751,10 +740,6 @@ export class BossEnemy {
 
         if (this.onDeath) this.onDeath();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // NETTOYAGE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     dispose() {
         this._dead = true;

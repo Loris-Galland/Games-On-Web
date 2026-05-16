@@ -1,9 +1,3 @@
-/**
- * MainMenu
- * --------
- * Reçoit les instances partagées de GraphicsMenu et KeybindingsMenu
- * pour garantir que l'état est synchronisé avec le PauseMenu.
- */
 export class MainMenu {
     /**
      * @param {function}        onPlayCallback

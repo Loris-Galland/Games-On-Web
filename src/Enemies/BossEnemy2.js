@@ -41,19 +41,16 @@ export class BossEnemy2 {
         this._CONTACT_CD   = 1.0;
         this._wpPulseT     = 0;
 
-        // Phase 1 — mines
         this._mineTimer  = 0;
         this._MINE_RATE  = 1.5;
         this._mineCount  = 0;
         this._MAX_MINES  = 6;
 
-        // Phase 2 — barrage
         this._burstTimer   = 0;
         this._BURST_RATE   = 2.0;
         this._moveCooldown = 0;
         this._moveTarget   = null;
 
-        // Phase 3 — laser tournant
         this._laserAngle  = 0;
         this._laserSpeed  = 0.7;
         this._laserMesh   = null;
@@ -71,10 +68,9 @@ export class BossEnemy2 {
         this._obs = scene.onBeforeRenderObservable.add(() => this._update());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTRUCTION
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * @param {BABYLON.Vector3} position
+     */
     _buildMesh(position) {
         const uid = Math.random().toString(36).slice(2);
         const mat = new BABYLON.StandardMaterial(`nexusMat_${uid}`, this.scene);
@@ -141,16 +137,15 @@ export class BossEnemy2 {
         this._transAura.stop();
     }
 
+    /**
+     * @param {Color4} c4
+     */
     _setAuraColor(c4) {
         const c2 = c4.clone(); c2.a *= 0.5;
         this._phaseAura.color1    = c4;
         this._phaseAura.color2    = c2;
         this._phaseAura.colorDead = new BABYLON.Color4(c4.r * 0.1, c4.g * 0.1, c4.b * 0.1, 0);
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // RAYCAST SOL DYNAMIQUE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _updateGroundY() {
         if (!this.body || this.body.isDisposed()) return;
@@ -159,10 +154,6 @@ export class BossEnemy2 {
         const hit = this.scene.pickWithRay(ray, m => m.checkCollisions && m !== this.body && m.name !== "weakPoint");
         if (hit.hit) this._groundY = hit.pickedPoint.y + 2.4;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BOUCLE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _update() {
         if (this._dead || !this.player?.camera) return;
@@ -204,10 +195,9 @@ export class BossEnemy2 {
         this.body.lookAt(new BABYLON.Vector3(playerPos.x, pos.y, playerPos.z));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSITIONS / PHASES
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * @param {number} nextPhase
+     */
     _enterTransition(nextPhase) {
         this._stateLabel      = "transition";
         this._invincible      = false;
@@ -225,12 +215,18 @@ export class BossEnemy2 {
         this.body.position.y = this._groundY;
     }
 
+    /**
+     * @param {number} dt
+     */
     _updateTransition(dt) {
         this._transitionTimer -= dt;
         this.body.position.y = this._groundY + Math.sin(this._t * 3) * 0.15;
         if (this._transitionTimer <= 0) this._enterPhase(this._nextPhase);
     }
 
+    /**
+     * @param {number} phaseNum
+     */
     _enterPhase(phaseNum) {
         this._stateLabel = `phase${phaseNum}`;
         this._phaseIndex = phaseNum;
@@ -263,10 +259,12 @@ export class BossEnemy2 {
         this.player.hud?.showWaveMessage?.(labels[phaseNum] ?? "");
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 1 — MINES
-    // ═══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase1(dt, pos, playerPos) {
         this.body.position.y = this._groundY + Math.sin(this._t * 2) * 0.1;
         this._mineTimer -= dt;
@@ -277,6 +275,9 @@ export class BossEnemy2 {
         if (this._mineCount >= this._MAX_MINES && this._mineTimer < -1.0) this._enterTransition(2);
     }
 
+    /**
+     * @param {BABYLON.Vector3} playerPos
+     */
     _spawnMine(playerPos) {
         const angle = Math.random() * Math.PI * 2;
         const r     = 2.5 + Math.random() * 5;
@@ -315,6 +316,9 @@ export class BossEnemy2 {
         });
     }
 
+    /**
+     * @param {BABYLON.Vector3} center
+     */
     _explodeMine(center) {
         EnemyParticles.death(this.scene, new BABYLON.Vector3(center.x, center.y + 0.5, center.z), new BABYLON.Color3(0, 0.6, 1));
         const ring = BABYLON.MeshBuilder.CreateDisc("mineBlast", { radius: 0.1, tessellation: 32 }, this.scene);
@@ -336,10 +340,11 @@ export class BossEnemy2 {
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 2 — BARRAGE CIRCULAIRE
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase2(dt, pos, playerPos) {
         this._moveCooldown -= dt;
         if (this._moveCooldown <= 0 || !this._moveTarget) {
@@ -358,6 +363,10 @@ export class BossEnemy2 {
         if (this._t >= 14.0) this._enterTransition(3);
     }
 
+    /**
+     * @param {BABYLON.Vector3} from
+     * @param {BABYLON.Vector3} playerPos
+     */
     _fireBurst(from, playerPos) {
         const N = 12;
         const origin = new BABYLON.Vector3(from.x, from.y + 0.5, from.z);
@@ -375,6 +384,11 @@ export class BossEnemy2 {
         }
     }
 
+    /**
+     * @param {BABYLON.Vector3} origin
+     * @param {BABYLON.Vector3} dir
+     * @param {boolean} fast
+     */
     _fireBullet(origin, dir, fast) {
         const bullet = BABYLON.MeshBuilder.CreateSphere("nexusBullet", { diameter: 0.22 }, this.scene);
         bullet.position = origin.clone(); bullet.isPickable = false; bullet.alwaysSelectAsActiveMesh = true;
@@ -396,9 +410,6 @@ export class BossEnemy2 {
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PHASE 3 — LASER TOURNANT
-    // ═══════════════════════════════════════════════════════════════════════════
 
     _buildLaser() {
         this._laserMesh = BABYLON.MeshBuilder.CreateBox("nexusLaser", { width: this._LASER_LEN, height: 0.2, depth: 0.2 }, this.scene);
@@ -437,10 +448,6 @@ export class BossEnemy2 {
         }
         if (this._t >= 15.0) { this._destroyLaser(); this._enterTransition(1); }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DÉGÂTS / MORT
-    // ═══════════════════════════════════════════════════════════════════════════
 
     takeDamage(amount) {
         if (this._dead || this._dying || this._invincible) return;

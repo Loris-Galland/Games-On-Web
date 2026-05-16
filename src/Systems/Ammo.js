@@ -8,7 +8,6 @@ export class Ammo {
     this.rechargeInterval = null;
   }
 
-  // Renvoie true si on a tiré, false si le chargeur est vide
   consume() {
     if (this.currentAmmo > 0) {
       this.currentAmmo--;
@@ -21,7 +20,6 @@ export class Ammo {
     return false;
   }
 
-  // Logique de rechargement automatique
   _startRecharge() {
     if (this.rechargeInterval !== null) return;
 
@@ -39,7 +37,9 @@ export class Ammo {
     }, this.rechargeRateMs);
   }
 
-  // Augmente la capacité du chargeur et le remplit
+  /**
+   * @param {number} amount
+   */
   increaseMax(amount) {
     this.maxAmmo += amount;
     this.currentAmmo += amount;

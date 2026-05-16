@@ -7,7 +7,9 @@ export class Health {
     this.onDeath = onDeathCallback;
   }
 
-  // Applique les dégâts
+  /**
+   * @param {number} amount
+   */
   takeDamage(amount) {
     if (this.currentHealth <= 0) return;
 
@@ -21,7 +23,9 @@ export class Health {
     }
   }
 
-  // Rend de la vie
+  /**
+   * @param {number} amount
+   */
   heal(amount) {
     this.currentHealth += amount;
     if (this.currentHealth > this.maxHealth)
@@ -30,12 +34,13 @@ export class Health {
     if (this.onDamage) this.onDamage(this.currentHealth, this.maxHealth);
   }
 
-  // Tue l'entité
   die() {
     if (this.onDeath) this.onDeath();
   }
 
-  // Augmente la vie maximale et soigne le joueur de ce montant
+  /**
+   * @param {number} amount
+   */
   increaseMax(amount) {
     this.maxHealth += amount;
     this.currentHealth += amount;

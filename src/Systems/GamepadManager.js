@@ -33,26 +33,22 @@ export class GamepadManager {
         this._prevButtons = [];
         this._prevAxes    = [];
 
-        // Menu
         this._menuMode     = false;
         this._menuEl       = null;
         this._menuItems    = [];
         this._menuFocusIdx = 0;
         this._menuDirty    = false;
 
-        // Répétition D-pad / stick vertical (navigation liste)
         this._navDir         = 0;
         this._navHoldTime    = 0;
         this._navRepeatDelay = 400;
         this._navRepeatRate  = 120;
         this._navFired       = false;
 
-        // Répétition stick droit horizontal (sliders)
         this._sliderDir      = 0;
         this._sliderHoldTime = 0;
         this._sliderFired    = false;
 
-        // Sensibilité
         this.lookSensitivityH = 0.04;
         this.lookSensitivityV = 0.03;
         this.deadzone         = 0.15;
@@ -60,7 +56,6 @@ export class GamepadManager {
         this._layoutType       = "unknown";
         this._vibrationEnabled = true;
 
-        // Suivi des touches virtuelles actives (pour le keyup)
         this._gpKeysActive = { up: false, down: false, left: false, right: false };
     }
 
@@ -80,6 +75,9 @@ export class GamepadManager {
         if (this._rafId) cancelAnimationFrame(this._rafId);
     }
 
+    /**
+     * @param {boolean} active
+     */
     setMenuMode(active, menuEl = null) {
         const wasActive = this._menuMode;
         this._menuMode  = active;
@@ -102,10 +100,6 @@ export class GamepadManager {
         this._menuDirty = true;
     }
 
-    /**
-     * Vide tout mouvement résiduel : relâche les touches virtuelles et
-     * remet cameraDirection à zéro. À appeler à chaque reprise du jeu.
-     */
     flushMovement() {
         this._releaseVirtualKeys();
         if (this.player?.camera?.cameraDirection) {
@@ -121,6 +115,11 @@ export class GamepadManager {
     setBinding(a, idx) { this._bindings[a] = idx; }
     resetBindings()    { this._bindings = { ...GamepadManager.DEFAULT_BINDINGS }; }
 
+    /**
+     * @param {number} duration
+     * @param {number} strong
+     * @param {number} weak
+     */
     vibrate(duration = 80, strong = 0.3, weak = 0.6) {
         if (!this._vibrationEnabled) return;
         const gp = this._getGamepad();
@@ -131,6 +130,9 @@ export class GamepadManager {
 
     // ── Boucle RAF ────────────────────────────────────────────────────────────
 
+    /**
+     * @param {number} now
+     */
     _loop(now) {
         if (!this._running) return;
         const dt = Math.min(now - this._lastTime, 50);
@@ -141,7 +143,7 @@ export class GamepadManager {
             if (this._layoutType === "unknown") this._detectLayout(gp);
 
             if (this._menuMode) {
-                this._releaseVirtualKeys(); // s'assurer qu'on ne bouge pas en menu
+                this._releaseVirtualKeys();
                 this._updateMenuNav(gp, dt);
             } else {
                 this._updateGameplay(gp, dt);
@@ -165,6 +167,9 @@ export class GamepadManager {
 
     // ── Détection layout ──────────────────────────────────────────────────────
 
+    /**
+     * @param {Gamepad} gp
+     */
     _detectLayout(gp) {
         const id = gp.id.toLowerCase();
         this._layoutType =
@@ -177,6 +182,9 @@ export class GamepadManager {
 
     // ── D-pad ─────────────────────────────────────────────────────────────────
 
+    /**
+     * @param {Gamepad} gp
+     */
     _getDpad(gp) {
         if (gp.buttons.length >= 16) {
             const up    = gp.buttons[12]?.pressed ?? false;
@@ -203,6 +211,10 @@ export class GamepadManager {
 
     // ── LT / RT ───────────────────────────────────────────────────────────────
 
+    /**
+     * @param {Gamepad} gp
+     * @param {number} btnIdx
+     */
     _getTriggerValue(gp, btnIdx) {
         const btn = gp.buttons[btnIdx];
         if (btn) return btn.value ?? (btn.pressed ? 1 : 0);
@@ -212,13 +224,11 @@ export class GamepadManager {
     }
 
     // ── Gameplay ──────────────────────────────────────────────────────────────
-    //
-    // FIX VITESSE : au lieu d'appeler cam.cameraDirection.addInPlace() qui
-    // contourne la physique interne de Babylon (et donne une vitesse×frames),
-    // on dispatche des KeyboardEvent synthétiques sur le canvas.
-    // La caméra UniversalCamera les traite exactement comme des touches physiques :
-    // même camera.speed, même collision, même gravité, même fréquence.
 
+    /**
+     * @param {Gamepad} gp
+     * @param {number} dt
+     */
     _updateGameplay(gp, dt) {
         if (!this.player || this.player.isDead) return;
 
@@ -226,19 +236,16 @@ export class GamepadManager {
         const lx = this._dead(gp.axes[0] ?? 0);
         const ly = this._dead(gp.axes[1] ?? 0);
 
-        // Stick gauche → touches virtuelles (même vitesse que clavier)
         this._setVirtualKey("up",    ly < -2);
         this._setVirtualKey("down",  ly >  2);
         this._setVirtualKey("left",  lx < -2);
         this._setVirtualKey("right", lx >  2);
 
-        // inputMap pour tilt/bobbing uniquement (pas de mouvement)
         const moving = Math.abs(lx) > 0.15 || Math.abs(ly) > 0.15;
         this.player.inputMap["_gp_move"] = moving;
         this.player.inputMap["a"]        = lx < -0.15;
         this.player.inputMap["d"]        = lx >  0.15;
 
-        // Stick droit → rotation caméra
         const rx = this._dead(gp.axes[2] ?? 0);
         const ry = this._dead(gp.axes[3] ?? 0);
         if (Math.abs(rx) > 0 || Math.abs(ry) > 0) {
@@ -248,13 +255,11 @@ export class GamepadManager {
                 cam.rotation.x + ry * this.lookSensitivityV));
         }
 
-        // Saut
         if (this._justPressed(gp, b.jump)) {
             this.player._jump();
             this.vibrate(60, 0.1, 0.3);
         }
 
-        // Tir RT/R2
         const rt = this._getTriggerValue(gp, b.fire);
         if (rt > 0.5) {
             const sc  = this.player.shootController;
@@ -266,14 +271,15 @@ export class GamepadManager {
             }
         }
 
-        // Pause
         if (this._justPressed(gp, b.pause)) {
             if (this._onPause) this._onPause();
         }
     }
 
-    // ── Touches virtuelles (KeyboardEvent sur canvas) ─────────────────────────
-
+    /**
+     * @param {string} dir
+     * @param {boolean} active
+     */
     _setVirtualKey(dir, active) {
         if (this._gpKeysActive[dir] === active) return;
         this._gpKeysActive[dir] = active;
@@ -281,6 +287,9 @@ export class GamepadManager {
         if (keyCode !== null) this._fireKey(active ? "keydown" : "keyup", keyCode);
     }
 
+    /**
+     * @param {string} dir
+     */
     _getDirKeyCode(dir) {
         if (!this.player?.camera) return null;
         const cam = this.player.camera;
@@ -293,6 +302,10 @@ export class GamepadManager {
         }
     }
 
+    /**
+     * @param {string} type
+     * @param {*} keyCode
+     */
     _fireKey(type, keyCode) {
         const canvas = this.player?.scene?.getEngine?.()?.getRenderingCanvas?.();
         if (!canvas) return;
@@ -318,6 +331,10 @@ export class GamepadManager {
 
     // ── Navigation menu ───────────────────────────────────────────────────────
 
+    /**
+     * @param {Gamepad} gp
+     * @param {number} dt
+     */
     _updateMenuNav(gp, dt) {
         const b = this._bindings;
 
@@ -326,7 +343,6 @@ export class GamepadManager {
             this._menuDirty = false;
         }
 
-        // A → activer l'élément focalisé
         if (this._justPressed(gp, b.jump)) {
             const item = this._menuItems[this._menuFocusIdx];
             if (item) {
@@ -336,19 +352,16 @@ export class GamepadManager {
             }
         }
 
-        // B → remonter d'un niveau (jamais quitter le jeu)
         if (this._justPressed(gp, b.back)) {
             this._clickBack();
             this.vibrate(30, 0.05, 0.1);
             setTimeout(() => { this._menuDirty = true; }, 80);
         }
 
-        // Start → pause
         if (this._justPressed(gp, b.pause)) {
             if (this._onPause) this._onPause();
         }
 
-        // D-pad / stick gauche vertical → navigation liste
         const dpad = this._getDpad(gp);
         const ly   = this._dead(gp.axes[1] ?? 0);
         const wantUp   = dpad.up   || ly < -0.5;
@@ -370,7 +383,6 @@ export class GamepadManager {
             this._navDir = 0; this._navFired = false;
         }
 
-        // Stick droit horizontal → modifier slider focalisé
         const rx = this._dead(gp.axes[2] ?? 0);
         if (Math.abs(rx) > 0.1) {
             const sDir = rx > 0 ? 1 : -1;
@@ -389,7 +401,6 @@ export class GamepadManager {
         }
     }
 
-    /** Active un élément selon son type. */
     _activateItem(el) {
         const tag  = el.tagName?.toLowerCase();
         const type = el.type?.toLowerCase();
@@ -406,7 +417,6 @@ export class GamepadManager {
         }
     }
 
-    /** Déplace un slider d'un step dans la direction donnée. */
     _nudgeSlider(el, dir) {
         if (!el) return;
         let slider = el;
@@ -448,10 +458,6 @@ export class GamepadManager {
         this._applyFocus();
     }
 
-    /**
-     * Remonte jusqu'au conteneur visible le plus profond.
-     * Priorité : .gfx-panel / .kb-panel → #settings-panel → .menu-buttons-container → root
-     */
     _findDeepestVisibleContainer(root) {
         const ok = el => el && el.offsetParent !== null && window.getComputedStyle(el).display !== 'none';
         for (const sel of ['.gfx-panel', '.kb-panel']) {
@@ -482,11 +488,6 @@ export class GamepadManager {
         this._menuItems = []; this._menuFocusIdx = 0;
     }
 
-    /**
-     * B / Circle = remonter d'un niveau.
-     * ANNULER (graphismes/touches) > RETOUR (paramètres) > REPRENDRE (pause principal)
-     * Le bouton "RETOUR À L'ACCUEIL" n'est jamais déclenché par B.
-     */
     _clickBack() {
         if (!this._menuEl) return;
         const root       = this._findDeepestVisibleContainer(this._menuEl);

@@ -23,6 +23,9 @@ export class BossEnemy3 {
         this._obs = scene.onBeforeRenderObservable.add(() => this._update());
     }
 
+    /**
+     * @param {BABYLON.Vector3} position
+     */
     _buildMesh(position) {
         const uid = Math.random().toString(36).slice(2);
         const mat = new BABYLON.StandardMaterial(`bruteMat_${uid}`, this.scene);
@@ -68,6 +71,9 @@ export class BossEnemy3 {
         this._transAura.colorDead = new BABYLON.Color4(0,0.6,0.1,0); this._transAura.stop();
     }
 
+    /**
+     * @param {Color4} c4
+     */
     _setAuraColor(c4) {
         const c2 = c4.clone(); c2.a *= 0.5;
         this._phaseAura.color1 = c4; this._phaseAura.color2 = c2;
@@ -113,6 +119,9 @@ export class BossEnemy3 {
         this.body.position.y = Math.max(this.body.position.y, this._groundY - 0.1);
     }
 
+    /**
+     * @param {number} nextPhase
+     */
     _enterTransition(nextPhase) {
         this._stateLabel = "transition"; this._invincible = false;
         this._transitionTimer = this._TRANSITION_DUR; this._nextPhase = nextPhase;
@@ -122,6 +131,10 @@ export class BossEnemy3 {
         this.body.position.y = this._groundY;
     }
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updateTransition(dt, playerPos) {
         this._transitionTimer -= dt;
         this.body.position.y = this._groundY + Math.abs(Math.sin(this._t * 10)) * 0.06;
@@ -131,6 +144,9 @@ export class BossEnemy3 {
         if (this._transitionTimer <= 0) this._enterPhase(this._nextPhase);
     }
 
+    /**
+     * @param {number} phaseNum
+     */
     _enterPhase(phaseNum) {
         this._stateLabel = `phase${phaseNum}`; this._phaseIndex = phaseNum; this._invincible = true; this._t = 0;
         if (this.weakPoint && !this.weakPoint.isDisposed()) { this.weakPoint.isVisible = false; this.weakPoint.isPickable = false; }
@@ -153,6 +169,11 @@ export class BossEnemy3 {
         this.player.hud?.showWaveMessage?.(labels[phaseNum] ?? "");
     }
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase1(dt, pos, playerPos) {
         if (this._chargeState === "idle") {
             const dx = playerPos.x-pos.x, dz = playerPos.z-pos.z, d = Math.sqrt(dx*dx+dz*dz);
@@ -199,6 +220,11 @@ export class BossEnemy3 {
         }
     }
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase2(dt, pos, playerPos) {
         this._spinCooldown -= dt;
         if (this._spinTimer > 0) {
@@ -230,6 +256,11 @@ export class BossEnemy3 {
         }
     }
 
+    /**
+     * @param {number} dt
+     * @param {BABYLON.Vector3} pos
+     * @param {BABYLON.Vector3} playerPos
+     */
     _updatePhase3(dt, pos, playerPos) {
         if (this._dashActive) {
             this.body.moveWithCollisions(new BABYLON.Vector3(this._dashDir.x*18*dt, 0, this._dashDir.z*18*dt));
@@ -250,6 +281,9 @@ export class BossEnemy3 {
         }
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     */
     _doStomp(pos) {
         this.body.position.y = this._groundY - 0.35;
         setTimeout(() => { if (!this.body?.isDisposed()) this.body.position.y = this._groundY; }, 100);
@@ -258,6 +292,10 @@ export class BossEnemy3 {
             .forEach(d => this._spawnWave(pos, d));
     }
 
+    /**
+     * @param {Vector3} origin
+     * @param {Vector3} dir
+     */
     _spawnWave(origin, dir) {
         const wave = BABYLON.MeshBuilder.CreateBox("bruteWave", { width:0.6, height:0.4, depth:0.6 }, this.scene);
         wave.position = new BABYLON.Vector3(origin.x, this._groundY-2.3, origin.z); wave.isPickable = false;
@@ -280,6 +318,10 @@ export class BossEnemy3 {
         });
     }
 
+    /**
+     * @param {Vector3} pos
+     * @param {number} radius
+     */
     _spawnShockwave(pos, radius) {
         const ring = BABYLON.MeshBuilder.CreateDisc("bruteShock", { radius:0.2, tessellation:32 }, this.scene);
         ring.position = new BABYLON.Vector3(pos.x, this._groundY-2.3, pos.z);
@@ -299,6 +341,9 @@ export class BossEnemy3 {
         });
     }
 
+    /**
+     * @param {number} amount
+     */
     takeDamage(amount) {
         if (this._dead || this._dying || this._invincible) return;
         if (!this.body || this.body.isDisposed()) return;

@@ -1,15 +1,3 @@
-/**
- * SoundManager
- * ------------
- * Gère uniquement la musique (ambient + boss) et le volume global.
- * Les SFX sont gérés directement avec new Audio() dans chaque classe.
- *
- * Usage :
- *   const sm = new SoundManager();
- *   sm.playMusic("ambient");
- *   sm.playMusic("boss");
- *   sm.setMasterVolume(0.8);
- */
 export class SoundManager {
 
     constructor() {
@@ -17,8 +5,6 @@ export class SoundManager {
         this._currentMusicKey = null;
         this._masterVolume    = 1.0;
         this._musicVolume     = 0.2;
-
-        // Pistes audio natives
         this._musicTracks = {
             ambient: new Audio("sounds/music/music_ambiant.mp3"),
             boss:    new Audio("sounds/music/music_boss.mp3"),
@@ -29,7 +15,6 @@ export class SoundManager {
             a.volume = 0;
         });
 
-        // Déblocage autoplay au premier clic/touche
         const unlock = () => {
             Object.values(this._musicTracks).forEach(a => {
                 a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
@@ -49,7 +34,6 @@ export class SoundManager {
     playMusic(key) {
         if (this._currentMusicKey === key) return;
 
-        // Fade out ancienne piste
         if (this._currentMusic) {
             const old = this._currentMusic;
             this._fadeAudio(old, 0, 1000, () => { old.pause(); old.currentTime = 0; });

@@ -1,29 +1,5 @@
-/**
- * ScoreManager
- * ------------
- * Système de scoring AAA complet.
- *
- * Features :
- *   - Points de base par type d'ennemi (standard, scout, heavy, boss)
- *   - Multiplicateur de combo (jusqu'à ×8)
- *   - Bonus de précision (headshot/weakpoint)
- *   - Streak kill (multi-kill rapide)
- *   - Bonus par phase de boss
- *   - Bonus de fin de vague (rapidité, sans dommage)
- *   - Décroissance du combo si inactif
- *   - Callbacks UI temps réel
- *
- * Usage :
- *   const sm = new ScoreManager(hud);
- *   sm.onKill("scout", { weakpoint: true });
- *   sm.onKill("heavy");
- *   sm.onWaveComplete({ time: 30, damageTaken: 0 });
- *   sm.onBossPhase(2);
- *   sm.onBossKill();
- */
 export class ScoreManager {
 
-    // Points de base par type
     static BASE_POINTS = {
         standard: 100,
         scout:    180,
@@ -31,7 +7,6 @@ export class ScoreManager {
         boss:    5000,
     };
 
-    // Multiplicateurs de combo (par palier)
     static COMBO_THRESHOLDS = [
         { kills: 1,  mult: 1.0, label: ""          },
         { kills: 3,  mult: 1.5, label: "DOUBLE"    },
@@ -43,7 +18,7 @@ export class ScoreManager {
         { kills: 40, mult: 8.0, label: "ARCHON"    },
     ];
 
-    static COMBO_DECAY_TIME = 4.5; // secondes sans kill → combo reset
+    static COMBO_DECAY_TIME = 4.5;
 
     constructor(hud = null) {
         this.hud = hud;
@@ -54,24 +29,21 @@ export class ScoreManager {
         this.weakpointKills  = 0;
         this.wavesCleared    = 0;
         this.roomsCleared    = 0;
-        this.perfectWaves    = 0;   // vagues sans dégâts
-        this.bossPhaseBonus  = 0;   // bonus accumulé durant le boss
+        this.perfectWaves    = 0;
+        this.bossPhaseBonus  = 0;
 
-        // Combo
         this._comboKills      = 0;
         this._comboMult       = 1.0;
         this._comboLabel      = "";
-        this._comboTimer      = 0;  // secondes depuis le dernier kill
+        this._comboTimer      = 0;
         this._comboDecaying   = false;
         this._comboIntervalId = null;
 
-        // Streak (multi-kill < 1s)
         this._streakTimer     = 0;
         this._streakCount     = 0;
         this._lastKillTime    = 0;
-        this._streakThreshold = 1.0; // secondes
+        this._streakThreshold = 1.0;
 
-        // Historique des événements pour l'écran de fin
         this._events = [];
 
         this._startDecayLoop();

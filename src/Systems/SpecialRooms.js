@@ -1,25 +1,11 @@
 import * as BABYLON from "@babylonjs/core";
 
-/**
- * SpecialRooms
- * ------------
- * Gère les 3 types de salles spéciales AAA :
- *
- * 1. WeaponShopRoom  — boutique avec 3 armes au choix (libres, via balises)
- * 2. ChallengeRoom   — défi chronométré, récompense bonus de score
- * 3. ForgeRoom       — station d'amélioration d'arme active
- *
- * Chaque salle expose :
- *   room.activate(player, weaponManager, scoreManager, hud)
- *   room.deactivate()
- */
-
 // ── WeaponShopRoom ────────────────────────────────────────────────────────────
 
 export class WeaponShopRoom {
     /**
      * @param {BABYLON.Scene} scene
-     * @param {BABYLON.Vector3} center  centre de la salle
+     * @param {BABYLON.Vector3} center
      */
     constructor(scene, center) {
         this.scene  = scene;
@@ -48,7 +34,6 @@ export class WeaponShopRoom {
             return;
         }
 
-        // Spawn 3 socles en éventail
         const count   = Math.min(weapons.length, 3);
         const spreadR = 4;
 
@@ -65,6 +50,10 @@ export class WeaponShopRoom {
         hud?.showWaveMessage?.("ARMURERIE — APPROCHEZ D'UN SOCLE POUR RAMASSER");
     }
 
+    /**
+     * @param pos
+     * @param weaponInfo
+     */
     _createPedestal(pos, weaponInfo) {
         // Socle
         const baseMat = new BABYLON.StandardMaterial("pedestalMat", this.scene);
@@ -76,7 +65,6 @@ export class WeaponShopRoom {
         base.material   = baseMat;
         base.isPickable = false;
 
-        // Arme flottante (représentée par une boîte colorée)
         const weapMat = new BABYLON.StandardMaterial("pedestalWeapon", this.scene);
         weapMat.emissiveColor   = BABYLON.Color3.FromHexString(weaponInfo.iconColor ?? "#00ffff");
         weapMat.disableLighting = true;
@@ -88,13 +76,10 @@ export class WeaponShopRoom {
         icon._weaponId  = weaponInfo.id;
         icon.alwaysSelectAsActiveMesh = true;
 
-        // Anneau de particules
         this._createPickupAura(pos, weapMat.emissiveColor);
 
-        // Label 3D (via plane + DynamicTexture)
         this._createLabel(pos, weaponInfo);
 
-        // Hover
         let t = 0;
         const obs = this.scene.onBeforeRenderObservable.add(() => {
             if (icon.isDisposed()) { this.scene.onBeforeRenderObservable.remove(obs); return; }
@@ -103,11 +88,9 @@ export class WeaponShopRoom {
             icon.rotation.y += 0.012;
         });
 
-        // Zone de ramassage (proximity)
         const pedestal = { base, icon, weaponInfo, obs, picked: false };
         this._pedestals.push(pedestal);
 
-        // Boucle de proximité
         const trigObs = this.scene.onBeforeRenderObservable.add(() => {
             if (pedestal.picked || icon.isDisposed() || !this._player?.camera) { this.scene.onBeforeRenderObservable.remove(trigObs); return; }
             const d = BABYLON.Vector3.Distance(this._player.camera.globalPosition, icon.position);
@@ -119,6 +102,10 @@ export class WeaponShopRoom {
         });
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     * @param {Color3} color
+     */
     _createPickupAura(pos, color) {
         const aura = new BABYLON.ParticleSystem("shopAura", 30, this.scene);
         aura.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
@@ -144,6 +131,10 @@ export class WeaponShopRoom {
         return aura;
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     * @param {string} weaponInfo
+     */
     _createLabel(pos, weaponInfo) {
         const plane = BABYLON.MeshBuilder.CreatePlane("shopLabel", { width: 2.2, height: 0.55 }, this.scene);
         plane.position   = new BABYLON.Vector3(pos.x, 0.7, pos.z);
@@ -173,13 +164,15 @@ export class WeaponShopRoom {
         plane.material = mat;
     }
 
+    /**
+     * @param {{base: Mesh, icon: Mesh, weaponInfo: *, obs: Observer<Scene>, picked: boolean}} pedestal
+     */
     _pickupWeapon(weaponInfo, pedestal) {
         if (this._sm.getSummary().totalScore < weaponInfo.cost) return;
         this._wm?.give?.(weaponInfo.id);
         this._hud?.showWaveMessage?.(`ARMEMENT : ${weaponInfo.name}`);
         this._sm.onShop(weaponInfo.cost);
 
-        // Dispose socle
         setTimeout(() => {
             try { if (!pedestal.base.isDisposed()) pedestal.base.dispose(); } catch(_) {}
             try { if (!pedestal.icon.isDisposed()) pedestal.icon.dispose(); } catch(_) {}
@@ -323,6 +316,10 @@ export class ForgeRoom {
         ],
     };
 
+    /**
+     * @param {null} weaponManager
+     * @param {null} scoreManager
+     */
     activate(player, weaponManager, scoreManager, hud) {
         if (this._used) { hud?.showWaveMessage?.("FORGE — DÉJÀ UTILISÉE"); return; }
 
@@ -340,6 +337,10 @@ export class ForgeRoom {
         this._spawnTerminals(upgrades, active);
     }
 
+    /**
+     * @param {*|[{id: string, name: string, desc: string, apply: function(*): void}]} upgrades
+     * @param {*} activeWeapon
+     */
     _spawnTerminals(upgrades, activeWeapon) {
         upgrades.forEach((upg, i) => {
             const angle = ((i / (upgrades.length - 1 || 1)) - 0.5) * Math.PI * 0.7;
@@ -350,7 +351,6 @@ export class ForgeRoom {
                 this.center.z + Math.sin(angle + Math.PI * 0.5) * r,
             );
 
-            // Socle forge
             const mat = new BABYLON.StandardMaterial("forgeMat", this.scene);
             mat.diffuseColor  = new BABYLON.Color3(0.3, 0.15, 0);
             mat.emissiveColor = new BABYLON.Color3(0.8, 0.4, 0);
@@ -360,7 +360,6 @@ export class ForgeRoom {
             base.material = mat;
             base.isPickable = false;
 
-            // Hologramme de l'upgrade
             const holo = BABYLON.MeshBuilder.CreateBox(`forgeHolo_${i}`, { width: 0.4, height: 0.4, depth: 0.4 }, this.scene);
             holo.position   = new BABYLON.Vector3(pos.x, 1.0, pos.z);
             holo.isPickable = true;
@@ -371,7 +370,6 @@ export class ForgeRoom {
             holoMat.wireframe       = true;
             holo.material = holoMat;
 
-            // Label
             this._createForgeLabel(pos, upg);
 
             let t = 0;
@@ -382,7 +380,6 @@ export class ForgeRoom {
                 holo.position.y  = 1.0 + Math.sin(t * 2.5) * 0.1;
             });
 
-            // Proximity pick
             const trigObs = this.scene.onBeforeRenderObservable.add(() => {
                 if (this._used || holo.isDisposed() || !this._player?.camera) {
                     this.scene.onBeforeRenderObservable.remove(trigObs); return;
@@ -395,7 +392,6 @@ export class ForgeRoom {
                     this._hud?.showPointsPopup?.(0, { label: upg.name });
                     this.scene.onBeforeRenderObservable.remove(trigObs);
 
-                    // Dispose tous les terminaux
                     this._terminals.forEach(t => {
                         try { if (!t.base.isDisposed()) t.base.dispose(); } catch(_) {}
                         try { if (!t.holo.isDisposed()) t.holo.dispose(); } catch(_) {}
@@ -407,6 +403,10 @@ export class ForgeRoom {
         });
     }
 
+    /**
+     * @param {Vector3} pos
+     * @param {T} upg
+     */
     _createForgeLabel(pos, upg) {
         const plane = BABYLON.MeshBuilder.CreatePlane("forgeLabel", { width: 2.0, height: 0.5 }, this.scene);
         plane.position      = new BABYLON.Vector3(pos.x, 0.6, pos.z);

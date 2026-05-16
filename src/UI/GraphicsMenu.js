@@ -1,15 +1,3 @@
-/**
- * GraphicsMenu
- * ------------
- * Panneau "GRAPHISMES" AAA réutilisable — MainMenu + PauseMenu.
- *
- * Comportement :
- *   - À l'ouverture, snapshot des params courants.
- *   - Sliders/toggles modifient la pipeline EN LIVE (prévisualisation).
- *   - "APPLIQUER" valide et ferme.
- *   - "ANNULER"   restaure le snapshot et ferme.
- *   - "RESET"     repasse sur le preset "high" (reste ouvert).
- */
 export class GraphicsMenu {
     constructor(lightingManager) {
         this.lm = lightingManager;
@@ -17,7 +5,6 @@ export class GraphicsMenu {
     }
 
     buildPanel(onBack) {
-        // Snapshot au moment de l'ouverture
         this._snapshot = this.lm ? { ...this.lm.getGraphicsParams() } : null;
 
         const panel = document.createElement("div");
@@ -43,19 +30,16 @@ export class GraphicsMenu {
         this._buildPresetRow(panel.querySelector("#gfxPresetRow"));
         this._buildControls(panel.querySelector("#gfxScroll"));
 
-        // APPLIQUER — valide et ferme
         panel.querySelector("#gfxApply").onclick = () => {
             this._snapshot = null;
             onBack();
         };
 
-        // ANNULER — restaure le snapshot et ferme
         panel.querySelector("#gfxBack").onclick = () => {
             this._rollback();
             onBack();
         };
 
-        // RESET — remet preset "high" et reste ouvert
         panel.querySelector("#gfxReset").onclick = () => {
             this.lm?.applyGraphicsPreset?.("low");
             this._refresh(panel);
@@ -66,8 +50,6 @@ export class GraphicsMenu {
 
     _rollback() {
         if (!this._snapshot || !this.lm) return;
-        // Restaurer directement le dictionnaire interne puis tout appliquer d'un coup
-        // (évite le bug où certaines clés ne sont pas couvertes par _applyParam)
         this.lm._params = { ...this._snapshot };
         this.lm._currentPreset = "custom";
         this.lm._applyAllParams();

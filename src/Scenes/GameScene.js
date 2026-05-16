@@ -35,7 +35,7 @@ export class GameScene {
         });
         this.engine.setHardwareScalingLevel(2);
         this._loadingScreen = null;
-        // upgradeManager est instancié après la création du player dans _generateMap
+
         this.upgradeManager = null;
         this.minimap = null;
 
@@ -60,6 +60,10 @@ export class GameScene {
         window.addEventListener("resize", () => this.engine.resize());
     }
 
+    /**
+     * @param canvas
+     * @return {Promise<Scene>}
+     */
     async _createScene(canvas) {
         const scene = new BABYLON.Scene(this.engine);
 
@@ -68,17 +72,13 @@ export class GameScene {
         scene.skipPointerMovePicking = true;
         scene.pointerMovePredicate   = () => false;
 
-        // ── Ambiance de base : sombre, le LightingManager prend le relais ──────
-        // On garde une hémisphérique minimaliste en fallback avant l'init du LM
         const fallback = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
         fallback.intensity = 0.15;
         scene.imageProcessingConfiguration.toneMappingEnabled = false;
 
-        // ── Couleur de fond scène (évite le blanc par défaut) ─────────────────
         scene.clearColor = new BABYLON.Color4(0.02, 0.02, 0.05, 1);
         scene.ambientColor = new BABYLON.Color3(0.02, 0.02, 0.04);
 
-        // ── Brouillard linéaire léger pour la profondeur ──────────────────────
         scene.fogMode    = BABYLON.Scene.FOGMODE_LINEAR;
         scene.fogColor   = new BABYLON.Color3(0.02, 0.02, 0.06);
         scene.fogStart   = 30;
@@ -92,8 +92,6 @@ export class GameScene {
 
         return scene;
     }
-
-    // ── Écran de chargement ──────────────────────────────────────────────────
 
     _createLoadingScreen() {
         const overlay = document.createElement("div");
@@ -121,6 +119,10 @@ export class GameScene {
         this._loadingScreen = overlay;
     }
 
+    /**
+     * @param {string|number} roomType
+     * @param {number} roomIdx
+     */
     async _showLoading(roomType, roomIdx) {
         const overlay = this._loadingScreen;
         if (!overlay) return;
@@ -153,8 +155,10 @@ export class GameScene {
         setTimeout(() => { overlay.style.opacity = "0"; }, 300);
     }
 
-    // ── Calcul des positions de portes ───────────────────────────────────────
-
+    /**
+     * @param {*} tile
+     * @param {string} side
+     */
     _doorInfoFromTile(room, tile, side) {
         const T = 4;
         const tx = (tile.x + 0.5) * T;
@@ -168,6 +172,11 @@ export class GameScene {
         }
     }
 
+    /**
+     * @param room
+     * @param {*} tile
+     * @return {null|string}
+     */
     _sideOf(room, tile) {
         if (tile.z === room.worldZ - 1         && tile.x >= room.worldX && tile.x < room.worldX + room.cols) return "N";
         if (tile.z === room.worldZ + room.rows  && tile.x >= room.worldX && tile.x < room.worldX + room.cols) return "S";
@@ -176,8 +185,11 @@ export class GameScene {
         return null;
     }
 
-    // ── Génération ───────────────────────────────────────────────────────────
-
+    /**
+     * @param scene
+     * @param canvas
+     * @return {Promise<void>}
+     */
     async _generateMap(scene, canvas) {
         const seed = Math.floor(Date.now() / 1000);
 
@@ -187,7 +199,6 @@ export class GameScene {
             assetBase: "assets/models/",
         });
 
-        // ── LightingManager ───────────────────────────────────────────────────
         this.lightingManager = new LightingManager(scene, this.engine);
         this.lightingManager.init();
 
@@ -213,11 +224,9 @@ export class GameScene {
                 if (m._worldMatrix) m.computeWorldMatrix(true);
             });
 
-            // ── Mise à jour lumières pour la nouvelle salle ───────────────
             this.lightingManager.setRoom(room);
             if (this.minimap) this.minimap.onRoomEnter(idx);
 
-            // ── Notifier le WaveManager ───────────────────────────────────
             if (this.waveManager && idx !== 0) {
                 const corridors = this.map.corridors;
                 const cIn  = idx > 0                 ? corridors[idx - 1] : null;
@@ -282,25 +291,20 @@ export class GameScene {
             this.map.spawnPoint.x, 2, this.map.spawnPoint.z,
         );
 
-        // ── UpgradeManager (nécessite this.player) ────────────────────────
         this.upgradeManager = new UpgradeManager(this.player);
         this._setupTabKey();
 
-        // ── Stats pour le Game Over ───────────────────────────────────────
         this.player.getStatsCallback = () => ({
             wavesCleared: this.waveManager ? this.waveManager.currentWave : 0,
             roomsCleared: this.waveManager ? this.waveManager._clearedRooms.size : 0,
         });
 
-        // ── Pipeline post-process sur la caméra joueur ────────────────────
         if (this.lightingManager._pipeline) {
             this.lightingManager._pipeline.addCamera(this.player.camera);
         }
 
-        // ── WaveManager ───────────────────────────────────────────────────
         this.waveManager = new WaveManager(scene, this.player, this.player.hud);
 
-        // Monkey-patch APRÈS instanciation pour capturer les bonnes références
         const _wm = this.waveManager;
         const _lm = this.lightingManager;
  
@@ -323,7 +327,6 @@ export class GameScene {
             if (_lm) _lm.setCombatMode(false);
         };
 
-        // ── Navigation ────────────────────────────────────────────────────
         this.navManager = new NavigationManager(scene);
         await this.navManager.init();
 
@@ -343,16 +346,19 @@ export class GameScene {
         this._finishLoading();
 
         /*scene.debugLayer.show({
-            embedMode: true, // s'affiche dans la page
+            embedMode: true,
         })*/
 
-
-        // Lumières de la salle de spawn (room 0)
         this.lightingManager.setRoom(this.map.rooms[0]);
         this.minimap = new MinimapManager(this.map, this.player, this.waveManager);
         this.minimap.onRoomEnter(0);
     }
 
+    /**
+     *
+     * @param scene
+     * @return {Promise<unknown>}
+     */
     _waitForUpgradeChoice(scene) {
     this.isInUpgrade = true;
     this.map._paused = true;

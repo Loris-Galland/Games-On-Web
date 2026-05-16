@@ -1,16 +1,8 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "./EnemyParticles";
 
-/**
- * SpiderEnemy
- * -----------
- * Araignée murale : se colle sur les murs/plafond, tire un laser hitscan
- * vers le joueur, puis se repositionne instantanément sur une autre surface.
- * Inspiré de la mission Jazz dans Transformers : Fall of Cybertron.
- */
 export class SpiderEnemy {
 
-    // HP total avant mort
     static MAX_HEALTH = 3;
 
     constructor(scene, position, player) {
@@ -19,23 +11,20 @@ export class SpiderEnemy {
 
         this.currentHealth = SpiderEnemy.MAX_HEALTH;
 
-        // ── Timers ────────────────────────────────────────────────────────────
-        this._fireTimer      = 1.5 + Math.random() * 1.0; // délai avant premier tir
-        this._FIRE_INTERVAL  = 2.5;   // secondes entre chaque tir
-        this._laserDuration  = 0.12;  // secondes pendant lesquelles le laser est visible
+        this._fireTimer      = 1.5 + Math.random() * 1.0;
+        this._FIRE_INTERVAL  = 2.5;
+        this._laserDuration  = 0.12;
         this._laserTimer     = 0;
-        this._repositionCd   = 0;     // cooldown après repositionnement
+        this._repositionCd   = 0;
 
-        // ── Surfaces possibles : sol exclu, uniquement murs verticaux + plafond
         this._wallNormals = [
             new BABYLON.Vector3( 1, 0,  0),
             new BABYLON.Vector3(-1, 0,  0),
             new BABYLON.Vector3( 0, 0,  1),
             new BABYLON.Vector3( 0, 0, -1),
-            new BABYLON.Vector3( 0, 1,  0), // plafond uniquement, pas le sol
+            new BABYLON.Vector3( 0, 1,  0),
         ];
 
-        // ── Body (araignée = boîte aplatie) ──────────────────────────────────
         this.body = BABYLON.MeshBuilder.CreateBox("spiderBody", {
             width: 1.4, height: 0.4, depth: 1.4,
         }, scene);
@@ -44,11 +33,10 @@ export class SpiderEnemy {
         this.body.checkCollisions = false;
 
         const mat = new BABYLON.StandardMaterial("spiderMat_" + Math.random().toString(36).slice(2), scene);
-        mat.diffuseColor  = new BABYLON.Color3(0.5, 0.15, 0.0);   // orange foncé visible
+        mat.diffuseColor  = new BABYLON.Color3(0.5, 0.15, 0.0);
         mat.emissiveColor = new BABYLON.Color3(0.3, 0.08, 0.0);
         this.body.material = mat;
 
-        // ── Point faible (noyau central lumineux) — agrandi ──────────────────
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 0.65 }, scene);
         this.weakPoint.parent   = this.body;
         this.weakPoint.position = BABYLON.Vector3.Zero();
@@ -59,7 +47,6 @@ export class SpiderEnemy {
         weakMat.disableLighting = true;
         this.weakPoint.material = weakMat;
 
-        // ── Pattes (8 lignes visuelles) ───────────────────────────────────────
         this._legs = [];
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2;
@@ -73,29 +60,25 @@ export class SpiderEnemy {
             this._legs.push(leg);
         }
 
-        // ── Laser mesh (ligne visible brièvement) ────────────────────────────
         this._laserMesh = null;
 
-        // ── Se positionner immédiatement sur un mur ───────────────────────────
         this._snapToWall(position);
 
-        // ── Boucle principale ─────────────────────────────────────────────────
         this._observer = scene.onBeforeRenderObservable.add(() => this._update());
 
-        // ── Mort ──────────────────────────────────────────────────────────────
         this.body.onDisposeObservable.add(() => {
             scene.onBeforeRenderObservable.remove(this._observer);
             this._laserMesh?.dispose();
             EnemyParticles.death(scene, this.body.position.clone(), new BABYLON.Color3(0, 1, 0.4));
         });
 
-        // takeDamage exposé pour les projectiles du joueur
         this.body._takeDamage    = (dmg) => this._takeDamage(dmg);
         this.weakPoint._takeDamage = (dmg) => this._takeDamage(dmg * 2); // point faible = x2
     }
 
-    // ── Dégâts ───────────────────────────────────────────────────────────────
-
+    /**
+     * @param {number} dmg
+     */
     _takeDamage(dmg = 1) {
         if (this.body.isDisposed()) return;
         this.currentHealth -= dmg;
@@ -111,8 +94,9 @@ export class SpiderEnemy {
         }
     }
 
-    // ── Snap sur un mur par raycast ──────────────────────────────────────────
-
+    /**
+     * @param {Vector3} fromPos
+     */
     _snapToWall(fromPos) {
     const RAY_LEN = 30;
     const candidates = [];
@@ -124,15 +108,15 @@ export class SpiderEnemy {
             m.checkCollisions &&
             m !== this.body &&
             !m.name.startsWith("spider") &&
-            !m.name.startsWith("fRDC") &&   // ← exclure sol
-            !m.name.startsWith("cF_")       // ← exclure sol couloir
+            !m.name.startsWith("fRDC") &&
+            !m.name.startsWith("cF_")
         );
         if (!hit.hit || hit.distance <= 0.3) continue;
 
         const hitNormal = hit.getNormal(true);
         if (!hitNormal) continue;
-        if (hitNormal.y > 0.5)  continue; // c'est le sol
-        if (hitNormal.y < -0.5) continue; // dessous de dalle
+        if (hitNormal.y > 0.5)  continue;
+        if (hitNormal.y < -0.5) continue;
 
         candidates.push({ hit, normal, dist: hit.distance });
     }
@@ -150,21 +134,19 @@ export class SpiderEnemy {
     this._orientToNormal(chosen.normal);
 }
 
+    /**
+     * @param {NodeMaterialConnectionPoint}normal
+     */
     _orientToNormal(normal) {
-        // Aligner l'axe Y du mesh avec la normale du mur
         if (Math.abs(normal.y) > 0.9) {
-            // Plafond ou sol
             this.body.rotation.x = normal.y > 0 ? Math.PI : 0;
             this.body.rotation.z = 0;
         } else {
-            // Mur vertical
             const angle = Math.atan2(normal.x, normal.z);
             this.body.rotation.y = angle;
             this.body.rotation.x = -Math.PI / 2;
         }
     }
-
-    // ── Repositionnement après tir ────────────────────────────────────────────
 
     _reposition() {
         const from = this.body.position.clone();
@@ -176,17 +158,13 @@ export class SpiderEnemy {
             playerPos.y + 1 + Math.random() * 3,
             playerPos.z + Math.sin(angle) * radius,
         );
-
-        // FX départ
         EnemyParticles.death(this.scene, from, new BABYLON.Color3(1, 0.4, 0));
 
-        // Calcul destination réelle avant de bouger
         const tempPos = newFrom.clone();
         this.body.position = tempPos;
         this._snapToWall(tempPos);
         const dest = this.body.position.clone();
 
-        // ── Marqueur de destination visible ~0.5s avant l'apparition ──────────
         const marker = BABYLON.MeshBuilder.CreateSphere("_spiderMarker", { diameter: 0.5 }, this.scene);
         marker.position   = dest.clone();
         marker.isPickable = false;
@@ -196,7 +174,6 @@ export class SpiderEnemy {
         markerMat.alpha = 0.8;
         marker.material = markerMat;
 
-        // Pulsation + disparition
         let t = 0;
         const obs = this.scene.onBeforeRenderObservable.add(() => {
             t += this.scene.getEngine().getDeltaTime() / 1000;
@@ -210,20 +187,16 @@ export class SpiderEnemy {
 
         this._repositionCd = 0.6;
 
-        // FX arrivée
         setTimeout(() => {
             EnemyParticles.death(this.scene, dest, new BABYLON.Color3(1, 0.4, 0));
         }, 500);
     }
-
-    // ── Tir laser hitscan ────────────────────────────────────────────────────
 
     _fireLaser() {
         const from      = this.body.position.clone();
         const playerPos = this.player.camera.globalPosition.clone();
         const dir       = playerPos.subtract(from).normalize();
 
-        // Raycast hitscan
         const ray = new BABYLON.Ray(from, dir, 50);
         const hit = this.scene.pickWithRay(ray, m =>
             m !== this.body && m !== this.weakPoint && m.isPickable &&
@@ -231,8 +204,6 @@ export class SpiderEnemy {
             !m.name.startsWith("weapon") && !m.name.startsWith("drone")
         );
 
-        // Le joueur n'est pas un mesh pickable — on vérifie si le rayon
-        // atteint le joueur avant de toucher un mur
         const distToPlayer = BABYLON.Vector3.Distance(from, playerPos);
         const distToWall   = hit.hit ? hit.distance : 999;
         if (distToPlayer < distToWall && !this.player.isDead) {
@@ -241,7 +212,6 @@ export class SpiderEnemy {
 
         const endPoint = hit.hit ? hit.pickedPoint.clone() : playerPos.clone();
 
-        // ── Visuel laser ──────────────────────────────────────────────────────
         this._laserMesh?.dispose();
 
         const path = [from, endPoint];
@@ -267,17 +237,11 @@ export class SpiderEnemy {
         setTimeout(() => this._reposition(), 150);
     }
 
-    // ── Update ───────────────────────────────────────────────────────────────
-
     _update() {
         if (this.body.isDisposed() || !this.player?.camera) return;
 
         const dt = this.scene.getEngine().getDeltaTime() / 1000;
 
-        // Pas de rotation vers le joueur — le body reste fixe collé au mur
-        // pour éviter de traverser la géométrie
-
-        // Laser visible
         if (this._laserTimer > 0) {
             this._laserTimer -= dt;
             if (this._laserTimer <= 0) {
@@ -291,13 +255,11 @@ export class SpiderEnemy {
             }
         }
 
-        // Cooldown repositionnement
         if (this._repositionCd > 0) {
             this._repositionCd -= dt;
             return;
         }
 
-        // Timer de tir
         this._fireTimer -= dt;
         if (this._fireTimer <= 0) {
             this._fireTimer = this._FIRE_INTERVAL + Math.random() * 0.5;
@@ -305,7 +267,6 @@ export class SpiderEnemy {
         }
     }
 
-    // ── Dispose ──────────────────────────────────────────────────────────────
 
     dispose() {
         this._laserMesh?.dispose();

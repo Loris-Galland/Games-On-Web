@@ -1,13 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "../Enemies/EnemyParticles";
 
-/**
- * QuantumSniper (corrigé)
- * -----------------------
- * Fix résidus visuels : scope + barrel sont désormais listés dans _allMeshParts
- * et masqués/détruits de façon atomique via setVisible() / destroy().
- * Le laser est aussi nettoyé proprement à chaque switch.
- */
 export class QuantumSniper {
     constructor(player) {
         this.player = player;
@@ -29,7 +22,6 @@ export class QuantumSniper {
         this._reloadTimer = null;
         this._fovInterval = null;
 
-        // Toutes les pièces visuelles — hide/show/dispose groupés
         this._allMeshParts = [];
         this._laserMesh    = null;
         this._laserObs     = null;
@@ -45,7 +37,6 @@ export class QuantumSniper {
     _buildMesh() {
         const uid = Math.random().toString(36).slice(2);
 
-        // Corps
         const mat = new BABYLON.StandardMaterial(`snpMat_${uid}`, this.scene);
         mat.diffuseColor  = new BABYLON.Color3(0.05, 0.15, 0.3);
         mat.emissiveColor = new BABYLON.Color3(0, 0.3, 0.6);
@@ -57,7 +48,6 @@ export class QuantumSniper {
         this.mesh.layerMask = 0x10000000;
         this._allMeshParts.push(this.mesh);
 
-        // Scope — parented au corps, donc suit automatiquement
         const scopeMat = new BABYLON.StandardMaterial(`scopeMat_${uid}`, this.scene);
         scopeMat.diffuseColor  = new BABYLON.Color3(0, 0.5, 1);
         scopeMat.emissiveColor = new BABYLON.Color3(0, 0.8, 1);
@@ -70,7 +60,6 @@ export class QuantumSniper {
         this.scope.layerMask  = 0x10000000;
         this._allMeshParts.push(this.scope);
 
-        // Canon
         const barrelMat = new BABYLON.StandardMaterial(`snpBarrelMat_${uid}`, this.scene);
         barrelMat.diffuseColor  = new BABYLON.Color3(0.02, 0.08, 0.18);
         barrelMat.emissiveColor = new BABYLON.Color3(0, 0.2, 0.5);
@@ -244,7 +233,6 @@ export class QuantumSniper {
         this.cancelZoom();
         this._killLaser();
 
-        // Détacher les enfants avant dispose du parent pour éviter double-dispose
         if (this.barrelMesh && !this.barrelMesh.isDisposed()) {
             this.barrelMesh.parent = null;
             this.barrelMesh.dispose();

@@ -1,24 +1,8 @@
-/**
- * PlayerHUD
- * ---------
- * Disposition :
- *   - Score + Combo     : haut CENTRE
- *   - Messages vague    : haut GAUCHE
- *   - Boss bar          : bas CENTRE
- *   - Health            : bas GAUCHE
- *   - Ammo + slots      : bas DROITE
- *   - Challenge timer   : haut DROITE
- *   - Ability cooldowns : bas CENTRE (au-dessus de la boss bar)
- */
 export class PlayerHUD {
   constructor(maxHealth) {
     this.maxHealth = maxHealth;
     this._createHUD();
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CRÉATION
-  // ═══════════════════════════════════════════════════════════════════════════
 
   _createHUD() {
     // ── Health (bas gauche) ───────────────────────────────────────────────
@@ -364,10 +348,6 @@ export class PlayerHUD {
         color:rgba(255,170,0,0.6);margin-top:2px;">0 / 0</div>`;
     document.body.appendChild(this._challengeEl);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MISES À JOUR
-  // ═══════════════════════════════════════════════════════════════════════════
 
   updateHealth(currentHealth) {
     for (let i = 0; i < this.segments.length; i++) {

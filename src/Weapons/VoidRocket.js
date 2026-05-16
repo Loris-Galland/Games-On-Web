@@ -1,32 +1,20 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "../Enemies/EnemyParticles";
 
-/**
- * VoidRocket
- * ----------
- * Lance-roquettes à projectiles lents, explosion de zone (AoE).
- * Détruit tous les ennemis dans un rayon. Danger de splash self.
- *
- * Usage :
- *   const rl = new VoidRocket(player);
- *   rl.fire();
- *   rl.destroy();
- */
 export class VoidRocket {
     /** @param {import('../Player/Player').Player} player */
     constructor(player) {
         this.player = player;
         this.scene  = player.scene;
 
-        // Stats
         this.fireRate       = 1400;
         this.projectileSpeed = 18;
         this.explosionRadius = 5.5;
-        this.projectileLife  = 3500; // ms
+        this.projectileLife  = 3500;
         this.ammoMax        = 1;
         this.currentAmmo    = 1;
         this.reloadTime     = 2800;
-        this.selfDamageMin  = 1.5;   // distance mini safe
+        this.selfDamageMin  = 1.5;
 
         this.lastFireTime  = 0;
         this._reloading    = false;
@@ -48,7 +36,6 @@ export class VoidRocket {
         this.mesh.position  = new BABYLON.Vector3(0.4, -0.4, 1.0);
         this.mesh.layerMask = 0x10000000;
 
-        // Tube lanceur
         const tubeMat = new BABYLON.StandardMaterial("rlTubeMat", this.scene);
         tubeMat.diffuseColor  = new BABYLON.Color3(0.12, 0.02, 0.18);
         tubeMat.emissiveColor = new BABYLON.Color3(0.3, 0, 0.5);
@@ -60,7 +47,6 @@ export class VoidRocket {
         this.tube.rotation.x = Math.PI / 2;
         this.tube.layerMask  = 0x10000000;
 
-        // Indicateur de charge (sphère à l'avant)
         const chargeMat = new BABYLON.StandardMaterial("rlChargeMat", this.scene);
         chargeMat.emissiveColor   = new BABYLON.Color3(0.8, 0, 1);
         chargeMat.disableLighting = true;
@@ -102,7 +88,6 @@ export class VoidRocket {
     }
 
     _spawnRocket(pos, dir) {
-        // Mesh roquette
         const rocketMesh = BABYLON.MeshBuilder.CreateCylinder("rocket", { diameter: 0.12, height: 0.45, tessellation: 8 }, this.scene);
         rocketMesh.position = pos;
         rocketMesh.isPickable = false;
@@ -113,7 +98,6 @@ export class VoidRocket {
         rMat.disableLighting = true;
         rocketMesh.material = rMat;
 
-        // Orient
         rocketMesh.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionRH(dir, BABYLON.Vector3.Up());
         rocketMesh.rotate(BABYLON.Axis.X, Math.PI / 2, BABYLON.Space.LOCAL);
 
@@ -124,7 +108,6 @@ export class VoidRocket {
         const lifeTime  = this.projectileLife;
         let   exploded  = false;
 
-        // Trainée de particules
         const emitter = rocketMesh;
         const trail = new BABYLON.ParticleSystem("rocketTrail", 60, scene);
         trail.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", scene);
@@ -153,10 +136,8 @@ export class VoidRocket {
             exploded = true;
             trail.stop();
 
-            // Explosion visuelle
             this._spawnExplosion(impactPos);
 
-            // AoE dommages : dispose tous les ennemis dans le rayon
             const meshesToKill = [];
             scene.meshes.forEach(m => {
                 if (!m || m.isDisposed()) return;
@@ -164,14 +145,12 @@ export class VoidRocket {
                     const dist = BABYLON.Vector3.Distance(m.position, impactPos);
                     if (dist <= radius) meshesToKill.push(m);
                 }
-                // Boss
                 if (m._isBossBody && BABYLON.Vector3.Distance(m.position, impactPos) <= radius) {
                     m._takeDamage?.(35);
                 }
             });
             meshesToKill.forEach(m => { if (!m.isDisposed()) m.dispose(); });
 
-            // Splash self-damage si joueur trop proche
             const playerDist = BABYLON.Vector3.Distance(this.player.camera.globalPosition, impactPos);
             if (playerDist < this.selfDamageMin && this.player.health && !this.player.isDead) {
                 this.player.health.takeDamage(1);
@@ -206,7 +185,6 @@ export class VoidRocket {
     }
 
     _spawnExplosion(pos) {
-        // Burst principal
         const emitter = BABYLON.MeshBuilder.CreateBox("_expEmitter", { size: 0.01 }, this.scene);
         emitter.position   = pos.clone();
         emitter.isVisible  = false;
@@ -237,7 +215,6 @@ export class VoidRocket {
         burst.updateSpeed     = 0.02;
         burst.start();
 
-        // Shockwave ring (plane qui s'étend)
         this._spawnShockwave(pos);
 
         setTimeout(() => {

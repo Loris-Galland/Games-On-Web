@@ -108,7 +108,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         // ── Hook WaveManager pour ScoreManager + WeaponManager ────────────────
-        // On observe la création du WaveManager (créé dans _generateMap après le player)
         const injectManagers = () => {
             if (!game.waveManager) return;
             game.waveManager.scoreManager  = scoreManager;
@@ -116,7 +115,6 @@ window.addEventListener('DOMContentLoaded', () => {
             game.waveManager.soundManager  = soundManager;
         };
         injectManagers();
-        // Au cas où le WaveManager n'est pas encore prêt
         const injectInterval = setInterval(() => {
             if (game.waveManager?.scoreManager !== scoreManager) {
                 injectManagers();
@@ -136,10 +134,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const crosshair = document.createElement("div");
         crosshair.id = "crosshair";
         document.body.appendChild(crosshair);
-
-        // NOTE: Le tir des armes secondaires est géré directement dans WeaponManager._initInputs
-        // via scene.onPointerDown. PlayerShoot utilise scene.onPointerObservable pour le dagger
-        // afin d'éviter tout conflit.
 
         // ── Toggle pause ──────────────────────────────────────────────────────
         function togglePause() {

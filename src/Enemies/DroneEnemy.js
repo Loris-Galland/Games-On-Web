@@ -18,7 +18,6 @@ export class DroneEnemy {
 
         this.currentHealth = DroneEnemy.MAX_HEALTH;
 
-        // ── Timers / comportement ─────────────────────────────────────────────
         this._fireTimer     = 1.0 + Math.random() * 1.5;
         this._FIRE_INTERVAL = 3.0;
         this._orbitAngle    = Math.random() * Math.PI * 2;
@@ -26,7 +25,6 @@ export class DroneEnemy {
         this._orbitSpeed    = 0.4 + Math.random() * 0.3;
         this._bobTimer      = Math.random() * Math.PI * 2;
 
-        // ── Body (drone = octaèdre aplati) ────────────────────────────────────
         this.body = BABYLON.MeshBuilder.CreateBox("droneBody", {
             width: 0.8, height: 0.25, depth: 0.8,
         }, scene);
@@ -40,7 +38,6 @@ export class DroneEnemy {
         mat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.3);
         this.body.material = mat;
 
-        // ── Rotors (4 petits cubes aux coins) ────────────────────────────────
         this._rotors = [];
         const rotorOffsets = [
             new BABYLON.Vector3( 0.5, 0,  0.5),
@@ -58,7 +55,6 @@ export class DroneEnemy {
             this._rotors.push(rotor);
         }
 
-        // ── Point faible (core lumineux en dessous) — agrandi ────────────────
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere("weakPoint", { diameter: 0.65 }, scene);
         this.weakPoint.parent    = this.body;
         this.weakPoint.position  = new BABYLON.Vector3(0, -0.2, 0);
@@ -69,29 +65,27 @@ export class DroneEnemy {
         weakMat.disableLighting = true;
         this.weakPoint.material = weakMat;
 
-        // ── Lumière de position ───────────────────────────────────────────────
         this._light = new BABYLON.PointLight("droneLight_" + Math.random(), this.body.position.clone(), scene);
         this._light.diffuse   = new BABYLON.Color3(0.2, 0.4, 1);
         this._light.intensity = 0.4;
         this._light.range     = 4;
 
-        // ── Boucle principale ─────────────────────────────────────────────────
         this._observer = scene.onBeforeRenderObservable.add(() => this._update());
 
-        // ── Mort ──────────────────────────────────────────────────────────────
         this.body.onDisposeObservable.add(() => {
             scene.onBeforeRenderObservable.remove(this._observer);
             this._light.dispose();
             EnemyParticles.death(scene, this.body.position.clone(), new BABYLON.Color3(0.2, 0.4, 1));
         });
 
-        // takeDamage
         this.body._takeDamage      = (dmg) => this._takeDamage(dmg);
         this.weakPoint._takeDamage = (dmg) => this._takeDamage(dmg * 2);
     }
 
-    // ── Dégâts ───────────────────────────────────────────────────────────────
 
+    /**
+     * @param {number} dmg
+     */
     _takeDamage(dmg = 1) {
         if (this.body.isDisposed()) return;
         this.currentHealth -= dmg;
@@ -106,8 +100,6 @@ export class DroneEnemy {
             this.body.dispose();
         }
     }
-
-    // ── Tir projectile ────────────────────────────────────────────────────────
 
     _fireProjectile() {
     const from      = this.body.position.clone();
@@ -137,7 +129,6 @@ export class DroneEnemy {
 
         const dt = this.scene.getEngine().getDeltaTime() / 1000;
 
-        // Vérifier si le joueur est touché — comparer distance joueur vs distance mur
         const camPos       = this.player.camera.globalPosition;
         const distToPlayer = BABYLON.Vector3.Distance(proj.position, camPos);
 
@@ -150,7 +141,6 @@ export class DroneEnemy {
             return;
         }
 
-        // Raycast contre les murs uniquement
         const ray = new BABYLON.Ray(proj.position.clone(), dir, SPEED * dt * 1.5);
         const hit = this.scene.pickWithRay(ray, m =>
             m.isPickable && m !== proj && !m.name.startsWith("drone") &&
@@ -181,15 +171,12 @@ export class DroneEnemy {
     });
 }
 
-    // ── Update ───────────────────────────────────────────────────────────────
-
     _update() {
         if (this.body.isDisposed() || !this.player?.camera) return;
 
         const dt        = this.scene.getEngine().getDeltaTime() / 1000;
         const playerPos = this.player.camera.globalPosition;
 
-        // ── Orbite autour du joueur ───────────────────────────────────────────
         this._orbitAngle += this._orbitSpeed * dt;
         this._bobTimer   += dt * 1.5;
 
@@ -197,20 +184,16 @@ export class DroneEnemy {
         const targetZ = playerPos.z + Math.sin(this._orbitAngle) * this._orbitRadius;
         const targetY = DroneEnemy.FLOAT_HEIGHT + Math.sin(this._bobTimer) * 0.3;
 
-        // Déplacement avec collisions pour ne pas traverser les murs
         const desired = new BABYLON.Vector3(targetX, targetY, targetZ);
         const delta   = desired.subtract(this.body.position).scale(0.04);
         this.body.moveWithCollisions(delta);
 
-        // Mettre à jour la lumière
         this._light.position.copyFrom(this.body.position);
 
-        // Rotation rotors
         this._rotors.forEach((r, i) => {
             r.rotation.y += (i % 2 === 0 ? 1 : -1) * 8 * dt;
         });
 
-        // Faire face au joueur
         const toPlayer = playerPos.subtract(this.body.position);
         toPlayer.y = 0;
         if (toPlayer.length() > 0.1) {
@@ -218,18 +201,14 @@ export class DroneEnemy {
             this.body.rotation.y = BABYLON.Scalar.Lerp(this.body.rotation.y, angle, 0.08);
         }
 
-        // Pulsation lumière
         this._light.intensity = 0.3 + Math.sin(this._bobTimer * 3) * 0.1;
 
-        // ── Tir ───────────────────────────────────────────────────────────────
         this._fireTimer -= dt;
         if (this._fireTimer <= 0) {
             this._fireTimer = this._FIRE_INTERVAL + Math.random() * 0.5;
             this._fireProjectile();
         }
     }
-
-    // ── Dispose ──────────────────────────────────────────────────────────────
 
     dispose() {
         this._light?.dispose();

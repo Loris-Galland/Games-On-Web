@@ -1,9 +1,3 @@
-/**
- * PauseMenu
- * ---------
- * Reçoit les instances partagées de GraphicsMenu et KeybindingsMenu
- * pour garantir que l'état est synchronisé avec le MainMenu.
- */
 export class PauseMenu {
     /**
      * @param {function}        onResumeCallback

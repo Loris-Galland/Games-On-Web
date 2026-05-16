@@ -1,14 +1,3 @@
-/**
- * GameOverScreen (version enrichie)
- * -----------------------------------
- * Affiche un bilan complet avec :
- *   - Score total + grade (S/A/B/C/D)
- *   - Kills par type d'ennemi
- *   - Précision weakpoint
- *   - Perfect waves
- *   - Bonus boss
- *   - Classement ASCII
- */
 export class GameOverScreen {
 
     constructor() {
@@ -48,12 +37,10 @@ export class GameOverScreen {
         this._overlay.innerHTML = `
             <div class="go-scanline"></div>
             <div class="go-content" style="max-width:800px;">
-
-                <!-- Titre glitch -->
+            
                 <div class="go-glitch" data-text="SYSTEM FAILURE">SYSTEM FAILURE</div>
                 <div class="go-subtitle">INTEGRITY COMPROMISED — UNIT TERMINATED</div>
 
-                <!-- Grade -->
                 <div style="
                     font-family:'Courier New',monospace;
                     font-size:96px;font-weight:bold;
@@ -69,7 +56,6 @@ export class GameOverScreen {
                     PERFORMANCE RATING
                 </div>
 
-                <!-- Score principal -->
                 <div style="
                     font-family:'Courier New',monospace;
                     font-size:42px;font-weight:bold;letter-spacing:6px;
@@ -82,7 +68,6 @@ export class GameOverScreen {
                     TOTAL SCORE
                 </div>
 
-                <!-- Stats grille -->
                 <div style="
                     display:grid;grid-template-columns:repeat(3,1fr);
                     gap:12px;width:100%;max-width:640px;margin-bottom:24px;">
@@ -95,7 +80,6 @@ export class GameOverScreen {
                     ${this._statCard("WEAKPOINTS", String(wpKills).padStart(3,"0"), "#ff88ff")}
                 </div>
 
-                <!-- Kills par type -->
                 ${totalKills > 0 ? `
                 <div style="
                     font-family:'Courier New',monospace;
@@ -114,7 +98,6 @@ export class GameOverScreen {
                     </div>
                 </div>` : ""}
 
-                <!-- Boutons -->
                 <div class="go-buttons">
                     <button class="go-btn go-btn-primary" id="go-retry">
                         ↺ NOUVELLE TENTATIVE

@@ -1,22 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
 
-/**
- * NavigationManager
- * -----------------
- * Encapsule le RecastJSPlugin de Babylon.js pour construire un navmesh
- * à partir des colliders de la salle active, puis piloter les ennemis
- * comme des "crowd agents" Recast (pathfinding + évitement mutuel).
- *
- * Usage :
- *   const nav = new NavigationManager(scene);
- *   await nav.init();                       // charge recast-detour (1 seule fois)
- *   await nav.buildForRoom(colliderMeshes); // construit le navmesh
- *   const agentIdx = nav.addAgent(position, mesh);
- *   nav.setAgentTarget(agentIdx, targetPos);
- *   // dans la boucle : nav.update(dt)
- *   nav.removeAgent(agentIdx);
- *   nav.dispose();
- */
 export class NavigationManager {
     constructor(scene) {
         this.scene   = scene;
@@ -26,10 +9,6 @@ export class NavigationManager {
         this._ready  = false;
         this._debugMesh = null;
     }
-
-    // ── Initialisation (charge Recast via CDN global) ─────────────────────────
-    // Nécessite dans index.html :
-    // <script src="https://cdn.babylonjs.com/recast.js"></script>
 
     async init() {
         try {
@@ -92,8 +71,6 @@ export class NavigationManager {
         };
 
         try {
-            // Bake world transform : les meshes GLB ont leurs vertices en local space,
-            // on crée des meshes temporaires avec les vertices transformés en world space
             const baked = valid.map(m => {
                 const worldMatrix = m.getWorldMatrix();
                 const positions   = m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
@@ -117,11 +94,8 @@ export class NavigationManager {
                 vertexData.applyToMesh(temp);
                 return temp;
             }).filter(Boolean);
-
-            // API synchrone (sans callback) — compatible CDN Recast
             this._plugin.createNavMesh(baked, params);
 
-            // Nettoyer les meshes temporaires
             baked.forEach(m => m.dispose());
 
             this._crowd = this._plugin.createCrowd(30, agentRadius, this.scene);
@@ -184,6 +158,8 @@ export class NavigationManager {
 
     /**
      * Ordonne à l'agent d'aller vers une position.
+     * @param {*} agentIdx
+     * @param {Vector3} targetPos
      */
     setAgentTarget(agentIdx, targetPos) {
         if (!this.isReady || agentIdx === null) return;
@@ -199,6 +175,7 @@ export class NavigationManager {
 
     /**
      * Retourne la vitesse actuelle d'un agent (Vector3).
+     * @param {number} agentIdx
      */
     getAgentVelocity(agentIdx) {
         if (!this.isReady || agentIdx === null) return BABYLON.Vector3.Zero();
@@ -208,6 +185,7 @@ export class NavigationManager {
 
     /**
      * Retourne la position navmesh d'un agent.
+     * @param {number} agentIdx
      */
     getAgentPosition(agentIdx) {
         if (!this.isReady || agentIdx === null) return null;
@@ -217,6 +195,7 @@ export class NavigationManager {
 
     /**
      * Supprime un agent du crowd.
+     * @param {number} agentIdx
      */
     removeAgent(agentIdx) {
         if (!this.isReady || agentIdx === null) return;

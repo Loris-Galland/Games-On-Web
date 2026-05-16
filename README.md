@@ -14,7 +14,7 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 
 ## Jouer en ligne
 
-**[▶ Jouer sur \[URL à venir\]](https://url-itch.io)**
+**[Jouer sur \[URL à venir\]](https://url-itch.io)**
 
 > Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS, jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.
 

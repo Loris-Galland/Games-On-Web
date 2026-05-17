@@ -14,9 +14,10 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 
 ## Jouer en ligne
 
-**[Jouer sur \[URL à venir\]](https://url-itch.io)**
+**[Jouer sur \[itch.io\]](https://gow2026-gal-may.itch.io/games-on-web-2026)**
 
-> Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS, jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.
+> Recommandé : navigateur Chrome ou Firefox à jour, **avec une vraie souris** (le jeu est un FPS, jouer sur trackpad de laptop est possible mais fortement déconseillé pour le confort et la précision). Une manette est prise en charge mais pas obligatoire.<br>
+> **mot de passe : GAMEONWEB2026**
 
 ---
 
@@ -60,7 +61,6 @@ PROJECT // ROGUE s'inscrit pleinement dans le thème **IA** de l'édition 2026 �
 | Reculer | S | S |
 | Strafe gauche | Q | A |
 | Strafe droit | D | D |
-| Sauter | Espace | Espace |
 | Tirer | Clic gauche | Clic gauche |
 | Blink (téléportation) | Clic droit | Clic droit |
 | Dash | Shift | Shift |

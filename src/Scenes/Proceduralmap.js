@@ -27,8 +27,6 @@ function resolveRot(rot, rand) {
     return Math.floor(rand() * 4) * (Math.PI / 2);
 }
 
-// Retourne l'origine (worldX, worldZ en tuiles) et la taille (cols, rows) d'un quadrant
-// dans l'espace global de la salle.
 function quadBounds(room, quad) {
     const hC = Math.floor(room.cols / 2);
     const hR = Math.floor(room.rows / 2);
@@ -67,8 +65,6 @@ export class ProceduralMap {
 
         this._paused = false
     }
-
-    // ── API publique ──────────────────────────────────────────────────────────
 
     async generate() {
         this._buildChain();
@@ -139,22 +135,17 @@ export class ProceduralMap {
         const room = this.rooms[idx];
         const cIn  = idx > 0                     ? this.corridors[idx - 1] : null;
         const cOut = idx < this.corridors.length  ? this.corridors[idx]    : null;
-
-        // Dispose la salle précédente complètement (meshes + matériaux)
         if (this._activeNode && this._activeNode !== this._root) {
             this._activeNode.getChildMeshes(false).forEach(m => {
-                // Ne dispose le matériau QUE sur les meshes procéduraux (pas les GLB)
                 const isProcedural = m.name.match(/^(fRDC_|wN_|wS_|wE_|wW_|wNH_|wSH_|wEH_|wWH_|w2|roof_|f2_)/);
                 if (isProcedural) m.material?.dispose();
-                m.dispose(false, false); // false, false = ne pas disposer matériaux ni textures enfants
+                m.dispose(false, false);
             });
             this._activeNode.dispose();
             this._activeNode = null;
-            // Retirer du cache pour forcer la reconstruction
             this._builtRooms.delete(this._activeIdx);
         }
 
-        // Toujours reconstruire (la salle n'est plus en mémoire)
         const roomNode = new BABYLON.TransformNode(`room_${idx}`, this.scene);
         roomNode.parent = this._root;
         await this._buildRoom(room, cIn, cOut, roomNode);
@@ -270,7 +261,6 @@ export class ProceduralMap {
                 const secondTile = tiles[1] ?? tiles[0];
                 const fx = firstTile.x * T + T / 2;
                 const fz = firstTile.z * T + T / 2;
-                // Direction vers la salle suivante
                 const dx = secondTile.x - firstTile.x;
                 const dz = secondTile.z - firstTile.z;
                 const rotY = dx !== 0 ? (dx > 0 ? Math.PI / 2 : Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
@@ -287,7 +277,6 @@ export class ProceduralMap {
                 arrowPlane.isPickable = false;
                 arrowPlane.parent     = node;
 
-                // Texture dynamique avec flèche
                 const dynTex = new BABYLON.DynamicTexture(`arrowTex_${roomIdx}`, { width: 128, height: 128 }, this.scene, false);
                 const ctx = dynTex.getContext();
                 ctx.clearRect(0, 0, 128, 128);
@@ -309,7 +298,6 @@ export class ProceduralMap {
                 arrowMat.emissiveTexture  = dynTex;
                 arrowMat.opacityTexture   = dynTex;
 
-                // Pulse d'opacité
                 let pulseT = 0;
                 const pulseObs = this.scene.onBeforeRenderObservable.add(() => {
                     if (arrowPlane.isDisposed()) { this.scene.onBeforeRenderObservable.remove(pulseObs); return; }
@@ -370,13 +358,11 @@ export class ProceduralMap {
 
         const ps = [];
 
-        // Sol
         for (let tx = 0; tx < room.cols; tx++)
             for (let tz = 0; tz < room.rows; tz++)
                 ps.push(this._vis(pick(floors, this.rand), new BABYLON.Vector3(ox + tx * T + T / 2, H1, oz + tz * T + T / 2), BABYLON.Vector3.Zero(), parent));
         this._mkCol(`fRDC_${ox}_${oz}`, ox + rW / 2, -0.1, oz + rD / 2, rW, 0.2, rD, parent);
 
-        // Murs N/S
         for (let tx = 0; tx < room.cols; tx++) {
             const wx = ox + tx * T + T / 2, tX = room.worldX + tx;
             const dN = openings.has("N") && ((cIn  && this._at(cIn.tiles,  tX, room.worldZ - 1))        || (cOut && this._at(cOut.tiles, tX, room.worldZ - 1)));
@@ -398,7 +384,7 @@ export class ProceduralMap {
                 ps.push(this._vis(wSet.light, new BABYLON.Vector3(wx, H1, oz + rD ), BABYLON.Vector3.Zero(),             parent));
             }
         }
-        // Murs E/W
+
         for (let tz = 0; tz < room.rows; tz++) {
             const wz = oz + tz * T + T / 2, tZ = room.worldZ + tz;
             const dW = openings.has("W") && ((cIn  && this._at(cIn.tiles,  room.worldX - 1,        tZ)) || (cOut && this._at(cOut.tiles, room.worldX - 1,        tZ)));
@@ -425,7 +411,6 @@ export class ProceduralMap {
             const lay   = pick(LAYOUTS[room.type] ?? LAYOUTS.default, this.rand);
             const qpats = QUAD_PATTERNS[room.type] ?? QUAD_PATTERNS.default;
 
-            // Props floor 1 — un pattern aléatoire par quadrant (sauf rampCorner)
             for (const quad of QUAD_NAMES) {
                 if (quad === lay.rampCorner) continue;
                 const pool = qpats[quad];
@@ -480,10 +465,9 @@ export class ProceduralMap {
         const ps = [];
 
         const fCols = Math.floor(room.cols * 0.4);
-        const fRows = Math.floor(room.rows * 0.35); // identique à l'original — pas de réduction
+        const fRows = Math.floor(room.rows * 0.35);
         const corner = lay.rampCorner ?? "NW";
 
-        // Identique à l'original
         let sCo, sRo;
         if      (corner === "NW") { sCo = 0;                sRo = 0;                }
         else if (corner === "NE") { sCo = room.cols - fCols; sRo = 0;               }
@@ -493,7 +477,6 @@ export class ProceduralMap {
         const eOx = ox + sCo * T, eOz = oz + sRo * T;
         const eW  = fCols * T,    eD  = fRows * T;
 
-        // Dalles balcon
         for (let tx = sCo; tx < sCo + fCols; tx++)
             for (let tz = sRo; tz < sRo + fRows; tz++)
                 ps.push(this._vis(pick(floors, this.rand), new BABYLON.Vector3(ox + tx * T + T / 2, H2, oz + tz * T + T / 2), BABYLON.Vector3.Zero(), parent));
@@ -501,7 +484,6 @@ export class ProceduralMap {
 
         const openSide = (corner === "NW" || corner === "NE") ? "S" : "N";
 
-        // Murs balcon — identiques à l'original
         for (let tx = sCo; tx < sCo + fCols; tx++) {
             const wx = ox + tx * T + T / 2;
             if (openSide !== "N") ps.push(this._vis(wSet.f2, new BABYLON.Vector3(wx, H2, eOz),      new BABYLON.Vector3(0, Math.PI, 0), parent));
@@ -519,10 +501,7 @@ export class ProceduralMap {
         if (openSide !== "E") this._mkCol(`w2E_${oz}`, eOx + eW,      H2 + 1.5, eOz + eD / 2, 0.3, 3, eD,  parent);
 
         // ── Rampes ────────────────────────────────────────────────────────────
-        // scale(1,1,-2) étire 2x vers -Z local depuis le pivot.
-        // Avec scale -1 (original) : pivot à rZ+T*0.5 → s'étend de rZ à rZ+T.
-        // Avec scale -2             : pivot à rZ+T*0.5 → s'étend de rZ-T/2 à rZ+T*1.5.
-        // Correction : décaler pivot de +T/2 → s'étend de rZ à rZ+2T. ✓
+
         if (openSide === "N" || openSide === "S") {
             const rZ    = openSide === "N" ? eOz - T : eOz + eD;
             const rRot  = openSide === "N" ? 0 : Math.PI;
@@ -563,7 +542,6 @@ export class ProceduralMap {
             }
         }
 
-        // Props floor 2
         for (const item of lay.floor2) {
             const px  = eOx + item.ox * eW;
             const pz  = eOz + item.oz * eD;

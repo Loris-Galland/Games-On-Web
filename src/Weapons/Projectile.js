@@ -67,10 +67,8 @@ export class Projectile {
 
         if (meshTouché.name === "weakPoint") {
             if (meshTouché.parent?._isBossBody) {
-                // Boss : appelle takeDamage au lieu de dispose direct
                 meshTouché.parent._takeDamage(1);
             } else if (meshTouché.parent) {
-                // Ennemi standard : dispose le body
                 meshTouché.parent.dispose();
             } else {
                 console.warn(`[Projectile.onHit] weakPoint has no parent!`);
@@ -81,13 +79,11 @@ export class Projectile {
             meshTouché.name === "enemyBodyHeavy" ||
             meshTouché.name === "enemyBodyScout"
         ) {
-            // Impact sur armure : petit splash cyan
             const impactPos = hitResult.pickedPoint ?? this.mesh.position.clone();
             const normal    = hitResult.getNormal(true) ?? BABYLON.Vector3.Up();
             EnemyParticles.projectileImpact(this.scene, impactPos, normal);
 
         } else {
-            // Impact sur le décor (mur, sol, prop...)
             const impactPos = hitResult.pickedPoint ?? this.mesh.position.clone();
             const normal    = hitResult.getNormal(true) ?? BABYLON.Vector3.Up();
             EnemyParticles.projectileImpact(this.scene, impactPos, normal);

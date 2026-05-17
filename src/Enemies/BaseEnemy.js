@@ -1,12 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { EnemyParticles } from "./EnemyParticles";
 
-// ── Compteur global pour distribuer les slots ─────────────────────────────────
-let _enemySpawnCounter = 0;
-
-/** Réinitialise le compteur de slots au début de chaque vague. */
-export function resetSlotCounter() { _enemySpawnCounter = 0; }
-
 /**
  * Les 4 slots d'attaque relatifs à l'orientation du joueur.
  *
@@ -21,18 +15,23 @@ export function resetSlotCounter() { _enemySpawnCounter = 0; }
  *   waypointDist  : distance du waypoint au joueur
  *   waypointDelay : le waypoint est visé tant que l'ennemi ne l'a pas atteint
  */
+
+let _enemySpawnCounter = 0;
+
+export function resetSlotCounter() { _enemySpawnCounter = 0; }
+
 const SLOTS = [
-    // FRONT — droit devant, pas de détour
     { id: "front", attackAngle: 0,           waypointAngle: null,  waypointDist: 0    },
-    // LEFT — attaque par le côté gauche, passe d'abord sur la gauche du joueur
     { id: "left",  attackAngle: Math.PI/2,   waypointAngle: Math.PI,     waypointDist: 10   },
-    // RIGHT — attaque par le côté droit, passe d'abord sur la droite du joueur
     { id: "right", attackAngle: -Math.PI/2,  waypointAngle: -Math.PI,    waypointDist: 10   },
-    // BACK — grand détour, attaque par derrière
     { id: "back",  attackAngle: Math.PI,     waypointAngle: Math.PI*0.6, waypointDist: 16   },
 ];
 
 export class BaseEnemy {
+
+    /**
+     * @param {Scene} scene
+     */
     constructor(scene, position, player, speed, navManager = null) {
         this.scene       = scene;
         this.player      = player;
@@ -54,27 +53,21 @@ export class BaseEnemy {
         this._targetUpdateTimer = 0;
         this._targetInterval    = 0.3;
 
-        // Contact damage
         this._damageCooldown = 1.0;
         this._damageTimer    = 0;
 
-        // Recul
         this._knockbackVel      = BABYLON.Vector3.Zero();
         this._knockbackDuration = 0;
 
-        // ── Slot directionnel ─────────────────────────────────────────────────
         const idx        = _enemySpawnCounter++;
         this._slot       = SLOTS[idx % SLOTS.length];
-        // Phase : "waypoint" → on vise d'abord le waypoint intermédiaire
-        //         "attack"   → on vise le point d'attaque final
-        this._phase      = this._slot.waypointDist > 0 ? "waypoint" : "attack";
-        this._orbitAngle = 0; // dérive lente une fois en position
 
-        // Config de la sous-classe (appelée APRÈS les inits ci-dessus)
+        this._phase      = this._slot.waypointDist > 0 ? "waypoint" : "attack";
+        this._orbitAngle = 0;
+
         const cfg  = this._getConfig();
         this._cfg  = cfg;
 
-        // Body
         this.body = BABYLON.MeshBuilder.CreateBox(
             cfg.bodyName,
             { width: cfg.bodySize.width, height: cfg.bodySize.height, depth: cfg.bodySize.depth },
@@ -90,7 +83,6 @@ export class BaseEnemy {
         bodyMat.diffuseColor = cfg.bodyColor;
         this.body.material   = bodyMat;
 
-        // Point faible
         this.weakPoint = BABYLON.MeshBuilder.CreateSphere(
             "weakPoint",
             { diameter: cfg.weakPointDiam },
@@ -119,6 +111,8 @@ export class BaseEnemy {
             );
         });
     }
+
+    // ── Fonctions utilitaires ─────────────────────────────────────────────────────
 
     _getConfig() {
         throw new Error("BaseEnemy._getConfig() must be implemented by subclass.");
@@ -149,9 +143,10 @@ export class BaseEnemy {
 
     /**
      * Convertit un angle relatif au joueur (0 = devant) en position monde.
-     * @param {BABYLON.Vector3} playerPos  position au sol du joueur
-     * @param {number} relAngle            angle relatif à l'avant du joueur
-     * @param {number} dist                distance au joueur
+     * @param {BABYLON.Vector3} playerPos
+     * @param {*} relAngle
+     * @param {*} dist
+     * @return {BABYLON.Vector3}
      */
     _relativePoint(playerPos, relAngle, dist) {
         const fwd   = this._getPlayerForward();
@@ -167,6 +162,10 @@ export class BaseEnemy {
      * Retourne la cible effective selon la phase courante.
      * - Phase "waypoint" : waypoint intermédiaire forcé par le slot
      * - Phase "attack"   : point d'attaque autour du joueur + légère dérive
+     * @param {BABYLON.Vector3} playerPos
+     * @param {number} distFlat
+     * @param {number} dt
+     * @return {BABYLON.Vector3}
      */
     _getTarget(playerPos, distFlat, dt) {
         const slot = this._slot;
@@ -174,22 +173,17 @@ export class BaseEnemy {
 
         if (this._phase === "waypoint") {
 
-            // Waypoint intermédiaire dans le repère du joueur
             const wp = this._relativePoint(playerPos, slot.waypointAngle, slot.waypointDist);
 
-            // Distance de l'ennemi au waypoint
             const pos    = this.body.position;
             const toWp   = Math.sqrt((pos.x - wp.x)**2 + (pos.z - wp.z)**2);
 
-            // Une fois assez proche du waypoint, on passe en phase attaque
             if (toWp < 3.5) {
                 this._phase = "attack";
             }
             return wp;
         }
 
-        // Phase attaque : point autour du joueur à encircleRadius
-        // Légère dérive angulaire pour que ça ne soit pas figé
         this._orbitAngle += this._cfg.angularDrift * dt;
         const fwd        = this._getPlayerForward();
         const baseAngle  = Math.atan2(fwd.x, fwd.z) + slot.attackAngle + this._orbitAngle;
@@ -244,7 +238,6 @@ export class BaseEnemy {
             return;
         }
 
-        // Calcul de la cible
         const target = this._getTarget(playerPos, distFlat, dt);
 
         // ── Mode Recast crowd ─────────────────────────────────────────────────
@@ -328,6 +321,11 @@ export class BaseEnemy {
 
     // ── Recul sécurisé ────────────────────────────────────────────────────────
 
+    /**
+     * Appliquer le recule
+     * @param {Vector3} pos
+     * @param {Vector3} playerPos
+     */
     _applyKnockback(pos, playerPos) {
         const KNOCKBACK_SPEED    = this.speed * 3.5;
         const KNOCKBACK_DURATION = 0.35;
@@ -367,6 +365,11 @@ export class BaseEnemy {
 
     // ── Helpers de déplacement ────────────────────────────────────────────────
 
+    /**
+     * Contourner le mur
+     * @param {Vector3} pos
+     * @param {*} desiredDir
+     */
     _steerAroundWalls(pos, desiredDir) {
         const origin = pos.add(new BABYLON.Vector3(0, 0.6, 0));
         const rayLen = 2.8;
@@ -392,10 +395,15 @@ export class BaseEnemy {
         return desiredDir;
     }
 
+    /**
+     * Marquer la distance
+     * @param {Vector3} pos
+     * @param {Vector3} desiredDir
+     */
     _applySeparation(pos, desiredDir) {
         const radius = 2.2;
         let push = BABYLON.Vector3.Zero();
-        // On itère uniquement sur les meshes qui ont le bon nom, sans autre vérification coûteuse
+
         for (const mesh of this.scene.meshes) {
             if (mesh === this.body) continue;
             const n = mesh.name;
@@ -419,6 +427,9 @@ export class BaseEnemy {
         return desiredDir;
     }
 
+    /**
+     * @param {Vector3} pos
+     */
     _updateGroundInfo(pos) {
         const halfH  = this._cfg.halfHeight;
         const tryRay = (len) => this.scene.pickWithRay(
@@ -439,11 +450,19 @@ export class BaseEnemy {
         }
     }
 
+    /**
+     * @param {*} v
+     * @param {number} a
+     */
     _rotateY(v, a) {
         const c = Math.cos(a), s = Math.sin(a);
         return new BABYLON.Vector3(v.x * c - v.z * s, 0, v.x * s + v.z * c).normalize();
     }
 
+    /**
+     * @param {Vector3} v
+     * @param {Vector3} n
+     */
     _projectOnPlane(v, n) {
         return v.subtract(n.scale(BABYLON.Vector3.Dot(v, n)));
     }

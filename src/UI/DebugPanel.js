@@ -1,8 +1,3 @@
-/**
- * DebugPanel — src/UI/DebugPanel.js
- * Touche F2 pour ouvrir/fermer.
- * Upgrades affichés triés par rareté : COMMUN → RARE → LÉGENDAIRE
- */
 export class DebugPanel {
     constructor(player, upgradeManager, waveManager, scoreManager) {
         this.player         = player;
@@ -85,14 +80,12 @@ export class DebugPanel {
         const rarityColors = { common: "#aaaaaa", rare: "#00ccff", legendary: "#ffaa00" };
         const rarityLabels = { common: "●", rare: "◆", legendary: "★" };
 
-        // Trier par rareté
         const sorted = [...this.upgradeManager.availableUpgrades].sort((a, b) => {
             const ra = rarityOrder[a.rarity?.id ?? "common"] ?? 0;
             const rb = rarityOrder[b.rarity?.id ?? "common"] ?? 0;
             return ra - rb;
         });
 
-        // Insérer des séparateurs de groupe
         let lastRarity = null;
         sorted.forEach(u => {
             const rid = u.rarity?.id ?? "common";

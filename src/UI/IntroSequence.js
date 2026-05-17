@@ -1,16 +1,3 @@
-/**
- * IntroSequence
- * -------------
- * Séquence d'intro style Undertale — HTML/CSS/JS pur, overlay au-dessus du canvas.
- * Même convention que PlayerHUD / GameOverScreen.
- *
- * Usage :
- *   const intro = new IntroSequence();
- *   intro.play(() => {
- *       // callback quand l'intro est terminée → lancer le jeu
- *   });
- */
-
 // ── Séquence complète ─────────────────────────────────────────────────────────
 
 const INTRO_SEQUENCE = [
@@ -371,7 +358,6 @@ export class IntroSequence {
             overflow: hidden;
         `;
 
-        // Scanlines permanentes
         const scanlines = document.createElement("div");
         scanlines.style.cssText = `
             position: absolute; inset: 0; z-index: 10; pointer-events: none;
@@ -382,7 +368,6 @@ export class IntroSequence {
         `;
         this._overlay.appendChild(scanlines);
 
-        // Compteur de step (discret)
         this._stepCounter = document.createElement("div");
         this._stepCounter.style.cssText = `
             position: absolute; top: 12px; right: 16px; z-index: 20;
@@ -391,14 +376,12 @@ export class IntroSequence {
         `;
         this._overlay.appendChild(this._stepCounter);
 
-        // Zone de contenu (changée à chaque step)
         this._content = document.createElement("div");
         this._content.style.cssText = `
             position: absolute; inset: 0; z-index: 5;
         `;
         this._overlay.appendChild(this._content);
 
-        // Overlay de fade entre steps
         this._fadeEl = document.createElement("div");
         this._fadeEl.style.cssText = `
             position: absolute; inset: 0; z-index: 15;
@@ -465,7 +448,6 @@ export class IntroSequence {
                 position: absolute; inset: 0;
                 display: flex; flex-direction: column;
             ">
-                <!-- Image -->
                 <div style="
                     flex: 1; overflow: hidden; position: relative;
                 ">
@@ -475,13 +457,11 @@ export class IntroSequence {
                     ">
                         ${svgFn()}
                     </div>
-                    <!-- Vignette -->
                     <div style="
                         position: absolute; inset: 0; pointer-events: none;
                         background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%);
                     "></div>
                 </div>
-                <!-- Bande texte -->
                 <div style="
                     background: rgba(0,0,0,0.88);
                     border-top: 1px solid #1a3050;
@@ -647,7 +627,6 @@ export class IntroSequence {
         this._typingSfx.currentTime = 0;
         this._typingSfx.play().catch(() => {});
 
-        // Curseur clignotant
         const cursor = document.createElement("span");
         cursor.style.cssText = `
             display: inline-block;
@@ -675,7 +654,6 @@ export class IntroSequence {
         };
         this._typeTimer = setTimeout(tick, speed);
 
-        // Clic pendant la frappe → skip au texte complet
         this._skipFn = () => {
             if (idx < text.length) {
                 clearTimeout(this._typeTimer);
@@ -715,10 +693,8 @@ export class IntroSequence {
         if (!step || step.type === "blackout") return;
 
         if (!this._canAdvance) {
-            // Texte pas fini → skip
             this._skipFn?.();
         } else {
-            // Texte fini → step suivant
             this._goNext();
         }
     }

@@ -9,7 +9,6 @@ export class Player {
         this.scene  = scene;
         this.canvas = canvas;
 
-        // Sons gameplay
         this._footstepSfx        = new Audio("sounds/sfx/footstep.wav");
         this._footstepSfx.loop   = true;
         this._footstepSfx.volume = 0.3;
@@ -35,7 +34,6 @@ export class Player {
         this.getStatsCallback = null;
         this.onEnemyKilled    = null;
 
-        // ── Caméra ────────────────────────────────────────────────────────────
         this.camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(0, 1.5, 0), this.scene);
         this.camera.attachControl(this.canvas, true);
         this.camera.checkCollisions    = true;
@@ -72,14 +70,10 @@ export class Player {
         this._currentFov = 1.0;
         this.camera.fov  = this._baseFov;
 
-        // ── Saut : on gère nous-mêmes la vélocité verticale ──────────────────
-        // applyGravity reste true pour que la caméra colle au sol normalement.
-        // On injecte la vélocité via camera._localDirection.y chaque frame.
-        this._jumpVelocity = 0;           // vitesse verticale courante (unités/frame)
-        this._JUMP_INIT    = 0.22;        // impulsion initiale
-        this._GRAVITY      = 0.012;       // gravité par frame
+        this._jumpVelocity = 0;
+        this._JUMP_INIT    = 0.22;
+        this._GRAVITY      = 0.012;
 
-        // ── États capacités ───────────────────────────────────────────────────
         this._dashEnabled    = false;
         this._dashCooldown   = 0;
         this._DASH_CD        = 1500;
@@ -110,7 +104,6 @@ export class Player {
         this._empCooldown  = 0;
         this._EMP_CD       = 10000;
 
-        // Vignette berserk (bords écran uniquement)
         this._berserkVignette = this._createVignette(
             "radial-gradient(ellipse at center, transparent 50%, rgba(180,0,0,0.6) 100%)"
         );
@@ -131,7 +124,6 @@ export class Player {
         });
     }
 
-    // ── Mort ──────────────────────────────────────────────────────────────────
 
     _onDeath() {
         if (this.isDead) return;
@@ -141,11 +133,9 @@ export class Player {
         setTimeout(() => { this._gameOverScreen.show(stats); }, 600);
     }
 
-    // ── Inputs ────────────────────────────────────────────────────────────────
 
     _initInputs() {
         this._installMouseSmoothing();
-        // window.addEventListener pour pouvoir faire preventDefault sur Space/Shift/Tab
         window.addEventListener("keydown", (e) => {
             if (this.isDead) return;
 
@@ -176,7 +166,6 @@ export class Player {
         if (e.code === "KeyD") this.inputMap["d"] = false; 
     });
 
-        // Observable Babylon pour la compatibilité WeaponManager
         this.scene.onKeyboardObservable.add((kbInfo) => {
             if (this.isDead) return;
             const key = kbInfo.event.key.toLowerCase();
@@ -187,7 +176,6 @@ export class Player {
             }
         });
 
-        // Clic droit → blink
         this.scene.onPointerObservable.add((pointerInfo) => {
             if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERDOWN) return;
             if (pointerInfo.event.button !== 2) return;
@@ -213,8 +201,6 @@ export class Player {
     }, true);
 }
 
-    // ── Cooldowns ─────────────────────────────────────────────────────────────
-
     _updateCooldowns(dt) {
         if (this._dashCooldown    > 0) this._dashCooldown    = Math.max(0, this._dashCooldown    - dt);
         if (this._blinkCooldown   > 0) this._blinkCooldown   = Math.max(0, this._blinkCooldown   - dt);
@@ -234,10 +220,6 @@ export class Player {
         });
     }
 
-    // ── SAUT ─────────────────────────────────────────────────────────────────
-    // On détecte le sol avec un raycast, puis on gère la vélocité verticale
-    // manuellement via moveWithCollisions — ce qui respecte les collisions.
-
     _isOnGround() {
         const ray = new BABYLON.Ray(this.camera.position, new BABYLON.Vector3(0, -1, 0), 1.2);
         const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "weapon");
@@ -245,8 +227,8 @@ export class Player {
     }
 
     _jump() {
-        if (this._jumpVelocity > 0) return;  // déjà en l'air
-        if (!this._isOnGround()) return;       // pas au sol
+        if (this._jumpVelocity > 0) return;
+        if (!this._isOnGround()) return;
         this._jumpVelocity = this._JUMP_INIT;
     }
 
@@ -261,8 +243,9 @@ export class Player {
         }
     }
 
-    // ── DASH ─────────────────────────────────────────────────────────────────
-
+    /**
+     * @param {string|number} actionId
+     */
     _isAction(actionId) {
         if (!this.keybindings) {
             const defaults = {
@@ -358,8 +341,6 @@ export class Player {
         }, 120);
     }
 
-    // ── BLINK ────────────────────────────────────────────────────────────────
-
     _tryBlink() {
         if (!this._blinkEnabled)     return;
         if (this._blinkCooldown > 0) return;
@@ -418,7 +399,6 @@ export class Player {
         setTimeout(() => { ps.stop(); setTimeout(() => { ps.dispose(); emitter.dispose(); }, 700); }, 100);
     }
 
-    // ── STOMP ────────────────────────────────────────────────────────────────
 
     _updateStomp() {
         if (!this._stompEnabled) return;
@@ -468,7 +448,6 @@ export class Player {
         this.hud?.showWaveMessage?.("ATTERRISSAGE LOURD");
     }
 
-    // ── BOUCLIER ─────────────────────────────────────────────────────────────
 
     _tryShield() {
         if (!this._shieldEnabled || this._shieldCooldown > 0 || this._shieldActive) return;
@@ -516,7 +495,6 @@ export class Player {
         }, 2000);
     }
 
-    // ── BERSERK ───────────────────────────────────────────────────────────────
 
     _tryBerserk() {
         if (!this._berserkEnabled || this._berserkCooldown > 0 || this._berserkActive) return;
@@ -550,7 +528,6 @@ export class Player {
         }, 10000);
     }
 
-    // ── EMP ───────────────────────────────────────────────────────────────────
 
     _tryEMP() {
         if (!this._empEnabled || this._empCooldown > 0) return;
@@ -565,6 +542,10 @@ export class Player {
         this.hud?.showWaveMessage?.("GRENADE EMP LANCÉE");
     }
 
+    /**
+     * @param {Vector3} from
+     * @param {Vector3} target
+     */
     _throwEMPGrenade(from, target) {
         const mat = new BABYLON.StandardMaterial("_empBallMat", this.scene);
         mat.emissiveColor   = new BABYLON.Color3(0, 1, 1);
@@ -593,6 +574,9 @@ export class Player {
         });
     }
 
+    /**
+     * @param {BABYLON.Vector3} pos
+     */
     _explodeEMP(pos) {
         const radius   = 4;
         const duration = 3;
@@ -687,8 +671,10 @@ export class Player {
         });
     }
 
-    // ── Vignette ──────────────────────────────────────────────────────────────
 
+    /**
+     * @param {string} gradient
+     */
     _createVignette(gradient) {
         const el = document.createElement("div");
         el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9996;background:${gradient};opacity:0;transition:opacity 0.4s ease;`;
@@ -696,7 +682,6 @@ export class Player {
         return el;
     }
 
-    // ── Arme ─────────────────────────────────────────────────────────────────
 
     _initWeapon() {
         const weaponMat = new BABYLON.StandardMaterial("weaponMat", this.scene);
@@ -725,6 +710,9 @@ export class Player {
         });
     }
 
+    /**
+     * @param {number} amount
+     */
     applyWeaponRecoil(amount) {
         if (!this.weapon) return;
         this.weapon.position.z = Math.max(this.weapon.position.z - amount, this.weaponMinZ);

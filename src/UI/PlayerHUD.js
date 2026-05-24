@@ -129,6 +129,7 @@ export class PlayerHUD {
       <div style="margin-bottom:5px;color:rgba(0,255,204,0.35);font-size:9px;letter-spacing:3px;">CONTRÔLES</div>
       <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
         <span><b style="color:#00ffcc">Z/W A/Q S D</b> Déplacement</span>
+        <span><b style="color:#00ffcc">ESPACE</b> Sauter</span>
         <span><b style="color:#00ffcc">CLIC G</b> Tirer</span>
         <span><b style="color:#00ffcc">1-4</b> Changer d'arme</span>
         <span><b style="color:#00ffcc">ENTRÉE</b> Pause</span>

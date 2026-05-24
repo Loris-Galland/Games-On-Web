@@ -71,7 +71,7 @@ export class Player {
         this.camera.fov  = this._baseFov;
 
         this._jumpVelocity = 0;
-        this._JUMP_INIT    = 0.22;
+        this._JUMP_INIT    = 0.25;
         this._GRAVITY      = 0.012;
 
         this._dashEnabled    = false;
@@ -221,7 +221,7 @@ export class Player {
     }
 
     _isOnGround() {
-        const ray = new BABYLON.Ray(this.camera.position, new BABYLON.Vector3(0, -1, 0), 1.2);
+        const ray = new BABYLON.Ray(this.camera.position, new BABYLON.Vector3(0, -1, 0), 2);
         const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "weapon");
         return hit.hit;
     }
@@ -414,7 +414,7 @@ export class Player {
     _triggerStomp() {
         const pos    = this.camera.globalPosition.clone();
         pos.y        = 0;
-        const radius = 4;
+        const radius = 16;
 
         this.scene.meshes.forEach(m => {
             if (!["enemyBody","enemyBodyHeavy","enemyBodyScout"].includes(m.name) || m.isDisposed()) return;
@@ -429,7 +429,7 @@ export class Player {
         mat.emissiveColor = new BABYLON.Color3(0, 1, 1);
         mat.alpha         = 0.6;
         mat.wireframe     = true;
-        const ring = BABYLON.MeshBuilder.CreateTorus("_stompRing", { diameter: 0.2, thickness: 0.1, tessellation: 32 }, this.scene);
+        const ring = BABYLON.MeshBuilder.CreateTorus("_stompRing", { diameter: 0.4, thickness: 0.2, tessellation: 32 }, this.scene);
         ring.position   = new BABYLON.Vector3(pos.x, 0.05, pos.z);
         ring.material   = mat;
         ring.isPickable = false;
@@ -437,7 +437,7 @@ export class Player {
         let t = 0;
         const obs = this.scene.onBeforeRenderObservable.add(() => {
             t += this.scene.getEngine().getDeltaTime() / 1000;
-            ring.scaling.set(1 + t * 10, 1, 1 + t * 10);
+            ring.scaling.set(1 + t * radius, 1, 1 + t * radius);
             mat.alpha = Math.max(0, 0.6 - t * 1.2);
             if (t > 0.5) {
                 this.scene.onBeforeRenderObservable.remove(obs);

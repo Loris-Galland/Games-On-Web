@@ -369,7 +369,7 @@ export class GameScene {
             this.player.hud.showUpgradeScreen(
                 upgrades,
                 (choix) => {
-                    this.upgradeManager.applyUpgrade(choix); // ← mémorise + applique
+                    this.upgradeManager.applyUpgrade(choix);
                     scene.getEngine().enterPointerlock();
                     this.map._paused = false;
                     this.isInUpgrade = false;

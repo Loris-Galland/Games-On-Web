@@ -61,6 +61,7 @@ PROJECT // ROGUE s'inscrit pleinement dans le thème **IA** de l'édition 2026 �
 | Reculer | S | S |
 | Strafe gauche | Q | A |
 | Strafe droit | D | D |
+| Sauter | Espace | Espace |
 | Tirer | Clic gauche | Clic gauche |
 | Blink (téléportation) | Clic droit | Clic droit |
 | Dash | Shift | Shift |

@@ -209,12 +209,6 @@ Assets 3D (`.glb`) dans `public/assets/models/`, icônes dans `public/assets/ico
 
 ## Documentation
 
-### Présentation de l'équipe
-
-*(à remplir)*
-
----
-
 ### Les débuts du projet
 
 Au départ, nous avions deux idées : un FPS ou un jeu de combat. Nous avons rapidement tranché, avec le temps disponible un jeu de combat était trop ambitieux, nous sommes donc partis sur le FPS.

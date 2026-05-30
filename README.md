@@ -24,7 +24,6 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 ## Vidéos
 
 - **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** : aperçu du gameplay, des mécaniques, de l'histoire
-- **[Présentation de l'équipe & making-of à venir](https://youtube.com/votre-lien-2)** *(optionnel)*
 
 ---
 
@@ -208,15 +207,45 @@ Assets 3D (`.glb`) dans `public/assets/models/`, icônes dans `public/assets/ico
 
 ---
 
+## Documentation
+
+### Présentation de l'équipe
+
+*(à remplir)*
+
+---
+
+### Les débuts du projet
+
+Au départ on avait deux idées : un FPS ou un jeu de combat. On a vite tranché, avec le temps qu'on avait un jeu de combat c'était trop ambitieux, donc on est partis sur le FPS.
+
+Ensuite pour ce que le jeu allait être exactement, le premier proto c'était une map ouverte, presque open world, avec des vagues d'ennemis et des améliorations entre chaque vague. Ça nous convenait pas vraiment.
+
+Pour la DA on kiffait bien le style de Ultrakill et Lethal Company, ce côté Low Poly Sci-fi, on a décidé de garder ça comme référence. Et pour le gameplay en lui-même c'est BPM qui nous a le plus influencés, sans le rythme. Le système de salles, les améliorations au début de chaque nouvelle salle, les salles spéciales, l'inspiration vient clairement de là. Les pouvoirs et les types d'armes eux on les a imaginés nous-mêmes.
+
+Côté assets 3D on avait vraiment peu de connaissances tous les deux donc on a improvisé, mais en vrai ça nous a permis de se concentrer sur ce qui nous intéressait vraiment genre le pathfinding et la génération procédurale.
+
+---
+
+### Notre objectif
+
+Notre objectif était simple : un jeu fonctionnel avec une vraie boucle de gameplay, que les gens puissent jouer et aller jusqu'au bout. Pour la répartition du boulot on s'organisait naturellement, celui qui avait l'idée d'une feature ou qui se sentait plus à l'aise dessus s'en chargeait.
+
+---
+
 ### Les galères du projet (non technique)
 
-**Restrictions de l'IUT :** 
-* Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d’autres établissements.
+**Restrictions de l'IUT :**
+* Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d'autres établissements.
 * Le projet ne pouvais être débuté seulement en mars.
 
 **Distance :** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
 
 ---
+
+### Le résultat
+
+Honnêtement on s'en est plutôt bien sortis. Y'a encore plein de trucs à corriger et à ajouter, mais vu les contraintes qu'on avait la boucle de gameplay fonctionne et les gens peuvent aller jusqu'au bout avec toutes les mécaniques.
 
 ## Crédits
 

@@ -21,7 +21,7 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 
 ---
 
-## Vidéos
+## Vidéo
 
 - **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** : aperçu du gameplay, des mécaniques, de l'histoire
 
@@ -217,19 +217,19 @@ Assets 3D (`.glb`) dans `public/assets/models/`, icônes dans `public/assets/ico
 
 ### Les débuts du projet
 
-Au départ on avait deux idées : un FPS ou un jeu de combat. On a vite tranché, avec le temps qu'on avait un jeu de combat c'était trop ambitieux, donc on est partis sur le FPS.
+Au départ, nous avions deux idées : un FPS ou un jeu de combat. Nous avons rapidement tranché, avec le temps disponible un jeu de combat était trop ambitieux, nous sommes donc partis sur le FPS.
 
-Ensuite pour ce que le jeu allait être exactement, le premier proto c'était une map ouverte, presque open world, avec des vagues d'ennemis et des améliorations entre chaque vague. Ça nous convenait pas vraiment.
+Pour ce que le jeu allait être exactement, le premier prototype était une map ouverte, presque open world, avec des vagues d'ennemis et des améliorations entre chaque vague. Cela ne nous convenait pas vraiment.
 
-Pour la DA on kiffait bien le style de Ultrakill et Lethal Company, ce côté Low Poly Sci-fi, on a décidé de garder ça comme référence. Et pour le gameplay en lui-même c'est BPM qui nous a le plus influencés, sans le rythme. Le système de salles, les améliorations au début de chaque nouvelle salle, les salles spéciales, l'inspiration vient clairement de là. Les pouvoirs et les types d'armes eux on les a imaginés nous-mêmes.
+Pour la direction artistique, nous nous sommes inspirés du style de Ultrakill et Lethal Company, ce côté Low Poly Sci-fi. Nous avons décidé de garder ça comme référence. Pour le gameplay en lui-même, c'est BPM qui nous a le plus influencés, sans le rythme. Le système de salles, les améliorations au début de chaque nouvelle salle, les salles spéciales, l'inspiration vient clairement de là. Les pouvoirs et les types d'armes, eux, nous les avons imaginés nous-mêmes.
 
-Côté assets 3D on avait vraiment peu de connaissances tous les deux donc on a improvisé, mais en vrai ça nous a permis de se concentrer sur ce qui nous intéressait vraiment genre le pathfinding et la génération procédurale.
+Côté assets 3D, nous avions tous les deux peu de connaissances en modélisation, donc nous avons dû nous adapter. En pratique, cela nous a permis de concentrer notre énergie sur ce qui nous intéressait vraiment techniquement, comme le pathfinding et la génération procédurale.
 
 ---
 
 ### Notre objectif
 
-Notre objectif était simple : un jeu fonctionnel avec une vraie boucle de gameplay, que les gens puissent jouer et aller jusqu'au bout. Pour la répartition du boulot on s'organisait naturellement, celui qui avait l'idée d'une feature ou qui se sentait plus à l'aise dessus s'en chargeait.
+Notre objectif était simple : livrer un jeu fonctionnel avec une vraie boucle de gameplay, que les joueurs puissent aller jusqu'au bout. Pour la répartition du travail, nous nous organisions naturellement, celui qui avait l'idée d'une feature ou qui se sentait plus à l'aise dessus s'en chargeait.
 
 ---
 
@@ -237,15 +237,25 @@ Notre objectif était simple : un jeu fonctionnel avec une vraie boucle de gamep
 
 **Restrictions de l'IUT :**
 * Le projet devait obligatoirement être réalisé en binôme, sans possibilité de constituer des équipes mixtes avec des étudiants d'autres établissements.
-* Le projet ne pouvais être débuté seulement en mars.
+* Le projet ne pouvait être débuté qu'en mars.
 
 **Distance :** M. Galland Loris ayant effectué son stage au Vietnam, la collaboration a nécessité une organisation rigoureuse afin de gérer efficacement la distance et le décalage horaire.
 
 ---
 
+### Les galères du projet (technique)
+
+**Import des modèles 3D :** n'utilisant pas de moteur de jeu classique mais Babylon.js directement, l'import des assets 3D en `.glb` a nécessité une gestion manuelle que nous n'avions pas anticipée. Les modèles étaient chargés en local space, ce qui signifie que le navmesh utilisé pour le pathfinding des ennemis était complètement décalé par rapport à la géométrie visible à l'écran. Nous avons dû transformer manuellement les vertices en world space avant de les transmettre à Recast, sans quoi les ennemis se déplaçaient dans le vide. Nous avons également mis en place un système de cache pour éviter de recharger les mêmes assets à chaque instanciation de salle, ce qui aurait rendu le jeu injouable.
+
+**Optimisation des performances :** maintenir 60 FPS constants dans un navigateur avec une scène 3D générée procéduralement, du post-processing, des ennemis avec pathfinding et un éclairage dynamique par salle a été un vrai défi. Nous avons mis en place plusieurs niveaux de présets graphiques (Low / Medium / High / Ultra) pour permettre au jeu de tourner sur des machines sans GPU dédié, tout en conservant un rendu correct sur les configurations plus solides.
+
+---
+
 ### Le résultat
 
-Honnêtement on s'en est plutôt bien sortis. Y'a encore plein de trucs à corriger et à ajouter, mais vu les contraintes qu'on avait la boucle de gameplay fonctionne et les gens peuvent aller jusqu'au bout avec toutes les mécaniques.
+Honnêtement, nous nous en sommes plutôt bien sortis. Il reste encore des choses à corriger et à ajouter, mais vu les contraintes que nous avions, la boucle de gameplay fonctionne et les joueurs peuvent aller jusqu'au bout avec toutes les mécaniques.
+
+---
 
 ## Crédits
 

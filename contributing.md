@@ -111,7 +111,7 @@ Quand `develop` est stable et testé manuellement, un membre de l'équipe ouvre 
   git rebase origin/develop
   ```
 - Ne committez pas de fichiers générés (`node_modules/`, `dist/`, `.env`). Vérifiez le `.gitignore`.
-- Un seul fichier CSS global (`Game.css`) — discutez avant d'en ajouter d'autres.
+- Un seul fichier CSS global (`Game.css`), discutez avant d'en ajouter d'autres.
 - Les assets binaires (`.glb`, images) ne doivent pas transiter par Git si leur taille est importante ; utilisez un stockage externe (Git LFS, drive partagé) et documentez l'emplacement dans le README.
 
 ---
@@ -120,5 +120,5 @@ Quand `develop` est stable et testé manuellement, un membre de l'équipe ouvre 
 
 Ouvrez une **Issue** sur le dépôt en utilisant les templates disponibles :
 
-- 🐛 **Bug report** : décrivez le comportement observé, le comportement attendu et les étapes pour reproduire.
-- ✨ **Feature request** : décrivez la fonctionnalité souhaitée et son intérêt pour le jeu.
+- **Bug report** : décrivez le comportement observé, le comportement attendu et les étapes pour reproduire.
+- **Feature request** : décrivez la fonctionnalité souhaitée et son intérêt pour le jeu.

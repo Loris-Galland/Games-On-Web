@@ -23,7 +23,8 @@ Deux élèves de 3e année du BUT Informatique, parcours _Réalisation d'applica
 
 ## Vidéo
 
-- **[Présentation du jeu et trailer à venir](https://youtube.com/votre-lien)** : aperçu du gameplay, des mécaniques, de l'histoire
+- **[Présentation du jeu] (https://youtu.be/DThi5A9zxF0)**
+- **[Présentation de l'équipe] (https://youtu.be/9ZKy1NU0dDg)**
 
 ---
 
